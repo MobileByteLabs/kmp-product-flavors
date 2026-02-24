@@ -57,5 +57,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Serializable data classes for task input caching
 - `afterEvaluate` pattern for consumer script evaluation
 
-[Unreleased]: https://github.com/anthropics/kmp-product-flavors/compare/v1.0.0-alpha01...HEAD
-[1.0.0-alpha01]: https://github.com/anthropics/kmp-product-flavors/releases/tag/v1.0.0-alpha01
+[Unreleased]: https://github.com/MobileByteLabs/kmp-product-flavors/compare/v1.0.0-alpha01...HEAD
+[1.0.0-alpha01]: https://github.com/MobileByteLabs/kmp-product-flavors/releases/tag/v1.0.0-alpha01

@@ -30,7 +30,7 @@ pluginManagement {
 // build.gradle.kts
 plugins {
     kotlin("multiplatform") version "2.1.0"
-    id("io.github.anthropic.kmp-product-flavors") version "1.0.0-alpha01"
+    id("io.github.mobilebytelabs.kmp-product-flavors") version "1.0.0-alpha01"
 }
 ```
 
@@ -43,7 +43,7 @@ includeBuild("path/to/kmp-product-flavors/build-logic")
 // build.gradle.kts
 plugins {
     kotlin("multiplatform")
-    id("io.github.anthropic.kmp-product-flavors")
+    id("io.github.mobilebytelabs.kmp-product-flavors")
 }
 ```
 
@@ -52,7 +52,7 @@ plugins {
 ```kotlin
 plugins {
     kotlin("multiplatform")
-    id("io.github.anthropic.kmp-product-flavors")
+    id("io.github.mobilebytelabs.kmp-product-flavors")
 }
 
 kotlin {
@@ -257,7 +257,7 @@ With 2 dimensions, the plugin generates a cartesian product of variants:
 ## License
 
 ```
-Copyright 2026 Anthropic, Inc.
+Copyright 2026 MobileByteLabs
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

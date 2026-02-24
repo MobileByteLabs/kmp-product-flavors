@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 Anthropic, Inc.
+ * Copyright 2026 MobileByteLabs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package com.anthropic.kmpflavors.tasks
+package com.mobilebytelabs.kmpflavors.tasks
 
-import com.anthropic.kmpflavors.BuildConfigField
+import com.mobilebytelabs.kmpflavors.BuildConfigField
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.provider.MapProperty

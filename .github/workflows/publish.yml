@@ -116,7 +116,7 @@ jobs:
             echo "Installation:" >> $GITHUB_STEP_SUMMARY
             echo '```kotlin' >> $GITHUB_STEP_SUMMARY
             echo 'plugins {' >> $GITHUB_STEP_SUMMARY
-            echo '    id("io.github.anthropic.kmp-product-flavors") version "${{ github.event.release.tag_name || inputs.version }}"' >> $GITHUB_STEP_SUMMARY
+            echo '    id("io.github.mobilebytelabs.kmp-product-flavors") version "${{ github.event.release.tag_name || inputs.version }}"' >> $GITHUB_STEP_SUMMARY
             echo '}' >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
           else

@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 Anthropic, Inc.
+ * Copyright 2026 MobileByteLabs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-package com.anthropic.kmpflavors
+package com.mobilebytelabs.kmpflavors
 
-import com.anthropic.kmpflavors.internal.DependencyConfigurator
-import com.anthropic.kmpflavors.internal.FlavorVariantResolver
-import com.anthropic.kmpflavors.internal.PlatformDetector
-import com.anthropic.kmpflavors.internal.SourceSetConfigurator
-import com.anthropic.kmpflavors.tasks.GenerateBuildConfigTask
-import com.anthropic.kmpflavors.tasks.ListFlavorsTask
-import com.anthropic.kmpflavors.tasks.ValidateFlavorsTask
+import com.mobilebytelabs.kmpflavors.internal.DependencyConfigurator
+import com.mobilebytelabs.kmpflavors.internal.FlavorVariantResolver
+import com.mobilebytelabs.kmpflavors.internal.PlatformDetector
+import com.mobilebytelabs.kmpflavors.internal.SourceSetConfigurator
+import com.mobilebytelabs.kmpflavors.tasks.GenerateBuildConfigTask
+import com.mobilebytelabs.kmpflavors.tasks.ListFlavorsTask
+import com.mobilebytelabs.kmpflavors.tasks.ValidateFlavorsTask
 import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -200,7 +200,7 @@ class KmpFlavorPlugin : Plugin<Project> {
         activeVariant: FlavorVariant,
         flavors: List<FlavorConfig>,
         dimensions: List<FlavorDimension>,
-        platforms: List<com.anthropic.kmpflavors.internal.PlatformGroup>,
+        platforms: List<com.mobilebytelabs.kmpflavors.internal.PlatformGroup>,
     ) {
         // Generate BuildConfig task
         if (extension.generateBuildConfig.get()) {

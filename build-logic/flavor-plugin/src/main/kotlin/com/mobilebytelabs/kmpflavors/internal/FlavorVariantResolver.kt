@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 Anthropic, Inc.
+ * Copyright 2026 MobileByteLabs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package com.anthropic.kmpflavors.internal
+package com.mobilebytelabs.kmpflavors.internal
 
-import com.anthropic.kmpflavors.FlavorConfig
-import com.anthropic.kmpflavors.FlavorDimension
-import com.anthropic.kmpflavors.FlavorVariant
+import com.mobilebytelabs.kmpflavors.FlavorConfig
+import com.mobilebytelabs.kmpflavors.FlavorDimension
+import com.mobilebytelabs.kmpflavors.FlavorVariant
 
 /**
  * Resolves the variant matrix from dimensions and flavors.

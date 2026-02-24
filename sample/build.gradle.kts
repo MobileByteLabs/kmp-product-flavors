@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 Anthropic, Inc.
+ * Copyright 2026 MobileByteLabs
  *
  * Sample module demonstrating KMP Product Flavors plugin usage.
  *
@@ -15,7 +15,7 @@
 
 plugins {
     kotlin("multiplatform")
-    id("io.github.anthropic.kmp-product-flavors")
+    id("io.github.mobilebytelabs.kmp-product-flavors")
 }
 
 kotlin {

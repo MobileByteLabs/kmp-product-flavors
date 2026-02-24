@@ -146,4 +146,4 @@ jobs:
 
       - name: Verify Published Artifacts
         run: |
-          ls -la ~/.m2/repository/io/github/anthropic/kmpflavors/flavor-plugin/1.0.0-alpha01/
+          ls -la ~/.m2/repository/io/github/mobilebytelabs/kmpflavors/flavor-plugin/1.0.0-alpha01/

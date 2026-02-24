@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 Anthropic, Inc.
+ * Copyright 2026 MobileByteLabs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package com.anthropic.kmpflavors
+package com.mobilebytelabs.kmpflavors
 
-import com.anthropic.kmpflavors.internal.FlavorVariantResolver
+import com.mobilebytelabs.kmpflavors.internal.FlavorVariantResolver
 import io.mockk.every
 import io.mockk.mockk
 import org.gradle.api.provider.Property

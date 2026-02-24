@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 Anthropic, Inc.
+ * Copyright 2026 MobileByteLabs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package com.anthropic.kmpflavors
+package com.mobilebytelabs.kmpflavors
 
-import com.anthropic.kmpflavors.tasks.GenerateBuildConfigTask
+import com.mobilebytelabs.kmpflavors.tasks.GenerateBuildConfigTask
 import org.gradle.testfixtures.ProjectBuilder
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach

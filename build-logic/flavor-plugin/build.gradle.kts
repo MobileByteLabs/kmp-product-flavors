@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 Anthropic, Inc.
+ * Copyright 2026 MobileByteLabs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ plugins {
     `maven-publish`
 }
 
-group = "io.github.anthropic.kmpflavors"
+group = "io.github.mobilebytelabs.kmpflavors"
 version = "1.0.0-alpha01"
 
 java {
@@ -49,8 +49,8 @@ dependencies {
 gradlePlugin {
     plugins {
         register("kmpProductFlavors") {
-            id = "io.github.anthropic.kmp-product-flavors"
-            implementationClass = "com.anthropic.kmpflavors.KmpFlavorPlugin"
+            id = "io.github.mobilebytelabs.kmp-product-flavors"
+            implementationClass = "com.mobilebytelabs.kmpflavors.KmpFlavorPlugin"
             displayName = "KMP Product Flavors"
             description = "Kotlin Multiplatform Product Flavors Gradle Plugin - Bring Android-style product flavors to KMP"
         }
@@ -65,7 +65,7 @@ publishing {
             pom {
                 name.set("KMP Product Flavors")
                 description.set("Kotlin Multiplatform Product Flavors Gradle Plugin")
-                url.set("https://github.com/anthropics/kmp-product-flavors")
+                url.set("https://github.com/MobileByteLabs/kmp-product-flavors")
 
                 licenses {
                     license {
@@ -76,16 +76,16 @@ publishing {
 
                 developers {
                     developer {
-                        id.set("anthropic")
-                        name.set("Anthropic")
-                        email.set("opensource@anthropic.com")
+                        id.set("mobilebytelabs")
+                        name.set("MobileByteLabs")
+                        email.set("opensource@mobilebytelabs.com")
                     }
                 }
 
                 scm {
-                    connection.set("scm:git:git://github.com/anthropics/kmp-product-flavors.git")
-                    developerConnection.set("scm:git:ssh://github.com/anthropics/kmp-product-flavors.git")
-                    url.set("https://github.com/anthropics/kmp-product-flavors")
+                    connection.set("scm:git:git://github.com/MobileByteLabs/kmp-product-flavors.git")
+                    developerConnection.set("scm:git:ssh://github.com/MobileByteLabs/kmp-product-flavors.git")
+                    url.set("https://github.com/MobileByteLabs/kmp-product-flavors")
                 }
             }
         }
