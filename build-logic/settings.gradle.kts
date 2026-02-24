@@ -14,21 +14,19 @@
  * limitations under the License.
  */
 
-pluginManagement {
-    includeBuild("build-logic")
-    repositories {
-        google()
-        mavenCentral()
-        gradlePluginPortal()
-    }
-}
+rootProject.name = "build-logic"
 
 dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        gradlePluginPortal()
+    }
+    versionCatalogs {
+        create("libs") {
+            from(files("../gradle/libs.versions.toml"))
+        }
     }
 }
 
-rootProject.name = "kmp-product-flavors"
-include(":sample")
+include(":flavor-plugin")

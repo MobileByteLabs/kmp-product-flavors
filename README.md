@@ -1,209 +1,263 @@
-# KMP Library Template
+# KMP Product Flavors
 
-[![CI](https://github.com/MobileByteLabs/mbl-library-template-kmp/actions/workflows/gradle.yml/badge.svg)](https://github.com/MobileByteLabs/mbl-library-template-kmp/actions/workflows/gradle.yml)
-[![GitHub Release](https://img.shields.io/github/v/release/MobileByteLabs/mbl-library-template-kmp?include_prereleases)](https://github.com/MobileByteLabs/mbl-library-template-kmp/releases)
-[![Kotlin](https://img.shields.io/badge/kotlin-2.1.0-blue.svg?logo=kotlin)](http://kotlinlang.org)
+A Gradle plugin that brings Android-style product flavor support to Kotlin Multiplatform projects.
+
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-A template for creating Kotlin Multiplatform libraries with full platform support and Compose Multiplatform sample app.
+## Features
 
-## Supported Platforms
-
-| Platform | Targets | Status |
-|----------|---------|--------|
-| Android  | android | Supported |
-| iOS      | iosX64, iosArm64, iosSimulatorArm64 | Supported |
-| macOS    | macosX64, macosArm64 | Supported |
-| tvOS     | tvosX64, tvosArm64, tvosSimulatorArm64 | Supported |
-| watchOS  | watchosX64, watchosArm32, watchosArm64, watchosSimulatorArm64, watchosDeviceArm64 | Supported |
-| JVM      | jvm | Supported |
-| Linux    | linuxX64, linuxArm64 | Supported |
-| Windows  | mingwX64 | Supported |
-| JavaScript | js (Browser, Node.js) | Supported |
-| WebAssembly | wasmJs (Browser, Node.js), wasmWasi (Node.js) | Supported |
+- **Multi-dimensional flavors** - Define multiple dimensions (tier, environment, region) with automatic variant matrix generation
+- **BuildConfig generation** - Compile-time constants with `VARIANT_NAME`, `IS_<FLAVOR>` flags, and custom fields
+- **Source set wiring** - Automatic `commonFree`, `androidFree`, `iosFree`, etc. source sets with proper `dependsOn` relationships
+- **Intermediate source sets** - Optional `webMain` and `nativeMain` for shared platform code
+- **Per-flavor dependencies** - Add dependencies that only apply to specific flavors
+- **IDE-friendly** - All flavor directories are recognized by the IDE, even inactive ones
+- **Build cache support** - Cacheable tasks for efficient incremental builds
 
 ## Installation
 
-Add the dependency to your `build.gradle.kts`:
+### Using Plugin DSL
 
 ```kotlin
-// In your shared module
+// settings.gradle.kts
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
+// build.gradle.kts
+plugins {
+    kotlin("multiplatform") version "2.1.0"
+    id("io.github.anthropic.kmp-product-flavors") version "1.0.0-alpha01"
+}
+```
+
+### Using included build
+
+```kotlin
+// settings.gradle.kts
+includeBuild("path/to/kmp-product-flavors/build-logic")
+
+// build.gradle.kts
+plugins {
+    kotlin("multiplatform")
+    id("io.github.anthropic.kmp-product-flavors")
+}
+```
+
+## Quick Start
+
+```kotlin
+plugins {
+    kotlin("multiplatform")
+    id("io.github.anthropic.kmp-product-flavors")
+}
+
 kotlin {
-    sourceSets {
-        commonMain.dependencies {
-            implementation("TEMPLATE_PACKAGE:template-library:1.0.0")
+    androidTarget()
+    iosArm64()
+    iosSimulatorArm64()
+    jvm("desktop")
+}
+
+kmpFlavors {
+    // Generate BuildConfig object
+    generateBuildConfig.set(true)
+    buildConfigPackage.set("com.example.app")
+
+    // Define dimensions
+    flavorDimensions {
+        register("tier") { priority.set(0) }
+        register("environment") { priority.set(1) }
+    }
+
+    // Define flavors
+    flavors {
+        register("free") {
+            dimension.set("tier")
+            isDefault.set(true)
+            buildConfigField("Boolean", "IS_PREMIUM", "false")
+        }
+        register("paid") {
+            dimension.set("tier")
+            buildConfigField("Boolean", "IS_PREMIUM", "true")
+        }
+        register("dev") {
+            dimension.set("environment")
+            isDefault.set(true)
+            buildConfigField("String", "BASE_URL", "\"https://dev-api.example.com\"")
+        }
+        register("prod") {
+            dimension.set("environment")
+            buildConfigField("String", "BASE_URL", "\"https://api.example.com\"")
         }
     }
 }
 ```
 
-### Platform-specific setup
+## DSL Reference
 
-<details>
-<summary>Android</summary>
+### Extension Properties
 
-No additional setup required.
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `generateBuildConfig` | `Property<Boolean>` | `true` | Generate BuildConfig Kotlin object |
+| `buildConfigPackage` | `Property<String>` | Required | Package name for generated config |
+| `buildConfigClassName` | `Property<String>` | `"FlavorConfig"` | Class name for generated config |
+| `activeFlavor` | `Property<String>` | Auto | Active variant name |
+| `createIntermediateSourceSets` | `Property<Boolean>` | `true` | Create webMain/nativeMain |
 
-</details>
-
-<details>
-<summary>iOS</summary>
-
-No additional setup required.
-
-</details>
-
-## Quick Start
+### Flavor Dimension
 
 ```kotlin
-import TEMPLATE_PACKAGE.Greeting
-
-fun main() {
-    val greeting = Greeting()
-    println(greeting.greet()) // Hello from [Platform]!
-    println(greeting.greet("World")) // Hello, World! Welcome from [Platform].
+flavorDimensions {
+    register("dimensionName") {
+        priority.set(0) // Lower = first in variant name
+    }
 }
 ```
 
-## Documentation
+### Flavor Configuration
 
-For detailed documentation, visit [Documentation Link].
+```kotlin
+flavors {
+    register("flavorName") {
+        dimension.set("dimensionName")        // Required if dimensions defined
+        isDefault.set(true)                   // Default for this dimension
 
-## Getting Started with Development
+        // Build config fields
+        buildConfigField("Boolean", "DEBUG", "true")
+        buildConfigField("String", "API_KEY", "\"abc123\"")
+        buildConfigField("Int", "MAX_RETRIES", "3")
 
-### Prerequisites
+        // Per-flavor dependencies
+        dependency("implementation", "com.example:ads-sdk:1.0.0")
 
-- JDK 17 or higher
-- Android SDK (for Android development)
-- Xcode 15+ (for iOS development, macOS only)
+        // Suffixes and extras
+        applicationIdSuffix.set(".free")
+        versionNameSuffix.set("-free")
+        extras.put("custom_key", "custom_value")
+    }
+}
+```
 
-### Setup
+## Source Set Hierarchy
 
-1. Clone the repository:
+The plugin creates source sets following this hierarchy:
+
+```
+commonMain
+├── commonFree ──────────────── Free-tier common code
+│   ├── androidFree
+│   ├── iosFree
+│   ├── desktopFree
+│   └── webFree (if web targets exist)
+│       ├── jsFree
+│       └── wasmJsFree
+└── commonPaid ──────────────── Paid-tier common code
+    ├── androidPaid
+    ├── iosPaid
+    └── ...
+```
+
+With intermediate source sets enabled:
+
+```
+commonMain
+├── nativeMain
+│   ├── iosMain
+│   └── macosMain
+└── webMain
+    ├── jsMain
+    └── wasmJsMain
+```
+
+## Gradle Tasks
+
+| Task | Description |
+|------|-------------|
+| `generateFlavorBuildConfig` | Generates the BuildConfig Kotlin object |
+| `validateFlavors` | Validates flavor configuration |
+| `listFlavors` | Lists all variants and marks the active one |
+
+## Setting Active Flavor
+
+### Via Gradle property (recommended for CI)
+
 ```bash
-git clone https://github.com/TEMPLATE_ORG/TEMPLATE_REPO.git
-cd TEMPLATE_REPO
+./gradlew build -PkmpFlavor=paidProd
 ```
 
-2. Customize the template (first time only):
-```bash
-bash customizer.sh com.yourpackage.library YourLibraryName your-org
+### Via gradle.properties
+
+```properties
+kmpFlavor=freeDev
 ```
 
-3. Set up git hooks:
-```bash
-bash scripts/setup-hooks.sh
+### Via DSL
+
+```kotlin
+kmpFlavors {
+    activeFlavor.set("freeDev")
+}
 ```
 
-4. Build the project:
-```bash
-./gradlew build
+## Generated BuildConfig
+
+The plugin generates a Kotlin object in `commonMain`:
+
+```kotlin
+// build/generated/kmpFlavors/commonMain/kotlin/com/example/app/FlavorConfig.kt
+package com.example.app
+
+object FlavorConfig {
+    const val VARIANT_NAME: String = "freeDev"
+
+    // Flavor flags
+    const val IS_FREE: Boolean = true
+    const val IS_PAID: Boolean = false
+    const val IS_DEV: Boolean = true
+    const val IS_PROD: Boolean = false
+
+    // Custom fields (merged from active flavors)
+    const val IS_PREMIUM: Boolean = false
+    const val BASE_URL: String = "https://dev-api.example.com"
+}
 ```
 
-### Running Tests
+## Variant Matrix
 
-```bash
-# All platforms
-./gradlew allTests
+With 2 dimensions, the plugin generates a cartesian product of variants:
 
-# Specific platforms
-./gradlew jvmTest
-./gradlew iosSimulatorArm64Test
-./gradlew testAndroidHostTest
-./gradlew linuxX64Test
-```
+| Dimension | Flavors | Default |
+|-----------|---------|---------|
+| tier | free, paid | free |
+| environment | dev, staging, prod | dev |
 
-### Code Quality
+**Generated variants:** `freeDev`, `freeStaging`, `freeProd`, `paidDev`, `paidStaging`, `paidProd`
 
-```bash
-# Format code
-./gradlew spotlessApply
+**Default variant:** `freeDev` (combining defaults from each dimension)
 
-# Run static analysis
-./gradlew detekt
-```
+## Best Practices
 
-### Sample App
+1. **Keep flavor code minimal** - Only put truly flavor-specific code in flavor source sets
+2. **Use expect/actual for platform differences** - Not flavors
+3. **BuildConfig for compile-time constants** - Use for values that differ per flavor
+4. **Test multiple flavors in CI** - Run tests with different `-PkmpFlavor` values
+5. **Set clear defaults** - Mark one flavor per dimension as default
 
-A Compose Multiplatform sample app is included to test the library on all platforms:
+## Requirements
 
-```bash
-# Run on Desktop (macOS, Windows, Linux)
-./gradlew :sample-app:run
-
-# Run on Android
-./gradlew :sample-app:installDebug
-
-# Run on iOS (requires Xcode on macOS)
-# Open sample-app in Xcode or use KMM plugin in Android Studio
-
-# Run on Web (WebAssembly)
-./gradlew :sample-app:wasmJsBrowserRun
-```
-
-## Publishing to Maven Central
-
-### Prerequisites
-
-1. Create a [Sonatype account](https://central.sonatype.com/)
-2. Generate a GPG key for signing
-3. Configure GitHub secrets:
-   - `MAVEN_CENTRAL_USERNAME` - Sonatype username
-   - `MAVEN_CENTRAL_PASSWORD` - Sonatype password
-   - `SIGNING_KEY_ID` - GPG key ID
-   - `SIGNING_PASSWORD` - GPG key password
-   - `GPG_KEY_CONTENTS` - Base64 encoded GPG private key
-
-### Release Process
-
-1. Update version in `cmp-library/build.gradle.kts`
-2. Create a GitHub release with a tag (e.g., `v1.0.0`)
-3. The publish workflow will automatically deploy to Maven Central
-
-## Project Structure
-
-```
-.
-├── cmp-library/                # Library module
-│   └── src/
-│       ├── commonMain/         # Common code (all platforms)
-│       ├── commonTest/         # Common tests
-│       ├── androidMain/        # Android-specific code
-│       ├── jvmMain/            # JVM-specific code
-│       ├── appleMain/          # Apple platforms (iOS, macOS, tvOS, watchOS)
-│       ├── linuxMain/          # Linux platforms (linuxX64, linuxArm64)
-│       ├── mingwMain/          # Windows (mingwX64)
-│       ├── jsMain/             # JavaScript (Browser, Node.js)
-│       ├── wasmJsMain/         # WebAssembly JS
-│       └── wasmWasiMain/       # WebAssembly WASI
-├── sample-app/                 # Compose Multiplatform sample app
-│   └── src/
-│       ├── commonMain/         # Shared UI code
-│       ├── androidMain/        # Android app entry
-│       ├── desktopMain/        # Desktop app entry
-│       ├── iosMain/            # iOS app entry
-│       └── wasmJsMain/         # Web app entry
-├── scripts/                    # Automation scripts
-│   ├── pre-commit.sh           # Pre-commit hook
-│   ├── pre-push.sh             # Pre-push hook
-│   └── setup-hooks.sh          # Hook setup script
-├── config/
-│   └── detekt/                 # Detekt configuration
-├── .github/
-│   ├── workflows/              # GitHub Actions
-│   └── ISSUE_TEMPLATE/         # Issue templates
-├── customizer.sh               # Template customization script
-└── build.gradle.kts            # Root build configuration
-```
-
-## Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+- Kotlin 2.0.0+
+- Gradle 8.0+
+- Kotlin Multiplatform plugin applied
 
 ## License
 
 ```
-Copyright 2025 MobileByteLabs
+Copyright 2026 Anthropic, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -217,8 +271,3 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ```
-
-## Acknowledgments
-
-- [Kotlin Multiplatform](https://kotlinlang.org/docs/multiplatform.html)
-- [Gradle Maven Publish Plugin](https://vanniktech.github.io/gradle-maven-publish-plugin/)
