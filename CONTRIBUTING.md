@@ -1,4 +1,4 @@
-# Contributing to TEMPLATE_LIBRARY_NAME
+# Contributing to KMP Product Flavors
 
 Thank you for your interest in contributing! This document provides guidelines and instructions for contributing.
 
@@ -11,32 +11,57 @@ Thank you for your interest in contributing! This document provides guidelines a
 ### Prerequisites
 
 - JDK 17 or higher
-- Android SDK (for Android target)
-- Xcode (for iOS target, macOS only)
 - Kotlin 2.0+
+- Gradle 8.0+
 
 ### Setup
 
 ```bash
 # Clone your fork
-git clone https://github.com/YOUR_USERNAME/TEMPLATE_REPO.git
-cd TEMPLATE_REPO
+git clone https://github.com/YOUR_USERNAME/kmp-product-flavors.git
+cd kmp-product-flavors
 
-# Set up git hooks
-bash scripts/setup-hooks.sh
+# Set up git hooks (recommended)
+./scripts/setup-hooks.sh
 
 # Build the project
-./gradlew build
+./gradlew :build-logic:flavor-plugin:assemble
 ```
 
 ## Development Workflow
 
-### Branch Naming
+### Branch Strategy
 
+- `main` - Stable release branch
+- `development` - Active development branch (PRs target this)
 - `feature/description` - New features
 - `fix/description` - Bug fixes
 - `docs/description` - Documentation updates
-- `refactor/description` - Code refactoring
+
+### Pre-Push Checks (IMPORTANT!)
+
+**Always run pre-push checks before pushing to avoid CI failures:**
+
+```bash
+# Full CI check (recommended before pushing)
+./ci-prepush.sh
+
+# With auto-fix for formatting issues
+./ci-prepush.sh --fix
+
+# Quick check (skips sample builds)
+./ci-prepush.sh --quick
+```
+
+The `ci-prepush.sh` script mirrors the exact checks that CI runs:
+
+| Check | Command | Description |
+|-------|---------|-------------|
+| Spotless | `spotlessCheck` | Code formatting (ktlint) |
+| Detekt | `detekt` | Static analysis |
+| Build Plugin | `:build-logic:flavor-plugin:assemble` | Plugin compilation |
+| Build Samples | `:samples:basic-flavors:assemble` | Sample project builds |
+| Validate Flavors | `validateFlavors` | Flavor configuration validation |
 
 ### Code Style
 
@@ -44,60 +69,107 @@ This project uses:
 - **Spotless** with ktlint for code formatting
 - **Detekt** for static analysis
 
-Before committing, run:
-
 ```bash
-# Format code
+# Check formatting
+./gradlew spotlessCheck
+
+# Auto-fix formatting
 ./gradlew spotlessApply
 
 # Run static analysis
 ./gradlew detekt
 ```
 
-### Running Tests
+### Building & Testing
 
 ```bash
-# Run all tests
-./gradlew allTests
+# Build the plugin
+./gradlew :build-logic:flavor-plugin:assemble
 
-# Run specific platform tests
-./gradlew jvmTest
-./gradlew iosSimulatorArm64Test
-./gradlew testAndroidHostTest
-./gradlew linuxX64Test
+# Build sample with specific flavor
+./gradlew :samples:basic-flavors:assemble -PkmpFlavor=freeDev
+./gradlew :samples:basic-flavors:assemble -PkmpFlavor=paidProd
+
+# Validate flavor configuration
+./gradlew :samples:basic-flavors:validateFlavors
+
+# List all available flavors
+./gradlew :samples:basic-flavors:listFlavors
+
+# Publish to local Maven for testing
+./MavenLocalRelease.sh
 ```
+
+### Testing Plugin Changes Locally
+
+1. Build and publish to local Maven:
+   ```bash
+   ./MavenLocalRelease.sh
+   ```
+
+2. In a test project, add `mavenLocal()` to repositories:
+   ```kotlin
+   // settings.gradle.kts
+   pluginManagement {
+       repositories {
+           mavenLocal()
+           gradlePluginPortal()
+       }
+   }
+   ```
+
+3. Apply the plugin:
+   ```kotlin
+   plugins {
+       id("io.github.mobilebytelabs.kmp-product-flavors") version "1.0.0-alpha01"
+   }
+   ```
 
 ## Pull Request Process
 
-1. Create a feature branch from `main`
+1. Create a feature branch from `development`
 2. Make your changes
-3. Ensure all tests pass
+3. Run `./ci-prepush.sh` to ensure all checks pass
 4. Update documentation if needed
-5. Submit a pull request
+5. Submit a pull request to `development`
 
 ### PR Checklist
 
+- [ ] Ran `./ci-prepush.sh` successfully
 - [ ] Code follows the project style guidelines
-- [ ] Tests added/updated for changes
-- [ ] Documentation updated
+- [ ] Documentation updated if needed
 - [ ] Commit messages are clear and descriptive
 - [ ] PR description explains the changes
+
+## Project Structure
+
+```
+kmp-product-flavors/
+├── build-logic/
+│   └── flavor-plugin/       # The Gradle plugin source
+│       └── src/main/kotlin/
+├── samples/
+│   ├── basic-flavors/       # Basic usage sample
+│   └── kmp-template-integration/  # Full KMP project integration
+├── .github/workflows/
+│   ├── build.yml            # CI workflow
+│   └── publish.yml          # Release workflow
+├── ci-prepush.sh            # Pre-push CI check script
+└── MavenLocalRelease.sh     # Local testing script
+```
 
 ## Reporting Issues
 
 When reporting issues, please include:
 
-- Library version
+- Plugin version
 - Kotlin version
+- Gradle version
 - Platform(s) affected
 - Steps to reproduce
 - Expected vs actual behavior
 - Relevant logs or stack traces
 
-## Code of Conduct
-
-Please read and follow our [Code of Conduct](CODE_OF_CONDUCT.md).
-
 ## License
 
-By contributing, you agree that your contributions will be licensed under the same license as the project.
+By contributing, you agree that your contributions will be licensed under the Apache 2.0 license.

@@ -1,17 +1,28 @@
 #!/bin/sh
 
-# Pre-push hook for KMP Library Template
-# Runs comprehensive checks before pushing to remote
+# =============================================================================
+# Pre-push Git Hook for KMP Product Flavors Plugin
+# =============================================================================
+# This hook runs before pushing to remote to ensure CI will pass.
+# Install with: ./scripts/setup-hooks.sh
+#
+# For comprehensive checks, run: ./ci-prepush.sh
+# =============================================================================
+
+set -e
+
+# Navigate to project root
+cd "$(git rev-parse --show-toplevel)"
 
 # Function to check the current branch
 check_current_branch() {
     printf "\n🚀 Checking the current git branch...\n"
     CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-    if [ "$CURRENT_BRANCH" = "main" ] || [ "$CURRENT_BRANCH" = "master" ]; then
+    if [ "$CURRENT_BRANCH" = "main" ] || [ "$CURRENT_BRANCH" = "master" ] || [ "$CURRENT_BRANCH" = "development" ]; then
         echo "⚠️  You're pushing to '$CURRENT_BRANCH' branch."
-        echo "Make sure you have the necessary permissions and approvals."
+        echo "   Make sure you have the necessary permissions and approvals."
     else
-        echo "✅ Pushing from '$CURRENT_BRANCH' branch. 🚀"
+        echo "✅ Pushing from '$CURRENT_BRANCH' branch."
     fi
 }
 
@@ -62,36 +73,39 @@ run_detekt_checks() {
     fi
 }
 
-# Function to run tests
-run_tests() {
-    printf "\n🧪 Running tests...\n"
+# Function to build plugin (quick verification)
+build_plugin() {
+    printf "\n🔨 Building plugin...\n"
 
-    # Run JVM tests as a quick sanity check
-    if ! ./gradlew jvmTest --daemon > /tmp/test-result 2>&1; then
-        cat /tmp/test-result
-        rm -f /tmp/test-result
+    if ! ./gradlew :build-logic:flavor-plugin:assemble --daemon > /tmp/build-result 2>&1; then
+        cat /tmp/build-result
+        rm -f /tmp/build-result
         printf "\n*********************************************************************************\n"
-        echo "   💥 Tests failed!"
-        echo "   💡 Fix the failing tests before pushing."
+        echo "   💥 Plugin build failed!"
+        echo "   💡 Fix the compilation errors before pushing."
         printf "*********************************************************************************\n"
         exit 1
     else
-        rm -f /tmp/test-result
-        echo "✅ Tests passed! 🧪"
+        rm -f /tmp/build-result
+        echo "✅ Plugin build passed! 🔨"
     fi
 }
 
-# Function to check API compatibility (optional)
-check_api_compatibility() {
-    printf "\n📋 Checking API compatibility...\n"
+# Function to build sample (quick verification)
+build_sample() {
+    printf "\n📦 Building sample project...\n"
 
-    if ./gradlew apiCheck --daemon > /tmp/api-result 2>&1; then
-        rm -f /tmp/api-result
-        echo "✅ API compatibility check passed! 📋"
+    if ! ./gradlew :samples:basic-flavors:assemble -PkmpFlavor=freeDev --daemon > /tmp/sample-result 2>&1; then
+        cat /tmp/sample-result
+        rm -f /tmp/sample-result
+        printf "\n*********************************************************************************\n"
+        echo "   💥 Sample build failed!"
+        echo "   💡 Fix the compilation errors before pushing."
+        printf "*********************************************************************************\n"
+        exit 1
     else
-        # API check might not be configured, that's OK
-        rm -f /tmp/api-result
-        echo "ℹ️  API compatibility check skipped (not configured)"
+        rm -f /tmp/sample-result
+        echo "✅ Sample build passed! 📦"
     fi
 }
 
@@ -101,7 +115,8 @@ print_success_message() {
     printf "\n*********************************************************************************\n"
     echo "🚀🎉 Congratulations, $GIT_USERNAME!"
     echo "Your code has passed all pre-push checks!"
-    echo "Your changes are ready to be pushed to the remote repository. 🌟"
+    echo ""
+    echo "💡 For comprehensive CI checks, run: ./ci-prepush.sh"
     printf "*********************************************************************************\n\n"
 }
 
@@ -109,8 +124,8 @@ print_success_message() {
 check_current_branch
 run_spotless_checks
 run_detekt_checks
-run_tests
-check_api_compatibility
+build_plugin
+build_sample
 print_success_message
 
 exit 0
