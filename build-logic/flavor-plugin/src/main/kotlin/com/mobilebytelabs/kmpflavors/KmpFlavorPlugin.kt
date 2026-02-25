@@ -21,6 +21,7 @@ import com.mobilebytelabs.kmpflavors.internal.FlavorVariantResolver
 import com.mobilebytelabs.kmpflavors.internal.PlatformDetector
 import com.mobilebytelabs.kmpflavors.internal.SourceSetConfigurator
 import com.mobilebytelabs.kmpflavors.tasks.GenerateBuildConfigTask
+import com.mobilebytelabs.kmpflavors.tasks.GenerateRunConfigurationsTask
 import com.mobilebytelabs.kmpflavors.tasks.ListFlavorsTask
 import com.mobilebytelabs.kmpflavors.tasks.ValidateFlavorsTask
 import org.gradle.api.GradleException
@@ -244,6 +245,18 @@ class KmpFlavorPlugin : Plugin<Project> {
             this.activeVariant.set(activeVariantNameValue)
             this.dimensions.set(dimensionsData)
             this.platforms.set(platformsData)
+        }
+
+        // Generate run configurations task
+        project.tasks.register(
+            "generateRunConfigurations",
+            GenerateRunConfigurationsTask::class.java,
+        ).configure {
+            projectName.set(project.name)
+            projectPath.set(project.path)
+            variants.set(variantsData)
+            this.activeVariant.set(activeVariantNameValue)
+            outputDirectory.set(project.rootProject.layout.projectDirectory.dir(".run"))
         }
     }
 
