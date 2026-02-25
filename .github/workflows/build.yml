@@ -108,7 +108,7 @@ jobs:
         continue-on-error: true  # Allow build to continue if Gradle services are unreachable
 
       - name: Check Plugin Publication
-        run: ./gradlew :build-logic:flavor-plugin:publishToMavenLocal --no-daemon
+        run: ./gradlew :build-logic:flavor-plugin:publishToMavenLocal --no-daemon -Psigning.gnupg.skip=true -x signPluginMavenPublication -x signKmpProductFlavorsPluginMarkerMavenPublication
 
       - name: Verify Published Artifacts
         run: |
