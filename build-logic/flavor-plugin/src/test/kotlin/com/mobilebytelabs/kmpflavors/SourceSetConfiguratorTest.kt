@@ -152,8 +152,10 @@ class SourceSetConfiguratorTest {
         )
 
         verify { sourceSets.maybeCreate("androidFree") }
-        verify { androidFree.dependsOn(androidMain) }
+        // Platform flavor source sets depend on commonFlavor only (NOT platformMain - compilation default)
         verify { androidFree.dependsOn(commonFree) }
+        // Should NOT depend on androidMain as it's a compilation default source set
+        verify(exactly = 0) { androidFree.dependsOn(androidMain) }
     }
 
     @Test
@@ -188,10 +190,13 @@ class SourceSetConfiguratorTest {
             createIntermediates = true,
         )
 
+        // Intermediate flavor source sets depend on commonFlavor only
         verify { sourceSets.maybeCreate("nativeFree") }
         verify { nativeFree.dependsOn(commonFree) }
-        verify { nativeFree.dependsOn(nativeMain) }
-        verify { iosFree.dependsOn(iosMain) }
+        // Should NOT depend on nativeMain/iosMain as they may be compilation default source sets
+        verify(exactly = 0) { nativeFree.dependsOn(nativeMain) }
+        verify(exactly = 0) { iosFree.dependsOn(iosMain) }
+        // Platform flavor with parent depends on intermediate flavor
         verify { iosFree.dependsOn(nativeFree) }
     }
 

@@ -241,8 +241,9 @@ src/
 | Sample | Description | Location |
 |--------|-------------|----------|
 | **basic-flavors** | Minimal plugin demo | [`samples/basic-flavors`](samples/basic-flavors) |
-| **convention-integration** | Convention plugin pattern | [`samples/convention-integration`](samples/convention-integration) |
-| **compose-multiplatform** | Full Compose app | [`samples/compose-multiplatform`](samples/compose-multiplatform) |
+| **kmp-project-template** | Full KMP convention plugin integration | [`samples/kmp-project-template`](samples/kmp-project-template) |
+| **convention-integration** | Standalone convention plugin demo | [`samples/convention-integration`](samples/convention-integration) |
+| **compose-multiplatform** | Full Compose Multiplatform app | [`samples/compose-multiplatform`](samples/compose-multiplatform) |
 
 ## Convention Plugin Integration
 

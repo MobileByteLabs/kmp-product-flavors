@@ -169,7 +169,8 @@ kmp-product-flavors/
 │       └── src/main/kotlin/
 ├── samples/
 │   ├── basic-flavors/       # Basic usage sample
-│   └── kmp-template-integration/  # Full KMP project integration
+│   ├── kmp-project-template/      # Full KMP project integration
+│   └── convention-integration/    # Standalone convention plugin demo
 ├── .github/workflows/
 │   ├── build.yml            # CI workflow
 │   └── publish.yml          # Release workflow

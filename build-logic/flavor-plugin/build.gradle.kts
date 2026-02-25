@@ -45,9 +45,9 @@ dependencies {
     // Gradle API
     implementation(gradleApi())
 
-    // Testing
+    // Testing - use embeddedKotlin to match kotlin-dsl compiler version (Gradle's embedded Kotlin)
     testImplementation(gradleTestKit())
-    testImplementation(libs.kotlin.test)
+    testImplementation(kotlin("test"))
     testImplementation(libs.mockk)
     testImplementation(libs.junit)
     // Kotlin Gradle Plugin for tests (needed to mock KMP extension)

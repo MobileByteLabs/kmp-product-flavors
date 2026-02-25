@@ -39,5 +39,5 @@ include(":samples:basic-flavors") // Minimal plugin demo
 // include(":samples:compose-multiplatform")   // Compose Multiplatform app with flavors
 // include(":cmp-library")                     // Shared library for compose-multiplatform
 
-// Note: samples/kmp-template-integration is a standalone project with its own build
-// Build it separately: cd samples/kmp-template-integration && ./gradlew build
+// Note: samples/kmp-project-template is a standalone project with its own build
+// Build it separately: cd samples/kmp-project-template && ./gradlew build
