@@ -111,4 +111,7 @@ jobs:
 
       - name: Verify Published Artifacts
         run: |
-          ls -la ~/.m2/repository/io/github/mobilebytelabs/kmpflavors/flavor-plugin/1.0.0-alpha01/
+          # Read version from version catalog (single source of truth)
+          VERSION=$(grep 'kmpProductFlavors' gradle/libs.versions.toml | head -1 | sed 's/.*= *"\(.*\)"/\1/')
+          echo "Plugin version: $VERSION"
+          ls -la ~/.m2/repository/io/github/mobilebytelabs/kmpflavors/flavor-plugin/$VERSION/

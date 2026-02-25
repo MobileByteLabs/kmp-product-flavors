@@ -24,7 +24,7 @@ plugins {
 }
 
 group = "io.github.mobilebytelabs.kmpflavors"
-version = "1.0.0-alpha01"
+version = libs.versions.kmpProductFlavors.get()
 
 java {
     sourceCompatibility = JavaVersion.VERSION_17

@@ -53,13 +53,15 @@ This plugin supports **all Kotlin Multiplatform targets**:
 
 ## Installation
 
+> **Latest Version:** Check the badges above or [Maven Central](https://central.sonatype.com/artifact/io.github.mobilebytelabs.kmpflavors/flavor-plugin) / [Gradle Plugin Portal](https://plugins.gradle.org/plugin/io.github.mobilebytelabs.kmp-product-flavors)
+
 ### Gradle Plugin Portal (Recommended)
 
 ```kotlin
 // build.gradle.kts
 plugins {
     kotlin("multiplatform") version "2.1.0"
-    id("io.github.mobilebytelabs.kmp-product-flavors") version "1.0.0-alpha01"
+    id("io.github.mobilebytelabs.kmp-product-flavors") version "<latest-version>"
 }
 ```
 
@@ -77,7 +79,7 @@ pluginManagement {
 // build.gradle.kts
 plugins {
     kotlin("multiplatform") version "2.1.0"
-    id("io.github.mobilebytelabs.kmp-product-flavors") version "1.0.0-alpha01"
+    id("io.github.mobilebytelabs.kmp-product-flavors") version "<latest-version>"
 }
 ```
 
