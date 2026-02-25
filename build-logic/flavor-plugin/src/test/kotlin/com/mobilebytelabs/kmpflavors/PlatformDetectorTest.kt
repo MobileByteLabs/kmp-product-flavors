@@ -183,15 +183,25 @@ class PlatformDetectorTest {
 
     private fun createMockKotlin(vararg targetNames: String): KotlinMultiplatformExtension {
         val targets = targetNames.map { name ->
-            mockk<KotlinTarget> {
+            mockk<KotlinTarget>(relaxed = true) {
                 every { this@mockk.name } returns name
             }
         }
 
-        val mockTargetContainer = mockk<NamedDomainObjectCollection<KotlinTarget>>()
-        every { mockTargetContainer.iterator() } returns targets.toMutableList().iterator()
+        // Use a real ArrayList wrapped by the mock to make standard Kotlin extension functions work
+        val targetsList = ArrayList(targets)
 
-        return mockk {
+        // Create a mock collection that delegates iteration to the real list
+        val mockTargetContainer = mockk<NamedDomainObjectCollection<KotlinTarget>>()
+
+        // Mock iterator() which is used by Kotlin's map extension function
+        every { mockTargetContainer.iterator() } answers { targetsList.iterator() }
+
+        // Mock size and isEmpty for completeness
+        every { mockTargetContainer.size } returns targetsList.size
+        every { mockTargetContainer.isEmpty() } returns targetsList.isEmpty()
+
+        return mockk(relaxed = true) {
             every { this@mockk.targets } returns mockTargetContainer
         }
     }

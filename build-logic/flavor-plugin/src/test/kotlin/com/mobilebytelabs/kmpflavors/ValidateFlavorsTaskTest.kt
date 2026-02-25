@@ -40,6 +40,12 @@ class ValidateFlavorsTaskTest {
             .build()
 
         task = project.tasks.create("testValidateFlavors", ValidateFlavorsTask::class.java)
+        // Initialize all properties with empty defaults
+        task.dimensionNames.set(emptySet())
+        task.flavorDimensions.set(emptyMap())
+        task.flavorDefaults.set(emptyMap())
+        task.validVariantNames.set(emptySet())
+        task.allFlavorNames.set(emptyList())
     }
 
     @Test
@@ -72,7 +78,7 @@ class ValidateFlavorsTaskTest {
     @Test
     fun `validate fails with duplicate flavor names`() {
         task.dimensionNames.set(emptySet())
-        task.flavorDimensions.set(mapOf("free" to null, "paid" to null))
+        task.flavorDimensions.set(mapOf("free" to "", "paid" to ""))
         task.flavorDefaults.set(mapOf("free" to false, "paid" to false))
         task.validVariantNames.set(setOf("free", "paid"))
         task.allFlavorNames.set(listOf("free", "free", "paid")) // Duplicate
@@ -87,7 +93,7 @@ class ValidateFlavorsTaskTest {
     @Test
     fun `validate fails with invalid flavor name`() {
         task.dimensionNames.set(emptySet())
-        task.flavorDimensions.set(mapOf("free-tier" to null)) // Invalid: contains hyphen
+        task.flavorDimensions.set(mapOf("free-tier" to "")) // Invalid: contains hyphen
         task.flavorDefaults.set(mapOf("free-tier" to false))
         task.validVariantNames.set(setOf("free-tier"))
         task.allFlavorNames.set(listOf("free-tier"))
@@ -102,7 +108,7 @@ class ValidateFlavorsTaskTest {
     @Test
     fun `validate fails when flavor has no dimension but dimensions are defined`() {
         task.dimensionNames.set(setOf("tier"))
-        task.flavorDimensions.set(mapOf("free" to null)) // Missing dimension
+        task.flavorDimensions.set(mapOf("free" to "")) // Missing dimension (empty string = no dimension)
         task.flavorDefaults.set(mapOf("free" to false))
         task.validVariantNames.set(emptySet())
         task.allFlavorNames.set(listOf("free"))
@@ -152,7 +158,7 @@ class ValidateFlavorsTaskTest {
     @Test
     fun `validate fails when active variant is invalid`() {
         task.dimensionNames.set(emptySet())
-        task.flavorDimensions.set(mapOf("free" to null))
+        task.flavorDimensions.set(mapOf("free" to ""))
         task.flavorDefaults.set(mapOf("free" to false))
         task.validVariantNames.set(setOf("free"))
         task.activeVariantName.set("unknown") // Invalid
@@ -168,7 +174,7 @@ class ValidateFlavorsTaskTest {
     @Test
     fun `validate passes with no dimensions`() {
         task.dimensionNames.set(emptySet())
-        task.flavorDimensions.set(mapOf("free" to null, "paid" to null))
+        task.flavorDimensions.set(mapOf("free" to "", "paid" to ""))
         task.flavorDefaults.set(mapOf("free" to true, "paid" to false))
         task.validVariantNames.set(setOf("free", "paid"))
         task.activeVariantName.set("free")
@@ -183,10 +189,10 @@ class ValidateFlavorsTaskTest {
         task.dimensionNames.set(emptySet())
         task.flavorDimensions.set(
             mapOf(
-                "free" to null,
-                "paidPro" to null,
-                "_internal" to null,
-                "tier1" to null,
+                "free" to "",
+                "paidPro" to "",
+                "_internal" to "",
+                "tier1" to "",
             ),
         )
         task.flavorDefaults.set(
@@ -207,7 +213,7 @@ class ValidateFlavorsTaskTest {
     @Test
     fun `validate fails with empty flavor name`() {
         task.dimensionNames.set(emptySet())
-        task.flavorDimensions.set(mapOf("" to null))
+        task.flavorDimensions.set(mapOf("" to ""))
         task.flavorDefaults.set(mapOf("" to false))
         task.validVariantNames.set(setOf(""))
         task.allFlavorNames.set(listOf(""))
@@ -222,7 +228,7 @@ class ValidateFlavorsTaskTest {
     @Test
     fun `validate fails when flavor name starts with number`() {
         task.dimensionNames.set(emptySet())
-        task.flavorDimensions.set(mapOf("1free" to null))
+        task.flavorDimensions.set(mapOf("1free" to ""))
         task.flavorDefaults.set(mapOf("1free" to false))
         task.validVariantNames.set(setOf("1free"))
         task.allFlavorNames.set(listOf("1free"))

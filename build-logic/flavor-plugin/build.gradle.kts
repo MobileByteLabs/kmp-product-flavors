@@ -38,8 +38,9 @@ kotlin {
 }
 
 dependencies {
-    // Kotlin Gradle Plugin - only needed at compile time to access KMP APIs
-    compileOnly(libs.kotlin.gradle.plugin)
+    // Kotlin Gradle Plugin - needed at runtime to access KMP APIs
+    // Must be 'implementation' (not compileOnly) because TestKit needs it on the plugin classpath
+    implementation(libs.kotlin.gradle.plugin)
 
     // Gradle API
     implementation(gradleApi())

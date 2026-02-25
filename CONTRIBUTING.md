@@ -60,6 +60,7 @@ The `ci-prepush.sh` script mirrors the exact checks that CI runs:
 | Spotless | `spotlessCheck` | Code formatting (ktlint) |
 | Detekt | `detekt` | Static analysis |
 | Build Plugin | `:build-logic:flavor-plugin:assemble` | Plugin compilation |
+| Unit Tests | `:build-logic:flavor-plugin:test` | Unit & integration tests |
 | Build Samples | `:samples:basic-flavors:assemble` | Sample project builds |
 | Validate Flavors | `validateFlavors` | Flavor configuration validation |
 
@@ -86,6 +87,9 @@ This project uses:
 # Build the plugin
 ./gradlew :build-logic:flavor-plugin:assemble
 
+# Run unit tests
+./gradlew :build-logic:flavor-plugin:test
+
 # Build sample with specific flavor
 ./gradlew :samples:basic-flavors:assemble -PkmpFlavor=freeDev
 ./gradlew :samples:basic-flavors:assemble -PkmpFlavor=paidProd
@@ -99,6 +103,21 @@ This project uses:
 # Publish to local Maven for testing
 ./MavenLocalRelease.sh
 ```
+
+### Test Suite
+
+The plugin includes 49 tests covering:
+
+| Test Class | Tests | Coverage |
+|------------|:-----:|----------|
+| `FlavorVariantResolverTest` | 10 | Variant resolution logic |
+| `GenerateBuildConfigTaskTest` | 7 | BuildConfig generation |
+| `KmpFlavorPluginIntegrationTest` | 6 | End-to-end integration |
+| `PlatformDetectorTest` | 10 | Platform detection |
+| `SourceSetConfiguratorTest` | 5 | Source set wiring |
+| `ValidateFlavorsTaskTest` | 11 | Configuration validation |
+
+Run all tests: `./gradlew :build-logic:flavor-plugin:test`
 
 ### Testing Plugin Changes Locally
 

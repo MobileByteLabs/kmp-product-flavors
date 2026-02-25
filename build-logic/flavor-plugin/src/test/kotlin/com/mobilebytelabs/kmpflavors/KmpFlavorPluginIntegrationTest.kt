@@ -40,6 +40,21 @@ class KmpFlavorPluginIntegrationTest {
 
         settingsFile.writeText(
             """
+            pluginManagement {
+                repositories {
+                    gradlePluginPortal()
+                    mavenCentral()
+                    google()
+                }
+            }
+
+            dependencyResolutionManagement {
+                repositories {
+                    mavenCentral()
+                    google()
+                }
+            }
+
             rootProject.name = "test-project"
             """.trimIndent(),
         )
