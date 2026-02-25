@@ -1,6 +1,6 @@
 [versions]
 # KMP Product Flavors Plugin Version (Single Source of Truth)
-kmpProductFlavors = "1.0.0"
+kmpProductFlavors = "1.0.1"
 
 # Core Dependencies (aligned with kmp-project-template)
 agp = "8.12.3"

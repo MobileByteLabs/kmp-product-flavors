@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-02-25
+
+### Fixed
+
+- Fixed source set dependency warnings ("Invalid Dependency on Default Compilation Source Set")
+- Platform flavor source sets now correctly depend only on commonFlavor (not platformMain)
+- Intermediate flavor source sets no longer depend on compilation default source sets
+
+### Changed
+
+- Renamed `kmp-template-integration` sample to `kmp-project-template`
+- Improved convention plugin integration in kmp-project-template sample
+
+### Documentation
+
+- Updated build-logic README with comprehensive KMP flavors documentation
+- Added detailed integration guide in samples README
+- Documented automatic kmp.flavors application in convention plugins
+
 ## [1.0.0] - 2026-02-25
 
 ### Changed
@@ -76,6 +95,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Serializable data classes for task input caching
 - `afterEvaluate` pattern for consumer script evaluation
 
-[Unreleased]: https://github.com/MobileByteLabs/kmp-product-flavors/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/MobileByteLabs/kmp-product-flavors/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/MobileByteLabs/kmp-product-flavors/releases/tag/v1.0.1
 [1.0.0]: https://github.com/MobileByteLabs/kmp-product-flavors/releases/tag/v1.0.0
 [1.0.0-alpha01]: https://github.com/MobileByteLabs/kmp-product-flavors/releases/tag/v1.0.0-alpha01
