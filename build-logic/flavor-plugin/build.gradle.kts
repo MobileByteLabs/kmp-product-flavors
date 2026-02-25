@@ -72,7 +72,12 @@ gradlePlugin {
 
 mavenPublishing {
     publishToMavenCentral(com.vanniktech.maven.publish.SonatypeHost.CENTRAL_PORTAL)
-    signAllPublications()
+    // Only sign if signing key is available (skip for local development)
+    if (project.findProperty("signing.keyId") != null ||
+        project.findProperty("signingInMemoryKeyId") != null
+    ) {
+        signAllPublications()
+    }
 
     coordinates(group.toString(), "flavor-plugin", version.toString())
 
@@ -111,4 +116,13 @@ mavenPublishing {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+// Disable signing tasks if no signing key is configured (for local development)
+tasks.withType<Sign>().configureEach {
+    val hasSigningKey =
+        project.findProperty("signing.keyId") != null ||
+            project.findProperty("signingInMemoryKeyId") != null ||
+            System.getenv("ORG_GRADLE_PROJECT_signingInMemoryKeyId") != null
+    onlyIf { hasSigningKey }
 }

@@ -19,6 +19,7 @@ package com.mobilebytelabs.kmpflavors
 import org.gradle.testkit.runner.GradleRunner
 import org.gradle.testkit.runner.TaskOutcome
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -65,7 +66,7 @@ class KmpFlavorPluginIntegrationTest {
         buildFile.writeText(
             """
             plugins {
-                kotlin("multiplatform") version "2.1.0"
+                kotlin("multiplatform") version "2.2.21"
                 id("io.github.mobilebytelabs.kmp-product-flavors")
             }
 
@@ -99,7 +100,7 @@ class KmpFlavorPluginIntegrationTest {
         buildFile.writeText(
             """
             plugins {
-                kotlin("multiplatform") version "2.1.0"
+                kotlin("multiplatform") version "2.2.21"
                 id("io.github.mobilebytelabs.kmp-product-flavors")
             }
 
@@ -143,7 +144,7 @@ class KmpFlavorPluginIntegrationTest {
         buildFile.writeText(
             """
             plugins {
-                kotlin("multiplatform") version "2.1.0"
+                kotlin("multiplatform") version "2.2.21"
                 id("io.github.mobilebytelabs.kmp-product-flavors")
             }
 
@@ -194,7 +195,7 @@ class KmpFlavorPluginIntegrationTest {
         buildFile.writeText(
             """
             plugins {
-                kotlin("multiplatform") version "2.1.0"
+                kotlin("multiplatform") version "2.2.21"
                 id("io.github.mobilebytelabs.kmp-product-flavors")
             }
 
@@ -245,7 +246,7 @@ class KmpFlavorPluginIntegrationTest {
         buildFile.writeText(
             """
             plugins {
-                kotlin("multiplatform") version "2.1.0"
+                kotlin("multiplatform") version "2.2.21"
                 id("io.github.mobilebytelabs.kmp-product-flavors")
             }
 
@@ -292,7 +293,7 @@ class KmpFlavorPluginIntegrationTest {
         buildFile.writeText(
             """
             plugins {
-                kotlin("multiplatform") version "2.1.0"
+                kotlin("multiplatform") version "2.2.21"
                 id("io.github.mobilebytelabs.kmp-product-flavors")
             }
 
@@ -331,5 +332,199 @@ class KmpFlavorPluginIntegrationTest {
         assertTrue(result.output.contains("SourceSet: commonPaid"))
         assertTrue(result.output.contains("SourceSet: desktopFree"))
         assertTrue(result.output.contains("SourceSet: desktopPaid"))
+    }
+
+    @Test
+    fun `kmpFlavorInit creates source directories`() {
+        buildFile.writeText(
+            """
+            plugins {
+                kotlin("multiplatform") version "2.2.21"
+                id("io.github.mobilebytelabs.kmp-product-flavors")
+            }
+
+            kotlin {
+                jvm("desktop")
+            }
+
+            kmpFlavors {
+                generateBuildConfig.set(false)
+
+                flavors {
+                    register("free") {
+                        isDefault.set(true)
+                    }
+                    register("paid")
+                }
+            }
+            """.trimIndent(),
+        )
+
+        val result = GradleRunner.create()
+            .withProjectDir(testProjectDir)
+            .withArguments("kmpFlavorInit", "--stacktrace")
+            .withPluginClasspath()
+            .build()
+
+        assertEquals(TaskOutcome.SUCCESS, result.task(":kmpFlavorInit")?.outcome)
+        assertTrue(result.output.contains("Initializing source directories"))
+
+        // Verify directories were created
+        assertTrue(File(testProjectDir, "src/commonFree/kotlin").exists())
+        assertTrue(File(testProjectDir, "src/commonPaid/kotlin").exists())
+        assertTrue(File(testProjectDir, "src/desktopFree/kotlin").exists())
+        assertTrue(File(testProjectDir, "src/desktopPaid/kotlin").exists())
+    }
+
+    @Test
+    fun `variantFilter excludes specified variants`() {
+        buildFile.writeText(
+            """
+            plugins {
+                kotlin("multiplatform") version "2.2.21"
+                id("io.github.mobilebytelabs.kmp-product-flavors")
+            }
+
+            kotlin {
+                jvm("desktop")
+            }
+
+            kmpFlavors {
+                generateBuildConfig.set(false)
+
+                flavorDimensions {
+                    register("tier") { priority.set(0) }
+                    register("environment") { priority.set(1) }
+                }
+
+                flavors {
+                    register("free") {
+                        dimension.set("tier")
+                        isDefault.set(true)
+                    }
+                    register("paid") {
+                        dimension.set("tier")
+                    }
+                    register("dev") {
+                        dimension.set("environment")
+                        isDefault.set(true)
+                    }
+                    register("prod") {
+                        dimension.set("environment")
+                    }
+                }
+
+                // Exclude freeProd variant
+                variantFilter {
+                    if (flavorNames.containsAll(listOf("free", "prod"))) {
+                        exclude()
+                    }
+                }
+            }
+            """.trimIndent(),
+        )
+
+        val result = GradleRunner.create()
+            .withProjectDir(testProjectDir)
+            .withArguments("listFlavors", "--stacktrace")
+            .withPluginClasspath()
+            .build()
+
+        assertEquals(TaskOutcome.SUCCESS, result.task(":listFlavors")?.outcome)
+        assertTrue(result.output.contains("freeDev"))
+        assertTrue(result.output.contains("paidDev"))
+        assertTrue(result.output.contains("paidProd"))
+        // freeProd should be excluded
+        assertFalse(result.output.contains("freeProd"))
+    }
+
+    @Test
+    fun `printFlavorProperties shows suffix values`() {
+        buildFile.writeText(
+            """
+            plugins {
+                kotlin("multiplatform") version "2.2.21"
+                id("io.github.mobilebytelabs.kmp-product-flavors")
+            }
+
+            kotlin {
+                jvm("desktop")
+            }
+
+            kmpFlavors {
+                generateBuildConfig.set(false)
+
+                flavors {
+                    register("free") {
+                        isDefault.set(true)
+                        applicationIdSuffix.set(".free")
+                        bundleIdSuffix.set(".free")
+                        versionNameSuffix.set("-free")
+                    }
+                    register("paid") {
+                        applicationIdSuffix.set(".paid")
+                    }
+                }
+            }
+            """.trimIndent(),
+        )
+
+        val result = GradleRunner.create()
+            .withProjectDir(testProjectDir)
+            .withArguments("printFlavorProperties", "--stacktrace")
+            .withPluginClasspath()
+            .build()
+
+        assertEquals(TaskOutcome.SUCCESS, result.task(":printFlavorProperties")?.outcome)
+        assertTrue(result.output.contains("Properties for variant: free"))
+        assertTrue(result.output.contains("applicationIdSuffix: .free"))
+        assertTrue(result.output.contains("bundleIdSuffix: .free"))
+        assertTrue(result.output.contains("versionNameSuffix: -free"))
+    }
+
+    @Test
+    fun `platform properties are exposed as extra properties`() {
+        buildFile.writeText(
+            """
+            plugins {
+                kotlin("multiplatform") version "2.2.21"
+                id("io.github.mobilebytelabs.kmp-product-flavors")
+            }
+
+            kotlin {
+                jvm("desktop")
+            }
+
+            kmpFlavors {
+                generateBuildConfig.set(false)
+
+                flavors {
+                    register("free") {
+                        isDefault.set(true)
+                        applicationIdSuffix.set(".free")
+                    }
+                }
+            }
+
+            tasks.register("checkProperties") {
+                doLast {
+                    val variantName = project.extra["kmpFlavor.variantName"] as String
+                    val suffix = project.extra["kmpFlavor.applicationIdSuffix"] as String
+                    println("Variant: ${'$'}variantName")
+                    println("Suffix: ${'$'}suffix")
+                }
+            }
+            """.trimIndent(),
+        )
+
+        val result = GradleRunner.create()
+            .withProjectDir(testProjectDir)
+            .withArguments("checkProperties", "--stacktrace")
+            .withPluginClasspath()
+            .build()
+
+        assertEquals(TaskOutcome.SUCCESS, result.task(":checkProperties")?.outcome)
+        assertTrue(result.output.contains("Variant: free"))
+        assertTrue(result.output.contains("Suffix: .free"))
     }
 }

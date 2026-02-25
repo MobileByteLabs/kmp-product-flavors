@@ -368,6 +368,7 @@ cmp-feature-convention = { id = "org.convention.cmp.feature", version = "unspeci
 kmp-koin-convention = { id = "org.convention.kmp.koin", version = "unspecified" }
 kmp-library-convention = { id = "org.convention.kmp.library", version = "unspecified" }
 kmp-core-base-library-convention = { id = "org.convention.kmp.core.base.library", version = "unspecified" }
+kmp-flavors-convention = { id = "org.convention.kmp.flavors", version = "unspecified" }
 
 android-application-firebase = { id = "org.convention.android.application.firebase" }
 android-lint = { id = "org.convention.android.application.lint" }

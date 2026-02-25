@@ -1,27 +1,28 @@
 [versions]
 # KMP Product Flavors Plugin Version (Single Source of Truth)
-kmpProductFlavors = "1.0.0-alpha01"
+kmpProductFlavors = "1.0.0"
 
-agp = "8.7.3"
-kotlin = "2.1.0"
-compose-multiplatform = "1.7.3"
+# Core Dependencies (aligned with kmp-project-template)
+agp = "8.12.3"
+kotlin = "2.2.21"
+compose-multiplatform = "1.9.3"
 android-minSdk = "24"
-android-compileSdk = "35"
-android-targetSdk = "35"
+android-compileSdk = "36"
+android-targetSdk = "36"
 vanniktechMavenPublish = "0.30.0"
 
-# Code Quality
-detekt = "1.23.7"
-spotless = "6.25.0"
+# Code Quality (aligned with kmp-project-template)
+detekt = "1.23.8"
+spotless = "7.0.2"
 ktlint = "1.5.0"
 
 # Testing
 junit = "4.13.2"
-coroutines = "1.9.0"
-mockk = "1.13.13"
+coroutines = "1.10.2"
+mockk = "1.13.16"
 
-# AndroidX
-androidx-activityCompose = "1.9.3"
+# AndroidX (aligned with kmp-project-template)
+androidx-activityCompose = "1.12.2"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }

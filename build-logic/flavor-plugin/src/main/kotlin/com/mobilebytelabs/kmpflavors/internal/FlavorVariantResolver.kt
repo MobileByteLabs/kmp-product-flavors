@@ -19,6 +19,8 @@ package com.mobilebytelabs.kmpflavors.internal
 import com.mobilebytelabs.kmpflavors.FlavorConfig
 import com.mobilebytelabs.kmpflavors.FlavorDimension
 import com.mobilebytelabs.kmpflavors.FlavorVariant
+import com.mobilebytelabs.kmpflavors.VariantFilter
+import org.gradle.api.Action
 
 /**
  * Resolves the variant matrix from dimensions and flavors.
@@ -37,21 +39,27 @@ object FlavorVariantResolver {
      *
      * @param dimensions The flavor dimensions, sorted by priority
      * @param flavors All configured flavors
-     * @return List of all possible variant combinations
+     * @param variantFilters Optional list of filter actions to exclude variants
+     * @return List of all possible variant combinations (after filtering)
      */
-    fun resolveAllVariants(dimensions: Collection<FlavorDimension>, flavors: Collection<FlavorConfig>): List<FlavorVariant> {
+    fun resolveAllVariants(
+        dimensions: Collection<FlavorDimension>,
+        flavors: Collection<FlavorConfig>,
+        variantFilters: List<Action<VariantFilter>> = emptyList(),
+    ): List<FlavorVariant> {
         if (flavors.isEmpty()) {
             return emptyList()
         }
 
         // If no dimensions, each flavor is its own variant
         if (dimensions.isEmpty()) {
-            return flavors.map { flavor ->
+            val singleFlavorVariants = flavors.map { flavor ->
                 FlavorVariant(
                     name = flavor.name,
                     flavors = listOf(flavor),
                 )
             }
+            return applyVariantFilters(singleFlavorVariants, variantFilters)
         }
 
         // Sort dimensions by priority
@@ -73,12 +81,44 @@ object FlavorVariantResolver {
         val combinations = cartesianProduct(flavorsByDimension)
 
         // Create variants from combinations
-        return combinations.map { flavorList ->
+        val allVariants = combinations.map { flavorList ->
             val variantName = buildVariantName(flavorList)
             FlavorVariant(
                 name = variantName,
                 flavors = flavorList,
             )
+        }
+
+        // Apply variant filters
+        return applyVariantFilters(allVariants, variantFilters)
+    }
+
+    /**
+     * Applies variant filter actions to exclude unwanted variants.
+     *
+     * @param variants All variants before filtering
+     * @param filters List of filter actions to apply
+     * @return Filtered list of variants
+     */
+    private fun applyVariantFilters(variants: List<FlavorVariant>, filters: List<Action<VariantFilter>>): List<FlavorVariant> {
+        if (filters.isEmpty()) {
+            return variants
+        }
+
+        return variants.filter { variant ->
+            val filter = VariantFilter(
+                variantName = variant.name,
+                flavorNames = variant.flavorNames,
+                flavors = variant.flavors,
+            )
+
+            // Apply all filter actions
+            filters.forEach { action ->
+                action.execute(filter)
+            }
+
+            // Keep variant if not excluded
+            !filter.isExcluded()
         }
     }
 

@@ -69,6 +69,13 @@ import javax.inject.Inject
  *             buildConfigField("String", "BASE_URL", "\"https://api.example.com\"")
  *         }
  *     }
+ *
+ *     // Filter out invalid variant combinations
+ *     variantFilter {
+ *         if (flavorNames.containsAll(listOf("free", "prod"))) {
+ *             exclude()
+ *         }
+ *     }
  * }
  * ```
  */
@@ -131,6 +138,27 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
         objects.domainObjectContainer(FlavorConfig::class.java)
 
     /**
+     * Container for build type configurations.
+     * Build types define different build configurations (e.g., debug, release).
+     * When build types are configured, variants become combinations of flavors + build type.
+     */
+    val buildTypes: NamedDomainObjectContainer<BuildTypeConfig> =
+        objects.domainObjectContainer(BuildTypeConfig::class.java)
+
+    /**
+     * Whether to enable build types support.
+     * When true, variants will include the build type suffix (e.g., freeDebug, paidRelease).
+     *
+     * Convention: false (build types are disabled by default for simplicity)
+     */
+    abstract val enableBuildTypes: Property<Boolean>
+
+    /**
+     * Internal list of variant filter actions.
+     */
+    internal val variantFilterActions = mutableListOf<Action<VariantFilter>>()
+
+    /**
      * Configure flavor dimensions using a DSL block.
      */
     fun flavorDimensions(action: Action<NamedDomainObjectContainer<FlavorDimension>>) {
@@ -144,10 +172,55 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
         action.execute(flavors)
     }
 
+    /**
+     * Filter variant combinations to exclude invalid or unwanted variants.
+     *
+     * This allows you to exclude specific variant combinations from the build.
+     * The filter action is called for each variant during resolution.
+     *
+     * Example:
+     * ```kotlin
+     * variantFilter {
+     *     // Exclude free + prod combination
+     *     if (flavorNames.containsAll(listOf("free", "prod"))) {
+     *         exclude()
+     *     }
+     * }
+     * ```
+     *
+     * @param action The filter action to execute for each variant
+     */
+    fun variantFilter(action: Action<VariantFilter>) {
+        variantFilterActions.add(action)
+    }
+
+    /**
+     * Configure build types using a DSL block.
+     *
+     * Example:
+     * ```kotlin
+     * buildTypes {
+     *     register("debug") {
+     *         isDefault.set(true)
+     *         isDebuggable.set(true)
+     *         buildConfigField("Boolean", "DEBUG", "true")
+     *     }
+     *     register("release") {
+     *         isMinifyEnabled.set(true)
+     *         buildConfigField("Boolean", "DEBUG", "false")
+     *     }
+     * }
+     * ```
+     */
+    fun buildTypes(action: Action<NamedDomainObjectContainer<BuildTypeConfig>>) {
+        action.execute(buildTypes)
+    }
+
     init {
         // Set conventions
         generateBuildConfig.convention(true)
         buildConfigClassName.convention("FlavorConfig")
         createIntermediateSourceSets.convention(true)
+        enableBuildTypes.convention(false)
     }
 }

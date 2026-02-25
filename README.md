@@ -60,7 +60,7 @@ This plugin supports **all Kotlin Multiplatform targets**:
 ```kotlin
 // build.gradle.kts
 plugins {
-    kotlin("multiplatform") version "2.1.0"
+    kotlin("multiplatform") version "2.2.21"
     id("io.github.mobilebytelabs.kmp-product-flavors") version "<latest-version>"
 }
 ```
@@ -78,7 +78,7 @@ pluginManagement {
 
 // build.gradle.kts
 plugins {
-    kotlin("multiplatform") version "2.1.0"
+    kotlin("multiplatform") version "2.2.21"
     id("io.github.mobilebytelabs.kmp-product-flavors") version "<latest-version>"
 }
 ```
@@ -241,8 +241,54 @@ src/
 | Sample | Description | Location |
 |--------|-------------|----------|
 | **basic-flavors** | Minimal plugin demo | [`samples/basic-flavors`](samples/basic-flavors) |
+| **convention-integration** | Convention plugin pattern | [`samples/convention-integration`](samples/convention-integration) |
 | **compose-multiplatform** | Full Compose app | [`samples/compose-multiplatform`](samples/compose-multiplatform) |
-| **kmp-template-integration** | Production template | [`samples/kmp-template-integration`](samples/kmp-template-integration) |
+
+## Convention Plugin Integration
+
+For projects using convention plugins like [kmp-project-template](https://github.com/openMF/kmp-project-template), we provide ready-to-use integration files.
+
+### Quick Setup
+
+```bash
+# Copy integration files to your project
+./integration/install-to-kmp-project-template.sh /path/to/your/project
+```
+
+### Manual Integration
+
+1. **Add dependency** to `build-logic/convention/build.gradle.kts`:
+   ```kotlin
+   dependencies {
+       compileOnly("io.github.mobilebytelabs:kmp-product-flavors-gradle-plugin:1.0.0")
+   }
+   ```
+
+2. **Copy plugin files** from [`integration/convention-plugin/`](integration/convention-plugin/):
+   - `KMPFlavorsConventionPlugin.kt`
+   - `org/convention/KmpFlavors.kt`
+   - `org/convention/KmpFlavorsBuildConfig.kt`
+
+3. **Register the plugin**:
+   ```kotlin
+   gradlePlugin {
+       plugins {
+           register("kmpFlavors") {
+               id = "org.convention.kmp.flavors"
+               implementationClass = "KMPFlavorsConventionPlugin"
+           }
+       }
+   }
+   ```
+
+4. **Apply in modules**:
+   ```kotlin
+   plugins {
+       id("org.convention.kmp.flavors")
+   }
+   ```
+
+See the full [Convention Plugin Integration Guide](integration/convention-plugin/README.md) for details.
 
 ### Run Samples
 

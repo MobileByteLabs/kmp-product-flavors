@@ -212,9 +212,13 @@ class SourceSetConfiguratorTest {
         every { mock.isDefault } returns mockProperty(false)
         every { mock.buildConfigFields } returns mockMapProperty(emptyMap())
         every { mock.applicationIdSuffix } returns mockProperty(null)
+        every { mock.bundleIdSuffix } returns mockProperty(null)
+        every { mock.desktopWindowTitleSuffix } returns mockProperty(null)
+        every { mock.webTitleSuffix } returns mockProperty(null)
         every { mock.versionNameSuffix } returns mockProperty(null)
         every { mock.extras } returns mockMapProperty(emptyMap())
         every { mock.flavorDependencies } returns mockListProperty(emptyList())
+        every { mock.matchingFallbacks } returns mockListProperty(emptyList())
         return mock
     }
 

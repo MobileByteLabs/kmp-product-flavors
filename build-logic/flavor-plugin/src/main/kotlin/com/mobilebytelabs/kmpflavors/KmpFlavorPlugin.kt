@@ -19,10 +19,13 @@ package com.mobilebytelabs.kmpflavors
 import com.mobilebytelabs.kmpflavors.internal.DependencyConfigurator
 import com.mobilebytelabs.kmpflavors.internal.FlavorVariantResolver
 import com.mobilebytelabs.kmpflavors.internal.PlatformDetector
+import com.mobilebytelabs.kmpflavors.internal.PlatformPropertiesConfigurator
 import com.mobilebytelabs.kmpflavors.internal.SourceSetConfigurator
 import com.mobilebytelabs.kmpflavors.tasks.GenerateBuildConfigTask
 import com.mobilebytelabs.kmpflavors.tasks.GenerateRunConfigurationsTask
+import com.mobilebytelabs.kmpflavors.tasks.InitFlavorSourceSetsTask
 import com.mobilebytelabs.kmpflavors.tasks.ListFlavorsTask
+import com.mobilebytelabs.kmpflavors.tasks.PrintFlavorPropertiesTask
 import com.mobilebytelabs.kmpflavors.tasks.ValidateFlavorsTask
 import org.gradle.api.GradleException
 import org.gradle.api.Plugin
@@ -122,11 +125,27 @@ class KmpFlavorPlugin : Plugin<Project> {
 
         logger.lifecycle("[KMP Flavors] Configuring ${flavors.size} flavors across ${dimensions.size} dimensions")
 
-        // Resolve all variants
-        val allVariants = FlavorVariantResolver.resolveAllVariants(dimensions, flavors)
+        // Resolve all variants (with filtering)
+        val allVariants = FlavorVariantResolver.resolveAllVariants(
+            dimensions,
+            flavors,
+            extension.variantFilterActions,
+        )
         if (allVariants.isEmpty()) {
-            logger.warn("[KMP Flavors] No variants resolved. Check dimension assignments.")
+            logger.warn("[KMP Flavors] No variants resolved. Check dimension assignments or variant filters.")
             return
+        }
+
+        // Log filtered variants if any were excluded
+        val totalPossible = if (dimensions.isEmpty()) {
+            flavors.size
+        } else {
+            dimensions.fold(1) { acc, dim ->
+                acc * flavors.count { it.dimension.orNull == dim.name }
+            }
+        }
+        if (allVariants.size < totalPossible) {
+            logger.lifecycle("[KMP Flavors] Variant filter excluded ${totalPossible - allVariants.size} variants")
         }
 
         // Determine active variant
@@ -159,6 +178,10 @@ class KmpFlavorPlugin : Plugin<Project> {
         // Configure dependencies
         val dependencyConfigurator = DependencyConfigurator(logger)
         dependencyConfigurator.configure(project, activeVariant)
+
+        // Configure platform-specific properties
+        val platformPropertiesConfigurator = PlatformPropertiesConfigurator(logger)
+        platformPropertiesConfigurator.configure(project, activeVariant)
 
         // Register tasks
         registerTasks(project, extension, allVariants, activeVariant, flavors, dimensions, platforms)
@@ -257,6 +280,47 @@ class KmpFlavorPlugin : Plugin<Project> {
             variants.set(variantsData)
             this.activeVariant.set(activeVariantNameValue)
             outputDirectory.set(project.rootProject.layout.projectDirectory.dir(".run"))
+        }
+
+        // Init flavor source sets task
+        val leafPlatformPrefixes = platforms.filter { !it.isIntermediate }.map { it.prefix }.toSet()
+        val intermediatePrefixes = platforms.filter { it.isIntermediate }.map { it.prefix }.toSet()
+
+        project.tasks.register(
+            "kmpFlavorInit",
+            InitFlavorSourceSetsTask::class.java,
+        ).configure {
+            flavorNames.set(flavors.map { it.name }.toSet())
+            platformPrefixes.set(leafPlatformPrefixes)
+            this.intermediatePrefixes.set(intermediatePrefixes)
+            createIntermediates.set(extension.createIntermediateSourceSets)
+            createGitKeep.set(true)
+            createExampleFiles.set(false)
+            examplePackage.set(extension.buildConfigPackage)
+            sourceDirectory.set(project.layout.projectDirectory.dir("src"))
+        }
+
+        // Print flavor properties task
+        project.tasks.register(
+            "printFlavorProperties",
+            PrintFlavorPropertiesTask::class.java,
+        ).configure {
+            variantName.set(activeVariant.name)
+            applicationIdSuffix.set(
+                activeVariant.combinedApplicationIdSuffix.ifEmpty { null },
+            )
+            bundleIdSuffix.set(
+                activeVariant.combinedBundleIdSuffix.ifEmpty { null },
+            )
+            versionNameSuffix.set(
+                activeVariant.combinedVersionNameSuffix.ifEmpty { null },
+            )
+            desktopTitleSuffix.set(
+                activeVariant.combinedDesktopTitleSuffix.ifEmpty { null },
+            )
+            webTitleSuffix.set(
+                activeVariant.combinedWebTitleSuffix.ifEmpty { null },
+            )
         }
     }
 

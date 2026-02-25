@@ -140,7 +140,7 @@ Run all tests: `./gradlew :build-logic:flavor-plugin:test`
 3. Apply the plugin:
    ```kotlin
    plugins {
-       id("io.github.mobilebytelabs.kmp-product-flavors") version "1.0.0-alpha01"
+       id("io.github.mobilebytelabs.kmp-product-flavors") version "1.0.0"
    }
    ```
 
