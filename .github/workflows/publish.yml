@@ -54,15 +54,16 @@ jobs:
             --no-configuration-cache
           rm /tmp/signing-key.asc
 
-      - name: Create GitHub Release Notes
+      - name: Upload Release Artifacts
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v1
         with:
           files: |
             build-logic/flavor-plugin/build/libs/*.jar
-          generate_release_notes: true
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
 
   publish-gradle-plugin-portal:
     name: Publish to Gradle Plugin Portal
