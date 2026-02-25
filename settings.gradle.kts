@@ -31,4 +31,13 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "kmp-product-flavors"
-include(":sample")
+
+// Samples demonstrating the KMP Product Flavors plugin
+include(":samples:basic-flavors")           // Minimal plugin demo
+
+// TODO: Enable after integrating flavor plugin
+// include(":samples:compose-multiplatform")   // Compose Multiplatform app with flavors
+// include(":cmp-library")                     // Shared library for compose-multiplatform
+
+// Note: samples/kmp-template-integration is a standalone project with its own build
+// Build it separately: cd samples/kmp-template-integration && ./gradlew build

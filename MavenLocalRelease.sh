@@ -107,20 +107,20 @@ fi
 
 # Step 2: Build sample project with specified flavor
 echo -e "${YELLOW}► Step 2: Building sample project with flavor: ${BLUE}$FLAVOR${NC}"
-./gradlew :sample:assemble -PkmpFlavor="$FLAVOR" --no-daemon 2>&1 | grep -E "(BUILD|FAILURE|Task|KMP Flavors)" | head -10
+./gradlew :samples:basic-flavors:assemble -PkmpFlavor="$FLAVOR" --no-daemon 2>&1 | grep -E "(BUILD|FAILURE|Task|KMP Flavors)" | head -10
 
 echo -e "${GREEN}✓ Sample build successful${NC}"
 echo
 
 # Step 3: Validate flavors
 echo -e "${YELLOW}► Step 3: Validating flavor configuration...${NC}"
-./gradlew :sample:validateFlavors -PkmpFlavor="$FLAVOR" --no-daemon 2>&1 | grep -E "(✓|Valid|flavor)" | head -5
+./gradlew :samples:basic-flavors:validateFlavors -PkmpFlavor="$FLAVOR" --no-daemon 2>&1 | grep -E "(✓|Valid|flavor)" | head -5
 echo -e "${GREEN}✓ Flavor validation passed${NC}"
 echo
 
 # Step 4: List all flavors
 echo -e "${YELLOW}► Step 4: Listing available flavors...${NC}"
-./gradlew :sample:listFlavors --no-daemon 2>&1 | grep -E "(Variant|Dimension|Platform|Active|BUILD)" | head -20
+./gradlew :samples:basic-flavors:listFlavors --no-daemon 2>&1 | grep -E "(Variant|Dimension|Platform|Active|BUILD)" | head -20
 echo
 
 # Summary

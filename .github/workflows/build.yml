@@ -77,13 +77,13 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build Sample with ${{ matrix.flavor }}
-        run: ./gradlew :sample:assemble -PkmpFlavor=${{ matrix.flavor }} --no-daemon
+        run: ./gradlew :samples:basic-flavors:assemble -PkmpFlavor=${{ matrix.flavor }} --no-daemon
 
       - name: Validate Flavors
-        run: ./gradlew :sample:validateFlavors -PkmpFlavor=${{ matrix.flavor }} --no-daemon
+        run: ./gradlew :samples:basic-flavors:validateFlavors -PkmpFlavor=${{ matrix.flavor }} --no-daemon
 
       - name: List Flavors
-        run: ./gradlew :sample:listFlavors --no-daemon
+        run: ./gradlew :samples:basic-flavors:listFlavors --no-daemon
 
   validate:
     name: Validate Plugin
