@@ -45,7 +45,7 @@ jobs:
 
       - name: Publish to Maven Central
         run: |
-          ./gradlew :build-logic:flavor-plugin:publishAllPublicationsToMavenCentral \
+          ./gradlew :build-logic:flavor-plugin:publishAllPublicationsToMavenCentralRepository \
             --no-daemon \
             -Psigning.gnupg.keyName=${{ secrets.SIGNING_KEY_ID }} \
             -Psigning.gnupg.passphrase=${{ secrets.SIGNING_PASSWORD }}

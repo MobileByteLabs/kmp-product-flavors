@@ -18,6 +18,9 @@ plugins {
     `kotlin-dsl`
     `java-gradle-plugin`
     `maven-publish`
+    signing
+    alias(libs.plugins.vanniktech.mavenPublish)
+    id("com.gradle.plugin-publish") version "1.3.0"
 }
 
 group = "io.github.mobilebytelabs.kmpflavors"
@@ -26,6 +29,8 @@ version = "1.0.0-alpha01"
 java {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
+    withJavadocJar()
+    withSourcesJar()
 }
 
 kotlin {
@@ -49,47 +54,53 @@ dependencies {
 }
 
 gradlePlugin {
+    website.set("https://github.com/MobileByteLabs/kmp-product-flavors")
+    vcsUrl.set("https://github.com/MobileByteLabs/kmp-product-flavors")
+
     plugins {
         register("kmpProductFlavors") {
             id = "io.github.mobilebytelabs.kmp-product-flavors"
             implementationClass = "com.mobilebytelabs.kmpflavors.KmpFlavorPlugin"
             displayName = "KMP Product Flavors"
             description = "Kotlin Multiplatform Product Flavors Gradle Plugin - Bring Android-style product flavors to KMP"
+            tags.set(listOf("kotlin", "multiplatform", "kmp", "flavors", "variants", "android"))
         }
     }
 }
 
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["java"])
+mavenPublishing {
+    publishToMavenCentral(com.vanniktech.maven.publish.SonatypeHost.CENTRAL_PORTAL)
+    signAllPublications()
 
-            pom {
-                name.set("KMP Product Flavors")
-                description.set("Kotlin Multiplatform Product Flavors Gradle Plugin")
-                url.set("https://github.com/MobileByteLabs/kmp-product-flavors")
+    coordinates(group.toString(), "flavor-plugin", version.toString())
 
-                licenses {
-                    license {
-                        name.set("Apache License 2.0")
-                        url.set("https://www.apache.org/licenses/LICENSE-2.0")
-                    }
-                }
+    pom {
+        name.set("KMP Product Flavors")
+        description.set("Kotlin Multiplatform Product Flavors Gradle Plugin - Bring Android-style product flavors to KMP")
+        url.set("https://github.com/MobileByteLabs/kmp-product-flavors")
+        inceptionYear.set("2026")
 
-                developers {
-                    developer {
-                        id.set("mobilebytelabs")
-                        name.set("MobileByteLabs")
-                        email.set("opensource@mobilebytelabs.com")
-                    }
-                }
-
-                scm {
-                    connection.set("scm:git:git://github.com/MobileByteLabs/kmp-product-flavors.git")
-                    developerConnection.set("scm:git:ssh://github.com/MobileByteLabs/kmp-product-flavors.git")
-                    url.set("https://github.com/MobileByteLabs/kmp-product-flavors")
-                }
+        licenses {
+            license {
+                name.set("Apache License 2.0")
+                url.set("https://www.apache.org/licenses/LICENSE-2.0")
+                distribution.set("repo")
             }
+        }
+
+        developers {
+            developer {
+                id.set("therajanmaurya")
+                name.set("Rajan Maurya")
+                email.set("rajanmaurya154@gmail.com")
+                url.set("https://github.com/therajanmaurya")
+            }
+        }
+
+        scm {
+            connection.set("scm:git:git://github.com/MobileByteLabs/kmp-product-flavors.git")
+            developerConnection.set("scm:git:ssh://github.com/MobileByteLabs/kmp-product-flavors.git")
+            url.set("https://github.com/MobileByteLabs/kmp-product-flavors")
         }
     }
 }
