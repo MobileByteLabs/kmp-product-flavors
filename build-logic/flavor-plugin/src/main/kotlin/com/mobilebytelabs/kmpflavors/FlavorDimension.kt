@@ -45,10 +45,7 @@ import javax.inject.Inject
  * }
  * ```
  */
-open class FlavorDimension @Inject constructor(
-    private val dimensionName: String,
-    objects: ObjectFactory,
-) : Named {
+open class FlavorDimension @Inject constructor(private val dimensionName: String, objects: ObjectFactory) : Named {
     /**
      * Returns the name of this dimension.
      */

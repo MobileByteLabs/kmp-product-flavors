@@ -146,7 +146,7 @@ abstract class ValidateFlavorsTask : DefaultTask() {
         // Rule 5: Validate active variant exists
         if (activeVariant != null && variants.isNotEmpty() && activeVariant !in variants) {
             errors.add(
-                "Active variant '$activeVariant' is not valid. Available variants: ${variants.joinToString(", ")}"
+                "Active variant '$activeVariant' is not valid. Available variants: ${variants.joinToString(", ")}",
             )
         }
 

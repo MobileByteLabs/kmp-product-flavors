@@ -26,10 +26,7 @@ package com.mobilebytelabs.kmpflavors
  * @property name The combined variant name (e.g., "freeDev")
  * @property flavors The individual flavors that make up this variant, ordered by dimension priority
  */
-data class FlavorVariant(
-    val name: String,
-    val flavors: List<FlavorConfig>,
-) {
+data class FlavorVariant(val name: String, val flavors: List<FlavorConfig>) {
     /**
      * Merged build config fields from all flavors in this variant.
      * Later dimensions (higher priority) override earlier ones.

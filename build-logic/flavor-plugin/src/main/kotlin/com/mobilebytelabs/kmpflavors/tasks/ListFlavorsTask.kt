@@ -146,12 +146,10 @@ abstract class ListFlavorsTask : DefaultTask() {
         println("└${"─".repeat(60)}┘")
     }
 
-    private fun padRight(text: String, length: Int): String {
-        return if (text.length >= length) {
-            text.take(length)
-        } else {
-            text + " ".repeat(length - text.length)
-        }
+    private fun padRight(text: String, length: Int): String = if (text.length >= length) {
+        text.take(length)
+    } else {
+        text + " ".repeat(length - text.length)
     }
 
     private fun centerText(text: String, width: Int): String {

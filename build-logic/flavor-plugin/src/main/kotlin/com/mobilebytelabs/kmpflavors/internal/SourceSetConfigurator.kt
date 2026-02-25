@@ -29,9 +29,7 @@ import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
  * 1. Creating source set entries for ALL flavors (so IDE recognizes all directories)
  * 2. Wiring dependsOn relationships for only the ACTIVE variant's flavors
  */
-class SourceSetConfigurator(
-    private val logger: Logger,
-) {
+class SourceSetConfigurator(private val logger: Logger) {
 
     /**
      * Configures all flavor source sets.
@@ -130,13 +128,8 @@ class SourceSetConfigurator(
     /**
      * Creates or retrieves a source set with proper directories configured.
      */
-    private fun createSourceSet(
-        sourceSets: org.gradle.api.NamedDomainObjectContainer<KotlinSourceSet>,
-        name: String,
-    ): KotlinSourceSet {
-        return sourceSets.maybeCreate(name).apply {
-            kotlin.srcDir("src/$name/kotlin")
-            resources.srcDir("src/$name/resources")
-        }
+    private fun createSourceSet(sourceSets: org.gradle.api.NamedDomainObjectContainer<KotlinSourceSet>, name: String): KotlinSourceSet = sourceSets.maybeCreate(name).apply {
+        kotlin.srcDir("src/$name/kotlin")
+        resources.srcDir("src/$name/resources")
     }
 }

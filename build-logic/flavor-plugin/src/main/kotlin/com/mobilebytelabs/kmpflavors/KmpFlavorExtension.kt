@@ -72,9 +72,7 @@ import javax.inject.Inject
  * }
  * ```
  */
-abstract class KmpFlavorExtension @Inject constructor(
-    objects: ObjectFactory,
-) {
+abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
     /**
      * Whether to generate a BuildConfig Kotlin object.
      * When true, a Kotlin object will be generated in commonMain with

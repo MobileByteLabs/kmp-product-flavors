@@ -50,20 +50,14 @@ object App {
     /**
      * Returns the API client configuration for the current flavor.
      */
-    fun getApiConfig(): ApiConfig {
-        return ApiConfig(
-            baseUrl = AppConfig.BASE_URL,
-            debugMode = AppConfig.DEBUG_MODE,
-            maxRetries = if (AppConfig.IS_PREMIUM) 5 else 2,
-        )
-    }
+    fun getApiConfig(): ApiConfig = ApiConfig(
+        baseUrl = AppConfig.BASE_URL,
+        debugMode = AppConfig.DEBUG_MODE,
+        maxRetries = if (AppConfig.IS_PREMIUM) 5 else 2,
+    )
 }
 
 /**
  * API client configuration.
  */
-data class ApiConfig(
-    val baseUrl: String,
-    val debugMode: Boolean,
-    val maxRetries: Int,
-)
+data class ApiConfig(val baseUrl: String, val debugMode: Boolean, val maxRetries: Int)

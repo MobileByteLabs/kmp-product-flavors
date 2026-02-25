@@ -33,7 +33,7 @@ dependencyResolutionManagement {
 rootProject.name = "kmp-product-flavors"
 
 // Samples demonstrating the KMP Product Flavors plugin
-include(":samples:basic-flavors")           // Minimal plugin demo
+include(":samples:basic-flavors") // Minimal plugin demo
 
 // TODO: Enable after integrating flavor plugin
 // include(":samples:compose-multiplatform")   // Compose Multiplatform app with flavors

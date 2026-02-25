@@ -58,10 +58,8 @@ object DevTools {
     /**
      * Exports logs to a string.
      */
-    fun exportLogs(): String {
-        return logs.joinToString("\n") { entry ->
-            "[${entry.timestamp}][${entry.level}][${entry.tag}] ${entry.message}"
-        }
+    fun exportLogs(): String = logs.joinToString("\n") { entry ->
+        "[${entry.timestamp}][${entry.level}][${entry.tag}] ${entry.message}"
     }
 
     /**
@@ -75,9 +73,7 @@ object DevTools {
     /**
      * Gets a feature toggle value.
      */
-    fun isFeatureEnabled(feature: String): Boolean {
-        return featureToggles[feature] ?: false
-    }
+    fun isFeatureEnabled(feature: String): Boolean = featureToggles[feature] ?: false
 
     /**
      * Gets all feature toggles.
@@ -87,29 +83,25 @@ object DevTools {
     /**
      * Generates mock user data for testing.
      */
-    fun generateMockUsers(count: Int): List<MockUser> {
-        return (1..count).map { index ->
-            MockUser(
-                id = "user_$index",
-                name = "Test User $index",
-                email = "user$index@test.com",
-                isPremium = index % 2 == 0,
-            )
-        }
+    fun generateMockUsers(count: Int): List<MockUser> = (1..count).map { index ->
+        MockUser(
+            id = "user_$index",
+            name = "Test User $index",
+            email = "user$index@test.com",
+            isPremium = index % 2 == 0,
+        )
     }
 
     /**
      * Generates mock items for testing.
      */
-    fun generateMockItems(count: Int): List<MockItem> {
-        return (1..count).map { index ->
-            MockItem(
-                id = "item_$index",
-                title = "Test Item $index",
-                description = "Description for item $index",
-                price = (index * 9.99),
-            )
-        }
+    fun generateMockItems(count: Int): List<MockItem> = (1..count).map { index ->
+        MockItem(
+            id = "item_$index",
+            title = "Test Item $index",
+            description = "Description for item $index",
+            price = (index * 9.99),
+        )
     }
 
     /**
@@ -145,12 +137,7 @@ object DevTools {
 /**
  * Log entry data class.
  */
-data class LogEntry(
-    val timestamp: Long,
-    val tag: String,
-    val message: String,
-    val level: LogLevel,
-)
+data class LogEntry(val timestamp: Long, val tag: String, val message: String, val level: LogLevel)
 
 /**
  * Log levels.
@@ -166,22 +153,12 @@ enum class LogLevel {
 /**
  * Mock user for testing.
  */
-data class MockUser(
-    val id: String,
-    val name: String,
-    val email: String,
-    val isPremium: Boolean,
-)
+data class MockUser(val id: String, val name: String, val email: String, val isPremium: Boolean)
 
 /**
  * Mock item for testing.
  */
-data class MockItem(
-    val id: String,
-    val title: String,
-    val description: String,
-    val price: Double,
-)
+data class MockItem(val id: String, val title: String, val description: String, val price: Double)
 
 /**
  * Exception for simulated network errors.

@@ -62,7 +62,8 @@ gradlePlugin {
             id = "io.github.mobilebytelabs.kmp-product-flavors"
             implementationClass = "com.mobilebytelabs.kmpflavors.KmpFlavorPlugin"
             displayName = "KMP Product Flavors"
-            description = "Kotlin Multiplatform Product Flavors Gradle Plugin - Bring Android-style product flavors to KMP"
+            description =
+                "Kotlin Multiplatform Product Flavors Gradle Plugin - Bring Android-style product flavors to KMP"
             tags.set(listOf("kotlin", "multiplatform", "kmp", "flavors", "variants", "android"))
         }
     }
@@ -76,7 +77,9 @@ mavenPublishing {
 
     pom {
         name.set("KMP Product Flavors")
-        description.set("Kotlin Multiplatform Product Flavors Gradle Plugin - Bring Android-style product flavors to KMP")
+        description.set(
+            "Kotlin Multiplatform Product Flavors Gradle Plugin - Bring Android-style product flavors to KMP",
+        )
         url.set("https://github.com/MobileByteLabs/kmp-product-flavors")
         inceptionYear.set("2026")
 

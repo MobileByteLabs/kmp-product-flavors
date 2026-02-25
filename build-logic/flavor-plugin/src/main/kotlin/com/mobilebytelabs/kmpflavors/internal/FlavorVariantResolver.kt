@@ -39,10 +39,7 @@ object FlavorVariantResolver {
      * @param flavors All configured flavors
      * @return List of all possible variant combinations
      */
-    fun resolveAllVariants(
-        dimensions: Collection<FlavorDimension>,
-        flavors: Collection<FlavorConfig>,
-    ): List<FlavorVariant> {
+    fun resolveAllVariants(dimensions: Collection<FlavorDimension>, flavors: Collection<FlavorConfig>): List<FlavorVariant> {
         if (flavors.isEmpty()) {
             return emptyList()
         }
@@ -92,10 +89,7 @@ object FlavorVariantResolver {
      * @param flavors All configured flavors
      * @return The default variant, or null if no defaults are configured
      */
-    fun resolveDefaultVariant(
-        dimensions: Collection<FlavorDimension>,
-        flavors: Collection<FlavorConfig>,
-    ): FlavorVariant? {
+    fun resolveDefaultVariant(dimensions: Collection<FlavorDimension>, flavors: Collection<FlavorConfig>): FlavorVariant? {
         if (flavors.isEmpty()) {
             return null
         }
@@ -139,12 +133,7 @@ object FlavorVariantResolver {
      * @param allVariants All available variants
      * @return The matching variant, or null if not found
      */
-    fun resolveVariantByName(
-        name: String,
-        allVariants: List<FlavorVariant>,
-    ): FlavorVariant? {
-        return allVariants.find { it.name.equals(name, ignoreCase = true) }
-    }
+    fun resolveVariantByName(name: String, allVariants: List<FlavorVariant>): FlavorVariant? = allVariants.find { it.name.equals(name, ignoreCase = true) }
 
     /**
      * Builds the variant name from a list of flavors.

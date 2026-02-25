@@ -72,7 +72,7 @@ abstract class GenerateRunConfigurationsTask : DefaultTask() {
 
         // Generate a run configuration for each variant
         variantsMap.forEach { (variantName, flavorNames) ->
-            val configFile = File(outputDir, "${projectNameValue}_${variantName}.run.xml")
+            val configFile = File(outputDir, "${projectNameValue}_$variantName.run.xml")
             val configContent = generateRunConfiguration(
                 name = "$projectNameValue [$variantName]",
                 projectPath = projectPathValue,
@@ -100,12 +100,7 @@ abstract class GenerateRunConfigurationsTask : DefaultTask() {
         logger.lifecycle("Restart your IDE or sync the project to see them in the run dropdown.")
     }
 
-    private fun generateRunConfiguration(
-        name: String,
-        projectPath: String,
-        variantName: String?,
-        tasks: List<String>,
-    ): String {
+    private fun generateRunConfiguration(name: String, projectPath: String, variantName: String?, tasks: List<String>): String {
         val taskNames = tasks.joinToString(" ") { "$projectPath:$it" }
         val scriptParameters = if (variantName != null) {
             "$taskNames -PkmpFlavor=$variantName"

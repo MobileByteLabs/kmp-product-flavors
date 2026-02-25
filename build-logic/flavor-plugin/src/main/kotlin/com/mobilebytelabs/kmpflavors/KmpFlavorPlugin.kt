@@ -260,10 +260,7 @@ class KmpFlavorPlugin : Plugin<Project> {
         }
     }
 
-    private fun wireGenerateBuildConfigToCompilation(
-        project: Project,
-        kotlin: KotlinMultiplatformExtension,
-    ) {
+    private fun wireGenerateBuildConfigToCompilation(project: Project, kotlin: KotlinMultiplatformExtension) {
         val generateTask = project.tasks.named(
             "generateFlavorBuildConfig",
             GenerateBuildConfigTask::class.java,

@@ -84,8 +84,6 @@ class AdManager {
 /**
  * Helper function to create and initialize AdManager.
  */
-fun createAdManager(): AdManager {
-    return AdManager().apply {
-        initialize()
-    }
+fun createAdManager(): AdManager = AdManager().apply {
+    initialize()
 }

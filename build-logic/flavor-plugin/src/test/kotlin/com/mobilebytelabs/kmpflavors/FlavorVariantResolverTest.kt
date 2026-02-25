@@ -181,11 +181,7 @@ class FlavorVariantResolverTest {
 
     // Helper functions to create mock objects
 
-    private fun createMockFlavorConfig(
-        name: String,
-        dimension: String?,
-        isDefault: Boolean = false,
-    ): FlavorConfig {
+    private fun createMockFlavorConfig(name: String, dimension: String?, isDefault: Boolean = false): FlavorConfig {
         val mock = mockk<FlavorConfig>()
         every { mock.name } returns name
         every { mock.dimension } returns mockProperty(dimension)

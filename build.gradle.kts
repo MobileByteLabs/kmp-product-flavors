@@ -36,17 +36,23 @@ tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
 spotless {
     kotlin {
         target("**/*.kt")
-        targetExclude("**/build/**/*.kt", "**/.gradle/**/*.kt")
+        targetExclude(
+            "**/build/**/*.kt",
+            "**/.gradle/**/*.kt",
+            // Exclude git subtree samples (external code we don't control)
+            "**/samples/kmp-template-integration/**/*.kt",
+        )
         ktlint(libs.versions.ktlint.get())
             .editorConfigOverride(
                 mapOf(
                     "android" to "true",
                     "indent_size" to "4",
                     "continuation_indent_size" to "4",
-                    "max_line_length" to "120",
+                    "max_line_length" to "180",
                     "ktlint_function_naming_ignore_when_annotated_with" to "Composable",
                     "ktlint_standard_function-naming" to "disabled",
                     "ktlint_standard_package-name" to "disabled",
+                    "ktlint_standard_filename" to "disabled",
                 ),
             )
         trimTrailingWhitespace()
@@ -56,7 +62,11 @@ spotless {
 
     kotlinGradle {
         target("**/*.gradle.kts")
-        targetExclude("**/build/**/*.gradle.kts")
+        targetExclude(
+            "**/build/**/*.gradle.kts",
+            // Exclude git subtree samples
+            "**/samples/kmp-template-integration/**/*.gradle.kts",
+        )
         ktlint(libs.versions.ktlint.get())
         trimTrailingWhitespace()
         indentWithSpaces(4)
@@ -65,7 +75,12 @@ spotless {
 
     format("misc") {
         target("**/*.md", "**/.gitignore", "**/*.yaml", "**/*.yml")
-        targetExclude("**/build/**", "**/.gradle/**")
+        targetExclude(
+            "**/build/**",
+            "**/.gradle/**",
+            // Exclude git subtree samples
+            "**/samples/kmp-template-integration/**",
+        )
         trimTrailingWhitespace()
         indentWithSpaces(4)
         endWithNewline()

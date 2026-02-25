@@ -35,9 +35,7 @@ class PremiumFeatures {
     /**
      * Checks if a feature is available.
      */
-    fun isFeatureAvailable(feature: String): Boolean {
-        return feature in unlockedFeatures
-    }
+    fun isFeatureAvailable(feature: String): Boolean = feature in unlockedFeatures
 
     /**
      * Gets all available premium features.
@@ -72,27 +70,21 @@ class PremiumFeatures {
     /**
      * Gets advanced analytics data.
      */
-    fun getAnalytics(): AnalyticsData {
-        return AnalyticsData(
-            totalUsageMinutes = 1234,
-            featureUsage = mapOf(
-                "sync" to 500,
-                "export" to 50,
-                "themes" to 200,
-            ),
-            streakDays = 30,
-        )
-    }
+    fun getAnalytics(): AnalyticsData = AnalyticsData(
+        totalUsageMinutes = 1234,
+        featureUsage = mapOf(
+            "sync" to 500,
+            "export" to 50,
+            "themes" to 200,
+        ),
+        streakDays = 30,
+    )
 }
 
 /**
  * Cloud sync configuration.
  */
-data class CloudSyncConfig(
-    val userId: String,
-    val syncInterval: Long,
-    val enableRealtime: Boolean,
-)
+data class CloudSyncConfig(val userId: String, val syncInterval: Long, val enableRealtime: Boolean)
 
 /**
  * Supported export formats.
@@ -107,25 +99,14 @@ enum class ExportFormat(val extension: String) {
 /**
  * Export operation result.
  */
-data class ExportResult(
-    val success: Boolean,
-    val format: ExportFormat,
-    val itemCount: Int,
-    val exportPath: String,
-)
+data class ExportResult(val success: Boolean, val format: ExportFormat, val itemCount: Int, val exportPath: String)
 
 /**
  * Analytics data for premium users.
  */
-data class AnalyticsData(
-    val totalUsageMinutes: Long,
-    val featureUsage: Map<String, Int>,
-    val streakDays: Int,
-)
+data class AnalyticsData(val totalUsageMinutes: Long, val featureUsage: Map<String, Int>, val streakDays: Int)
 
 /**
  * Factory function to create premium features manager.
  */
-fun createPremiumFeatures(): PremiumFeatures {
-    return PremiumFeatures()
-}
+fun createPremiumFeatures(): PremiumFeatures = PremiumFeatures()

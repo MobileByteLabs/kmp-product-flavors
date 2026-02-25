@@ -28,12 +28,7 @@ import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
  * @property parent The parent intermediate group (e.g., "web" for js/wasmJs)
  * @property isIntermediate Whether this is an intermediate group (webMain, nativeMain)
  */
-data class PlatformGroup(
-    val prefix: String,
-    val mainSourceSet: String,
-    val parent: String? = null,
-    val isIntermediate: Boolean = false,
-)
+data class PlatformGroup(val prefix: String, val mainSourceSet: String, val parent: String? = null, val isIntermediate: Boolean = false)
 
 /**
  * Detects active KMP platforms and manages intermediate source sets.
@@ -53,10 +48,7 @@ object PlatformDetector {
      * @param logger Logger for debug output
      * @return List of detected platform groups
      */
-    fun detect(
-        kotlin: KotlinMultiplatformExtension,
-        logger: Logger,
-    ): List<PlatformGroup> {
+    fun detect(kotlin: KotlinMultiplatformExtension, logger: Logger): List<PlatformGroup> {
         val targetNames = kotlin.targets.map { it.name }.toSet()
         val platforms = mutableListOf<PlatformGroup>()
         val needsNativeIntermediate = mutableSetOf<String>()
@@ -140,10 +132,7 @@ object PlatformDetector {
      * @param kotlin The KMP extension
      * @param platforms The detected platforms
      */
-    fun wireIntermediateSourceSets(
-        kotlin: KotlinMultiplatformExtension,
-        platforms: List<PlatformGroup>,
-    ) {
+    fun wireIntermediateSourceSets(kotlin: KotlinMultiplatformExtension, platforms: List<PlatformGroup>) {
         val sourceSets = kotlin.sourceSets
         val commonMain = sourceSets.getByName("commonMain")
 
@@ -185,10 +174,7 @@ object PlatformDetector {
      * @param platforms The detected platforms
      * @return Map of platform groups to source sets
      */
-    fun resolveSourceSets(
-        kotlin: KotlinMultiplatformExtension,
-        platforms: List<PlatformGroup>,
-    ): Map<PlatformGroup, KotlinSourceSet> {
+    fun resolveSourceSets(kotlin: KotlinMultiplatformExtension, platforms: List<PlatformGroup>): Map<PlatformGroup, KotlinSourceSet> {
         val sourceSets = kotlin.sourceSets
 
         return platforms.mapNotNull { platform ->

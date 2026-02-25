@@ -31,11 +31,7 @@ import javax.inject.Inject
  * @property name The name of the constant
  * @property value The value as a string (will be formatted based on type)
  */
-data class BuildConfigField(
-    val type: String,
-    val name: String,
-    val value: String,
-) : Serializable {
+data class BuildConfigField(val type: String, val name: String, val value: String) : Serializable {
     companion object {
         private const val serialVersionUID = 1L
     }
@@ -47,10 +43,7 @@ data class BuildConfigField(
  * @property configuration The Gradle configuration (e.g., "implementation", "api")
  * @property notation The dependency notation (e.g., "com.example:library:1.0.0")
  */
-data class FlavorDependency(
-    val configuration: String,
-    val notation: String,
-) : Serializable {
+data class FlavorDependency(val configuration: String, val notation: String) : Serializable {
     companion object {
         private const val serialVersionUID = 1L
     }
@@ -79,10 +72,7 @@ data class FlavorDependency(
  * }
  * ```
  */
-open class FlavorConfig @Inject constructor(
-    private val flavorName: String,
-    objects: ObjectFactory,
-) : Named {
+open class FlavorConfig @Inject constructor(private val flavorName: String, objects: ObjectFactory) : Named {
     /**
      * Returns the name of this flavor.
      */

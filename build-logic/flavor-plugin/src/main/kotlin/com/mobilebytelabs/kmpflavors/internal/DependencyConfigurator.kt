@@ -23,9 +23,7 @@ import org.gradle.api.logging.Logger
 /**
  * Configures per-flavor dependencies for the active variant.
  */
-class DependencyConfigurator(
-    private val logger: Logger,
-) {
+class DependencyConfigurator(private val logger: Logger) {
 
     /**
      * Adds all dependencies from the active variant's flavors.
@@ -33,10 +31,7 @@ class DependencyConfigurator(
      * @param project The Gradle project
      * @param activeVariant The currently active variant
      */
-    fun configure(
-        project: Project,
-        activeVariant: FlavorVariant,
-    ) {
+    fun configure(project: Project, activeVariant: FlavorVariant) {
         val dependencies = activeVariant.allDependencies
 
         if (dependencies.isEmpty()) {
