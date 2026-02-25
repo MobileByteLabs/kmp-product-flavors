@@ -104,7 +104,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Validate Gradle Wrapper
-        uses: gradle/actions/wrapper-validation-action@v4
+        uses: gradle/wrapper-validation-action@v3
 
       - name: Check Plugin Publication
         run: ./gradlew :build-logic:flavor-plugin:publishToMavenLocal --no-daemon
