@@ -19,6 +19,7 @@ package com.mobilebytelabs.kmpflavors
 import com.mobilebytelabs.kmpflavors.internal.PlatformDetector
 import io.mockk.every
 import io.mockk.mockk
+import org.gradle.api.NamedDomainObjectCollection
 import org.gradle.api.logging.Logger
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.KotlinTarget
@@ -187,14 +188,11 @@ class PlatformDetectorTest {
             }
         }
 
+        val mockTargetContainer = mockk<NamedDomainObjectCollection<KotlinTarget>>()
+        every { mockTargetContainer.iterator() } returns targets.toMutableList().iterator()
+
         return mockk {
-            every { this@mockk.targets } returns mockk {
-                every { iterator() } returns targets.iterator()
-                every { map<String>(any()) } answers {
-                    val mapper = firstArg<(KotlinTarget) -> String>()
-                    targets.map(mapper)
-                }
-            }
+            every { this@mockk.targets } returns mockTargetContainer
         }
     }
 }

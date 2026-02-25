@@ -211,12 +211,11 @@ class FlavorVariantResolverTest {
         return mock
     }
 
-    @Suppress("UNCHECKED_CAST")
-    private fun <T> mockProperty(value: T?): Property<T> {
+    private inline fun <reified T : Any> mockProperty(value: T?): Property<T> {
         val mock = mockk<Property<T>>()
         every { mock.orNull } returns value
-        every { mock.getOrElse(any<T>()) } answers {
-            value ?: (firstArg<T>())
+        every { mock.getOrElse(any()) } answers {
+            value ?: firstArg()
         }
         if (value != null) {
             every { mock.get() } returns value

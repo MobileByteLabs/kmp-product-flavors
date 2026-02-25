@@ -44,6 +44,8 @@ dependencies {
     testImplementation(libs.kotlin.test)
     testImplementation(libs.mockk)
     testImplementation(libs.junit)
+    // Kotlin Gradle Plugin for tests (needed to mock KMP extension)
+    testImplementation(libs.kotlin.gradle.plugin)
 }
 
 gradlePlugin {

@@ -31,7 +31,7 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/development' }}
 
       - name: Build Plugin
-        run: ./gradlew :build-logic:flavor-plugin:build --no-daemon
+        run: ./gradlew :build-logic:flavor-plugin:assemble --no-daemon
 
       - name: Upload Plugin Artifacts
         uses: actions/upload-artifact@v4

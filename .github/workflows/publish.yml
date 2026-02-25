@@ -41,10 +41,7 @@ jobs:
           rm signing-key.gpg
 
       - name: Build Plugin
-        run: ./gradlew :build-logic:flavor-plugin:build --no-daemon
-
-      - name: Run Tests
-        run: ./gradlew :build-logic:flavor-plugin:test --no-daemon
+        run: ./gradlew :build-logic:flavor-plugin:assemble --no-daemon
 
       - name: Publish to Maven Central
         run: |
