@@ -34,22 +34,25 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Build Plugin
+        run: ./gradlew :build-logic:flavor-plugin:assemble --no-daemon --no-configuration-cache
+
       - name: Decode GPG Key
         run: |
-          echo "${{ secrets.GPG_KEY_CONTENTS }}" | base64 -d > signing-key.gpg
-          gpg --batch --import signing-key.gpg
-          rm signing-key.gpg
-
-      - name: Build Plugin
-        run: ./gradlew :build-logic:flavor-plugin:assemble --no-daemon
+          echo "${{ secrets.GPG_KEY_CONTENTS }}" | base64 -d > /tmp/signing-key.asc
 
       - name: Publish to Maven Central
+        env:
+          ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.SIGNING_KEY_ID }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
         run: |
+          export ORG_GRADLE_PROJECT_signingInMemoryKey=$(cat /tmp/signing-key.asc)
           ./gradlew :build-logic:flavor-plugin:publishAllPublicationsToMavenCentralRepository \
             --no-daemon \
-            --no-configuration-cache \
-            -Psigning.gnupg.keyName=${{ secrets.SIGNING_KEY_ID }} \
-            -Psigning.gnupg.passphrase=${{ secrets.SIGNING_PASSWORD }}
+            --no-configuration-cache
+          rm /tmp/signing-key.asc
 
       - name: Create GitHub Release Notes
         if: github.event_name == 'release'
