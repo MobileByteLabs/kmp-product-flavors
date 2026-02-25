@@ -77,7 +77,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build Sample with ${{ matrix.flavor }}
-        run: ./gradlew :sample:assemble -PkmpFlavor=${{ matrix.flavor }} --no-daemon -x test
+        run: ./gradlew :sample:assemble -PkmpFlavor=${{ matrix.flavor }} --no-daemon
 
       - name: Validate Flavors
         run: ./gradlew :sample:validateFlavors -PkmpFlavor=${{ matrix.flavor }} --no-daemon
@@ -107,7 +107,7 @@ jobs:
         uses: gradle/actions/wrapper-validation-action@v4
 
       - name: Check Plugin Publication
-        run: ./gradlew :build-logic:flavor-plugin:publishToMavenLocal -x test --no-daemon
+        run: ./gradlew :build-logic:flavor-plugin:publishToMavenLocal --no-daemon
 
       - name: Verify Published Artifacts
         run: |
