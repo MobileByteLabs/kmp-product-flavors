@@ -86,32 +86,97 @@ basic-flavors/
 
 **Production-ready KMP template from [openMF](https://github.com/openMF/kmp-project-template).**
 
-This sample demonstrates how to integrate kmp-product-flavors into a real-world KMP project using the **convention plugin pattern**.
+This sample demonstrates how to integrate kmp-product-flavors into a real-world KMP project using the **convention plugin pattern**. The plugin is automatically applied to all KMP modules through the convention plugins.
 
 ### Features
-- **Convention plugin integration** - Wraps kmp-product-flavors in a reusable convention plugin
-- **Centralized flavor configuration** - Single source of truth for all modules
-- **Demo/Prod flavors** - Environment-based configuration
-- **Build types support** - Debug/Release with specific settings
 
-### Build Separately
+- **Automatic integration** - All KMP modules get flavors via `KMPLibraryConventionPlugin`
+- **Convention plugin pattern** - Wraps kmp-product-flavors in reusable convention plugins
+- **Centralized configuration** - Single source of truth in `KmpFlavors.kt`
+- **Demo/Prod flavors** - Aligned with Android application flavors
+- **Cross-platform BuildConfig** - Access flavor info from shared code
+
+### How It Works
+
+The plugin is applied in `KMPLibraryConventionPlugin` and `KMPCoreBaseLibraryConventionPlugin`:
+
+```kotlin
+// KMPLibraryConventionPlugin.kt
+with(pluginManager) {
+    apply("com.android.library")
+    apply("org.jetbrains.kotlin.multiplatform")
+    apply("org.convention.kmp.flavors") // <-- Automatically applied
+    // ...
+}
+```
+
+All modules using these convention plugins automatically get cross-platform flavor support.
+
+### Flavor Configuration
+
+Defined in [`org/convention/KmpFlavors.kt`](kmp-project-template/build-logic/convention/src/main/kotlin/org/convention/KmpFlavors.kt):
+
+| Flavor | Description | Suffix |
+|--------|-------------|--------|
+| `demo` | Demo environment (default) | `.demo` |
+| `prod` | Production environment | - |
+
+### Generated BuildConfig
+
+```kotlin
+// Access from any shared module
+import com.example.FlavorConfig
+
+println(FlavorConfig.VARIANT_NAME)      // "demo"
+println(FlavorConfig.IS_DEMO)           // true
+println(FlavorConfig.BASE_URL)          // "https://demo-api.mifos.org"
+println(FlavorConfig.ANALYTICS_ENABLED) // false
+```
+
+### Build Commands
 
 ```bash
 cd samples/kmp-project-template
-./gradlew build -PkmpFlavor=demoDev
+
+# Build with demo flavor (default)
+./gradlew build
+
+# Build with prod flavor
+./gradlew build -PkmpFlavor=prod
+
+# List all variants
 ./gradlew listFlavors
+
+# Initialize flavor source directories
+./gradlew kmpFlavorInit
 ```
 
 ### Convention Plugin Structure
 
 ```
 build-logic/convention/
+├── build.gradle.kts                           # Plugin dependency
 ├── src/main/kotlin/
-│   ├── KMPFlavorsConventionPlugin.kt    # Main convention plugin
+│   ├── KMPFlavorsConventionPlugin.kt          # Convention plugin wrapper
+│   ├── KMPLibraryConventionPlugin.kt          # Applies kmp.flavors
+│   ├── KMPCoreBaseLibraryConventionPlugin.kt  # Applies kmp.flavors
 │   └── org/convention/
-│       ├── KmpFlavors.kt                 # Flavor definitions
-│       └── KmpFlavorsBuildConfig.kt      # BuildConfig helpers
+│       ├── KmpFlavors.kt                      # Flavor definitions
+│       └── KmpFlavorsBuildConfig.kt           # BuildConfig helpers
 ```
+
+### Integration Steps (for other projects)
+
+1. Add dependency to `build-logic/convention/build.gradle.kts`:
+   ```kotlin
+   implementation("io.github.mobilebytelabs.kmpflavors:flavor-plugin:1.0.0")
+   ```
+
+2. Copy convention plugin files from this sample
+
+3. Apply `org.convention.kmp.flavors` in your KMP convention plugins
+
+4. Customize `KmpFlavors.kt` for your project's flavors
 
 ---
 

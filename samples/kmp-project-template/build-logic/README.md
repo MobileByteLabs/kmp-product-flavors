@@ -23,16 +23,115 @@ code.
 
 These plugins are *additive* and *composable*, and try to only accomplish a single responsibility.
 Modules can then pick and choose the configurations they need.
-If there is one-off logic for a module without shared code, it's preferable to define that directly
-in the module's `build.gradle`, as opposed to creating a convention plugin with module-specific
-setup.
 
-Current list of convention plugins:
+## Convention Plugins
 
-- [`android.application`](convention/src/main/kotlin/AndroidApplicationConventionPlugin.kt),
-  [`android.library`](convention/src/main/kotlin/AndroidLibraryConventionPlugin.kt),
-  [`android.test`](convention/src/main/kotlin/AndroidTestConventionPlugin.kt):
-  Configures common Android and Kotlin options.
-- [`android.application.compose`](convention/src/main/kotlin/AndroidApplicationComposeConventionPlugin.kt),
-  [`android.library.compose`](convention/src/main/kotlin/AndroidLibraryComposeConventionPlugin.kt):
-  Configures Jetpack Compose options
+### Android Plugins
+
+| Plugin | Description |
+|--------|-------------|
+| `org.convention.android.application` | Base Android application configuration |
+| `org.convention.android.application.compose` | Android application with Compose |
+| `org.convention.android.application.flavors` | Android application product flavors (demo/prod) |
+| `org.convention.android.application.firebase` | Firebase integration (Analytics, Crashlytics) |
+| `org.convention.android.application.lint` | Android Lint configuration |
+
+### KMP & CMP Plugins
+
+| Plugin | Description |
+|--------|-------------|
+| `org.convention.kmp.library` | KMP library with Android support (includes kmp.flavors) |
+| `org.convention.kmp.core.base.library` | KMP core-base library (includes kmp.flavors) |
+| `org.convention.kmp.koin` | Koin dependency injection for KMP |
+| `org.convention.kmp.flavors` | **KMP Product Flavors** - Cross-platform flavor support |
+| `org.convention.cmp.feature` | Compose Multiplatform feature module |
+| `mifos.kmp.room` | Room database for KMP |
+
+### Code Quality Plugins
+
+| Plugin | Description |
+|--------|-------------|
+| `org.convention.detekt.plugin` | Detekt static analysis |
+| `org.convention.spotless.plugin` | Spotless code formatting |
+| `org.convention.ktlint.plugin` | Ktlint code style |
+| `org.convention.git.hooks` | Git hooks for pre-commit checks |
+
+## KMP Product Flavors Integration
+
+This project integrates [kmp-product-flavors](https://github.com/MobileByteLabs/kmp-product-flavors)
+for cross-platform flavor support that aligns with Android application flavors.
+
+### Automatic Application
+
+KMP flavors are automatically applied when using:
+- `org.convention.kmp.library`
+- `org.convention.kmp.core.base.library`
+
+All KMP modules get cross-platform flavor support without any additional configuration.
+
+### Flavor Configuration
+
+Flavors are configured in [`org/convention/KmpFlavors.kt`](convention/src/main/kotlin/org/convention/KmpFlavors.kt):
+
+| Flavor | Description | Default |
+|--------|-------------|---------|
+| `demo` | Demo/development environment | Yes |
+| `prod` | Production environment | No |
+
+### Generated BuildConfig
+
+All KMP modules have access to flavor-specific constants:
+
+```kotlin
+import com.example.FlavorConfig
+
+// Access from shared code
+println("Variant: ${FlavorConfig.VARIANT_NAME}")  // "demo" or "prod"
+println("Is Demo: ${FlavorConfig.IS_DEMO}")       // true/false
+println("Is Prod: ${FlavorConfig.IS_PROD}")       // true/false
+println("Base URL: ${FlavorConfig.BASE_URL}")     // flavor-specific URL
+```
+
+### Source Sets
+
+Flavor-specific source sets are available:
+
+```
+src/
+├── commonMain/      # All variants
+├── commonDemo/      # Demo flavor (all platforms)
+├── commonProd/      # Prod flavor (all platforms)
+├── androidDemo/     # Android + Demo
+├── iosDemo/         # iOS + Demo
+└── desktopDemo/     # Desktop + Demo
+```
+
+### Build Commands
+
+```bash
+# Build with demo flavor (default)
+./gradlew build
+
+# Build with prod flavor
+./gradlew build -PkmpFlavor=prod
+
+# List all variants
+./gradlew listFlavors
+
+# Initialize source directories
+./gradlew kmpFlavorInit
+```
+
+## Helper Files
+
+Located in `convention/src/main/kotlin/org/convention/`:
+
+| File | Description |
+|------|-------------|
+| `AppFlavor.kt` | Android application flavor definitions |
+| `KmpFlavors.kt` | KMP cross-platform flavor configuration |
+| `KmpFlavorsBuildConfig.kt` | BuildConfig field helpers |
+| `KotlinAndroid.kt` | Kotlin Android configuration |
+| `KotlinMultiplatform.kt` | Kotlin Multiplatform configuration |
+| `AndroidCompose.kt` | Compose configuration |
+| `HierarchyTemplate.kt` | Source set hierarchy template |
