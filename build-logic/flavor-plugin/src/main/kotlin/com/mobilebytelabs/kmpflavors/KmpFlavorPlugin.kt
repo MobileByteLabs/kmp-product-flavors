@@ -204,35 +204,46 @@ class KmpFlavorPlugin : Plugin<Project> {
     ) {
         // Generate BuildConfig task
         if (extension.generateBuildConfig.get()) {
-            project.tasks.register("generateFlavorBuildConfig", GenerateBuildConfigTask::class.java) { task ->
-                task.packageName.set(extension.buildConfigPackage)
-                task.className.set(extension.buildConfigClassName)
-                task.variantName.set(activeVariant.name)
-                task.allFlavorNames.set(flavors.map { it.name }.toSet())
-                task.activeFlavorNames.set(activeVariant.flavorNames.toSet())
-                task.buildConfigFields.set(activeVariant.mergedBuildConfigFields)
-                task.outputDirectory.set(
+            project.tasks.register(
+                "generateFlavorBuildConfig",
+                GenerateBuildConfigTask::class.java,
+            ) {
+                packageName.set(extension.buildConfigPackage)
+                className.set(extension.buildConfigClassName)
+                variantName.set(activeVariant.name)
+                allFlavorNames.set(flavors.map { it.name }.toSet())
+                activeFlavorNames.set(activeVariant.flavorNames.toSet())
+                buildConfigFields.set(activeVariant.mergedBuildConfigFields)
+                outputDirectory.set(
                     project.layout.buildDirectory.dir("generated/kmpFlavors/commonMain/kotlin"),
                 )
             }
         }
 
         // Validate flavors task
-        project.tasks.register("validateFlavors", ValidateFlavorsTask::class.java) { task ->
-            task.dimensionNames.set(dimensions.map { it.name }.toSet())
-            task.flavorDimensions.set(flavors.associate { it.name to it.dimension.orNull })
-            task.flavorDefaults.set(flavors.associate { it.name to it.isDefault.getOrElse(false) })
-            task.validVariantNames.set(allVariants.map { it.name }.toSet())
-            task.activeVariantName.set(activeVariant.name)
-            task.allFlavorNames.set(flavors.map { it.name })
+        project.tasks.register(
+            "validateFlavors",
+            ValidateFlavorsTask::class.java,
+        ) {
+            dimensionNames.set(dimensions.map { it.name }.toSet())
+            flavorDimensions.set(flavors.associate { it.name to it.dimension.orNull })
+            flavorDefaults.set(flavors.associate { it.name to it.isDefault.getOrElse(false) })
+            validVariantNames.set(allVariants.map { it.name }.toSet())
+            activeVariantName.set(activeVariant.name)
+            allFlavorNames.set(flavors.map { it.name })
         }
 
         // List flavors task
-        project.tasks.register("listFlavors", ListFlavorsTask::class.java) { task ->
-            task.variants.set(allVariants.associate { it.name to it.flavorNames })
-            task.activeVariant.set(activeVariant.name)
-            task.dimensions.set(dimensions.associate { it.name to it.priority.getOrElse(0) })
-            task.platforms.set(platforms.filter { !it.isIntermediate }.map { it.prefix })
+        val variantsData = allVariants.associate { it.name to it.flavorNames }
+        val activeVariantNameValue = activeVariant.name
+        val dimensionsData = dimensions.associate { it.name to it.priority.getOrElse(0) }
+        val platformsData = platforms.filter { !it.isIntermediate }.map { it.prefix }
+
+        project.tasks.register("listFlavors", ListFlavorsTask::class.java).configure {
+            this.variants.set(variantsData)
+            this.activeVariant.set(activeVariantNameValue)
+            this.dimensions.set(dimensionsData)
+            this.platforms.set(platformsData)
         }
     }
 
@@ -240,7 +251,10 @@ class KmpFlavorPlugin : Plugin<Project> {
         project: Project,
         kotlin: KotlinMultiplatformExtension,
     ) {
-        val generateTask = project.tasks.named("generateFlavorBuildConfig", GenerateBuildConfigTask::class.java)
+        val generateTask = project.tasks.named(
+            "generateFlavorBuildConfig",
+            GenerateBuildConfigTask::class.java,
+        )
 
         // Add generated source directory to commonMain
         kotlin.sourceSets.getByName("commonMain").kotlin.srcDir(
@@ -248,8 +262,8 @@ class KmpFlavorPlugin : Plugin<Project> {
         )
 
         // Make Kotlin compilation depend on generation
-        project.tasks.matching { it.name.startsWith("compileKotlin") }.configureEach { compileTask ->
-            compileTask.dependsOn(generateTask)
+        project.tasks.matching { it.name.startsWith("compileKotlin") }.configureEach {
+            dependsOn(generateTask)
         }
     }
 }

@@ -51,7 +51,7 @@ class KmpFlavorPluginIntegrationTest {
             """
             plugins {
                 kotlin("multiplatform") version "2.1.0"
-                id("io.github.anthropic.kmp-product-flavors")
+                id("io.github.mobilebytelabs.kmp-product-flavors")
             }
 
             kotlin {
@@ -85,7 +85,7 @@ class KmpFlavorPluginIntegrationTest {
             """
             plugins {
                 kotlin("multiplatform") version "2.1.0"
-                id("io.github.anthropic.kmp-product-flavors")
+                id("io.github.mobilebytelabs.kmp-product-flavors")
             }
 
             kotlin {
@@ -129,7 +129,7 @@ class KmpFlavorPluginIntegrationTest {
             """
             plugins {
                 kotlin("multiplatform") version "2.1.0"
-                id("io.github.anthropic.kmp-product-flavors")
+                id("io.github.mobilebytelabs.kmp-product-flavors")
             }
 
             kotlin {
@@ -180,7 +180,7 @@ class KmpFlavorPluginIntegrationTest {
             """
             plugins {
                 kotlin("multiplatform") version "2.1.0"
-                id("io.github.anthropic.kmp-product-flavors")
+                id("io.github.mobilebytelabs.kmp-product-flavors")
             }
 
             kotlin {
@@ -231,7 +231,7 @@ class KmpFlavorPluginIntegrationTest {
             """
             plugins {
                 kotlin("multiplatform") version "2.1.0"
-                id("io.github.anthropic.kmp-product-flavors")
+                id("io.github.mobilebytelabs.kmp-product-flavors")
             }
 
             kotlin {
@@ -278,7 +278,7 @@ class KmpFlavorPluginIntegrationTest {
             """
             plugins {
                 kotlin("multiplatform") version "2.1.0"
-                id("io.github.anthropic.kmp-product-flavors")
+                id("io.github.mobilebytelabs.kmp-product-flavors")
             }
 
             kotlin {

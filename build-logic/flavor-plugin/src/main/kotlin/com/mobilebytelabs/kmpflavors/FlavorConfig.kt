@@ -17,10 +17,12 @@
 package com.mobilebytelabs.kmpflavors
 
 import org.gradle.api.Named
+import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.MapProperty
 import org.gradle.api.provider.Property
 import java.io.Serializable
+import javax.inject.Inject
 
 /**
  * Represents a custom build config field that will be generated in the BuildConfig object.
@@ -77,75 +79,87 @@ data class FlavorDependency(
  * }
  * ```
  */
-abstract class FlavorConfig : Named {
+open class FlavorConfig @Inject constructor(
+    private val flavorName: String,
+    objects: ObjectFactory,
+) : Named {
+    /**
+     * Returns the name of this flavor.
+     */
+    override fun getName(): String = flavorName
+
     /**
      * The dimension this flavor belongs to.
      * Must reference a dimension declared in [KmpFlavorExtension.flavorDimensions].
      */
-    abstract val dimension: Property<String>
+    val dimension: Property<String> = objects.property(String::class.java)
 
     /**
      * Whether this flavor is the default for its dimension.
      * Each dimension must have exactly one default flavor.
      * Convention: false
      */
-    abstract val isDefault: Property<Boolean>
+    val isDefault: Property<Boolean> = objects.property(Boolean::class.javaObjectType).convention(false)
 
     /**
      * Custom build config fields to include in the generated BuildConfig object.
      * These will be available as `const val` properties in the generated Kotlin object.
      */
-    abstract val buildConfigFields: MapProperty<String, BuildConfigField>
+    val buildConfigFields: MapProperty<String, BuildConfigField> =
+        objects.mapProperty(String::class.java, BuildConfigField::class.java)
 
     /**
      * Suffix to append to the Android application ID.
      * Example: ".free" results in "com.example.app.free"
      */
-    abstract val applicationIdSuffix: Property<String>
+    val applicationIdSuffix: Property<String> = objects.property(String::class.java)
 
     /**
      * Suffix to append to the iOS bundle ID.
      * Example: ".free" results in "com.example.app.free"
      */
-    abstract val bundleIdSuffix: Property<String>
+    val bundleIdSuffix: Property<String> = objects.property(String::class.java)
 
     /**
      * Suffix to append to the desktop window title.
      */
-    abstract val desktopWindowTitleSuffix: Property<String>
+    val desktopWindowTitleSuffix: Property<String> = objects.property(String::class.java)
 
     /**
      * Suffix to append to the web page title.
      */
-    abstract val webTitleSuffix: Property<String>
+    val webTitleSuffix: Property<String> = objects.property(String::class.java)
 
     /**
      * Suffix to append to the version name.
      * Example: "-free" results in "1.0.0-free"
      */
-    abstract val versionNameSuffix: Property<String>
+    val versionNameSuffix: Property<String> = objects.property(String::class.java)
 
     /**
      * Arbitrary key-value pairs for custom configuration.
      * These are available at configuration time but not in generated code.
      */
-    abstract val extras: MapProperty<String, String>
+    val extras: MapProperty<String, String> =
+        objects.mapProperty(String::class.java, String::class.java)
 
     /**
      * Dependencies that should only be included when this flavor is active.
      */
-    abstract val flavorDependencies: ListProperty<FlavorDependency>
+    val flavorDependencies: ListProperty<FlavorDependency> =
+        objects.listProperty(FlavorDependency::class.java)
 
     /**
      * Fallback flavors for dependency resolution when a dependency doesn't
      * have a variant for this flavor.
      */
-    abstract val matchingFallbacks: ListProperty<String>
+    val matchingFallbacks: ListProperty<String> =
+        objects.listProperty(String::class.java)
 
     /**
      * The signing config name to use for Android builds with this flavor.
      */
-    abstract val signingConfig: Property<String>
+    val signingConfig: Property<String> = objects.property(String::class.java)
 
     /**
      * Adds a custom build config field to this flavor.

@@ -198,7 +198,7 @@ class FlavorVariantResolverTest {
         every { mock.extras } returns mockk {
             every { get() } returns emptyMap()
         }
-        every { mock.dependencies } returns mockk {
+        every { mock.flavorDependencies } returns mockk {
             every { get() } returns emptyList()
         }
         return mock
@@ -211,11 +211,12 @@ class FlavorVariantResolverTest {
         return mock
     }
 
+    @Suppress("UNCHECKED_CAST")
     private fun <T> mockProperty(value: T?): Property<T> {
         val mock = mockk<Property<T>>()
         every { mock.orNull } returns value
-        every { mock.getOrElse(any()) } answers {
-            value ?: firstArg()
+        every { mock.getOrElse(any<T>()) } answers {
+            value ?: (firstArg<T>())
         }
         if (value != null) {
             every { mock.get() } returns value

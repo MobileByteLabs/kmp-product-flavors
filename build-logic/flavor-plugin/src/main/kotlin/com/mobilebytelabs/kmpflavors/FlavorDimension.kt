@@ -17,7 +17,9 @@
 package com.mobilebytelabs.kmpflavors
 
 import org.gradle.api.Named
+import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.Property
+import javax.inject.Inject
 
 /**
  * Configuration for a flavor dimension.
@@ -26,7 +28,7 @@ import org.gradle.api.provider.Property
  * - "tier" dimension with flavors: free, paid
  * - "environment" dimension with flavors: dev, staging, prod
  *
- * This creates a variant matrix of 2×3 = 6 variants:
+ * This creates a variant matrix of 2x3 = 6 variants:
  * freeDev, freeStaging, freeProd, paidDev, paidStaging, paidProd
  *
  * Example usage:
@@ -43,7 +45,15 @@ import org.gradle.api.provider.Property
  * }
  * ```
  */
-abstract class FlavorDimension : Named {
+open class FlavorDimension @Inject constructor(
+    private val dimensionName: String,
+    objects: ObjectFactory,
+) : Named {
+    /**
+     * Returns the name of this dimension.
+     */
+    override fun getName(): String = dimensionName
+
     /**
      * The merge priority for this dimension.
      *
@@ -53,5 +63,5 @@ abstract class FlavorDimension : Named {
      *
      * Convention: 0
      */
-    abstract val priority: Property<Int>
+    val priority: Property<Int> = objects.property(Int::class.javaObjectType).convention(0)
 }
