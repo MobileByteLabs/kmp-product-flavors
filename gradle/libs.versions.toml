@@ -2,7 +2,7 @@
 # KMP Product Flavors Plugin Version (Single Source of Truth)
 kmpProductFlavors = "1.0.0-alpha01"
 
-agp = "8.7.3"
+agp = "9.0.1"
 kotlin = "2.1.0"
 compose-multiplatform = "1.7.3"
 android-minSdk = "24"
