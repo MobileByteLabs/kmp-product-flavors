@@ -26,7 +26,7 @@ jobs:
           java-version: '17'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/development' }}
 
@@ -74,7 +74,7 @@ jobs:
           java-version: '17'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Build Sample with ${{ matrix.flavor }}
         run: ./gradlew :samples:basic-flavors:assemble -PkmpFlavor=${{ matrix.flavor }} --no-daemon
@@ -101,7 +101,7 @@ jobs:
           java-version: '17'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Validate Gradle Wrapper
         uses: gradle/wrapper-validation-action@v3
