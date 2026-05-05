@@ -19,6 +19,7 @@ package com.mobilebytelabs.kmpflavors
 import com.mobilebytelabs.kmpflavors.internal.FlavorVariantResolver
 import io.mockk.every
 import io.mockk.mockk
+import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -190,6 +191,9 @@ class FlavorVariantResolverTest {
             every { get() } returns emptyMap()
         }
         every { mock.applicationIdSuffix } returns mockProperty(null)
+        every { mock.bundleIdSuffix } returns mockProperty(null)
+        every { mock.desktopWindowTitleSuffix } returns mockProperty(null)
+        every { mock.webTitleSuffix } returns mockProperty(null)
         every { mock.versionNameSuffix } returns mockProperty(null)
         every { mock.extras } returns mockk {
             every { get() } returns emptyMap()
@@ -197,6 +201,14 @@ class FlavorVariantResolverTest {
         every { mock.flavorDependencies } returns mockk {
             every { get() } returns emptyList()
         }
+        every { mock.matchingFallbacks } returns mockListProperty(emptyList())
+        return mock
+    }
+
+    private inline fun <reified T : Any> mockListProperty(values: List<T>): ListProperty<T> {
+        val mock = mockk<ListProperty<T>>()
+        every { mock.get() } returns values
+        every { mock.getOrElse(any()) } returns values
         return mock
     }
 

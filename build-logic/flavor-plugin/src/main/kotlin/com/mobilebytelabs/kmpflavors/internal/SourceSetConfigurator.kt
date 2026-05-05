@@ -41,6 +41,7 @@ class SourceSetConfigurator(private val logger: Logger) {
      * @param platformSourceSets Map of platforms to their source sets
      * @param createIntermediates Whether to create intermediate flavor source sets
      */
+    @Suppress("UNUSED_PARAMETER") // platformSourceSets kept for API compatibility
     fun configure(
         kotlin: KotlinMultiplatformExtension,
         activeVariant: FlavorVariant,
@@ -75,36 +76,31 @@ class SourceSetConfigurator(private val logger: Logger) {
             }
 
             // 2. Create intermediate<Flavor> source sets (if enabled)
+            // Note: Intermediate flavor source sets only depend on commonFlavor
+            // (NOT on intermediateMain as it may be a compilation default source set)
             if (createIntermediates) {
                 for (intermediate in intermediatePlatforms) {
                     val intermediateFlavorName = "${intermediate.prefix}$capitalizedFlavor"
                     val intermediateFlavor = createSourceSet(sourceSets, intermediateFlavorName)
 
                     if (isActiveFlavor) {
-                        // Wire to both commonFlavor and intermediateMain
+                        // Wire only to commonFlavor (not intermediateMain to avoid compilation default dependency)
                         intermediateFlavor.dependsOn(commonFlavor)
-                        val intermediateMain = sourceSets.findByName(intermediate.mainSourceSet)
-                        if (intermediateMain != null) {
-                            intermediateFlavor.dependsOn(intermediateMain)
-                            logger.info("[KMP Flavors] Wired $intermediateFlavorName -> $commonFlavorName, ${intermediate.mainSourceSet}")
-                        }
+                        logger.info("[KMP Flavors] Wired $intermediateFlavorName -> $commonFlavorName")
                     }
                 }
             }
 
             // 3. Create <platform><Flavor> source sets for leaf platforms
+            // Note: Platform flavor source sets should NOT depend on platformMain
+            // (e.g., desktopFree cannot depend on desktopMain as it's a compilation default source set)
+            // Instead, they depend on commonFlavor or intermediate flavor source sets only
             for (platform in leafPlatforms) {
                 val platformFlavorName = "${platform.prefix}$capitalizedFlavor"
                 val platformFlavor = createSourceSet(sourceSets, platformFlavorName)
 
                 if (isActiveFlavor) {
-                    // Wire to platformMain
-                    val platformMain = platformSourceSets[platform]
-                    if (platformMain != null) {
-                        platformFlavor.dependsOn(platformMain)
-                    }
-
-                    // Wire to intermediate flavor or common flavor
+                    // Wire to intermediate flavor or common flavor (NOT to platformMain)
                     if (createIntermediates && platform.parent != null) {
                         val parentIntermediate = intermediatePlatforms.find { it.prefix == platform.parent }
                         if (parentIntermediate != null) {
@@ -112,13 +108,13 @@ class SourceSetConfigurator(private val logger: Logger) {
                             val intermediateFlavor = sourceSets.findByName(intermediateFlavorName)
                             if (intermediateFlavor != null) {
                                 platformFlavor.dependsOn(intermediateFlavor)
-                                logger.info("[KMP Flavors] Wired $platformFlavorName -> ${platform.mainSourceSet}, $intermediateFlavorName")
+                                logger.info("[KMP Flavors] Wired $platformFlavorName -> $intermediateFlavorName")
                             }
                         }
                     } else {
                         // No intermediate parent, wire directly to commonFlavor
                         platformFlavor.dependsOn(commonFlavor)
-                        logger.info("[KMP Flavors] Wired $platformFlavorName -> ${platform.mainSourceSet}, $commonFlavorName")
+                        logger.info("[KMP Flavors] Wired $platformFlavorName -> $commonFlavorName")
                     }
                 }
             }

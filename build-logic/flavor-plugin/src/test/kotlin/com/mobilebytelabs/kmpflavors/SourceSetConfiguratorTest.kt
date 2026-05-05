@@ -24,6 +24,8 @@ import io.mockk.verify
 import org.gradle.api.NamedDomainObjectContainer
 import org.gradle.api.file.SourceDirectorySet
 import org.gradle.api.logging.Logger
+import org.gradle.api.provider.ListProperty
+import org.gradle.api.provider.MapProperty
 import org.gradle.api.provider.Property
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
@@ -136,8 +138,9 @@ class SourceSetConfiguratorTest {
 
         every { sourceSets.maybeCreate("commonFree") } returns commonFree
         every { sourceSets.maybeCreate("androidFree") } returns androidFree
-        every { sourceSets.findByName("androidMain") } returns androidMain
+        // Set default first, then specific overrides
         every { sourceSets.findByName(any()) } returns null
+        every { sourceSets.findByName("androidMain") } returns androidMain
 
         configurator.configure(
             kotlin = kotlin,
@@ -149,8 +152,10 @@ class SourceSetConfiguratorTest {
         )
 
         verify { sourceSets.maybeCreate("androidFree") }
-        verify { androidFree.dependsOn(androidMain) }
+        // Platform flavor source sets depend on commonFlavor only (NOT platformMain - compilation default)
         verify { androidFree.dependsOn(commonFree) }
+        // Should NOT depend on androidMain as it's a compilation default source set
+        verify(exactly = 0) { androidFree.dependsOn(androidMain) }
     }
 
     @Test
@@ -170,10 +175,11 @@ class SourceSetConfiguratorTest {
         every { sourceSets.maybeCreate("commonFree") } returns commonFree
         every { sourceSets.maybeCreate("nativeFree") } returns nativeFree
         every { sourceSets.maybeCreate("iosFree") } returns iosFree
+        // Set default first, then override with specific matches
+        every { sourceSets.findByName(any()) } returns null
         every { sourceSets.findByName("iosMain") } returns iosMain
         every { sourceSets.findByName("nativeMain") } returns nativeMain
         every { sourceSets.findByName("nativeFree") } returns nativeFree
-        every { sourceSets.findByName(any()) } returns null
 
         configurator.configure(
             kotlin = kotlin,
@@ -184,10 +190,13 @@ class SourceSetConfiguratorTest {
             createIntermediates = true,
         )
 
+        // Intermediate flavor source sets depend on commonFlavor only
         verify { sourceSets.maybeCreate("nativeFree") }
         verify { nativeFree.dependsOn(commonFree) }
-        verify { nativeFree.dependsOn(nativeMain) }
-        verify { iosFree.dependsOn(iosMain) }
+        // Should NOT depend on nativeMain/iosMain as they may be compilation default source sets
+        verify(exactly = 0) { nativeFree.dependsOn(nativeMain) }
+        verify(exactly = 0) { iosFree.dependsOn(iosMain) }
+        // Platform flavor with parent depends on intermediate flavor
         verify { iosFree.dependsOn(nativeFree) }
     }
 
@@ -206,17 +215,15 @@ class SourceSetConfiguratorTest {
         every { mock.name } returns name
         every { mock.dimension } returns mockProperty(dimension)
         every { mock.isDefault } returns mockProperty(false)
-        every { mock.buildConfigFields } returns mockk {
-            every { get() } returns emptyMap()
-        }
+        every { mock.buildConfigFields } returns mockMapProperty(emptyMap())
         every { mock.applicationIdSuffix } returns mockProperty(null)
+        every { mock.bundleIdSuffix } returns mockProperty(null)
+        every { mock.desktopWindowTitleSuffix } returns mockProperty(null)
+        every { mock.webTitleSuffix } returns mockProperty(null)
         every { mock.versionNameSuffix } returns mockProperty(null)
-        every { mock.extras } returns mockk {
-            every { get() } returns emptyMap()
-        }
-        every { mock.flavorDependencies } returns mockk {
-            every { get() } returns emptyList()
-        }
+        every { mock.extras } returns mockMapProperty(emptyMap())
+        every { mock.flavorDependencies } returns mockListProperty(emptyList())
+        every { mock.matchingFallbacks } returns mockListProperty(emptyList())
         return mock
     }
 
@@ -229,6 +236,22 @@ class SourceSetConfiguratorTest {
         if (value != null) {
             every { mock.get() } returns value
         }
+        return mock
+    }
+
+    private inline fun <reified K : Any, reified V : Any> mockMapProperty(value: Map<K, V>): MapProperty<K, V> {
+        val mock = mockk<MapProperty<K, V>>()
+        every { mock.get() } returns value
+        every { mock.orNull } returns value
+        every { mock.getOrElse(any()) } returns value
+        return mock
+    }
+
+    private inline fun <reified T : Any> mockListProperty(value: List<T>): ListProperty<T> {
+        val mock = mockk<ListProperty<T>>()
+        every { mock.get() } returns value
+        every { mock.orNull } returns value
+        every { mock.getOrElse(any()) } returns value
         return mock
     }
 }

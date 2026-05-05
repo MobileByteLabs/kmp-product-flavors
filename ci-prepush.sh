@@ -104,7 +104,14 @@ run_task "Build Plugin" \
     "./gradlew :build-logic:flavor-plugin:assemble --no-daemon"
 
 # =============================================================================
-# STEP 4: Build Samples with Different Flavors
+# STEP 4: Run Unit Tests
+# Mirrors: .github/workflows/build.yml - "Run Tests" job
+# =============================================================================
+run_task "Run Unit Tests" \
+    "./gradlew :build-logic:flavor-plugin:test --no-daemon"
+
+# =============================================================================
+# STEP 5: Build Samples with Different Flavors
 # Mirrors: .github/workflows/build.yml - "Build Sample" matrix job
 # =============================================================================
 run_task "Build Sample (freeDev)" \
@@ -116,7 +123,7 @@ run_task "Build Sample (paidProd)" \
     "$QUICK_MODE"
 
 # =============================================================================
-# STEP 5: Validate Flavors
+# STEP 6: Validate Flavors
 # Mirrors: .github/workflows/build.yml - "Validate Flavors" step
 # =============================================================================
 run_task "Validate Flavors (freeDev)" \
@@ -128,7 +135,7 @@ run_task "Validate Flavors (paidProd)" \
     "$QUICK_MODE"
 
 # =============================================================================
-# STEP 6: List Flavors (verification)
+# STEP 7: List Flavors (verification)
 # Mirrors: .github/workflows/build.yml - "List Flavors" step
 # =============================================================================
 run_task "List Flavors" \
@@ -136,7 +143,7 @@ run_task "List Flavors" \
     "$QUICK_MODE"
 
 # =============================================================================
-# STEP 7: Verify Plugin JAR
+# STEP 8: Verify Plugin JAR
 # Mirrors: .github/workflows/build.yml - "Validate Plugin" job
 # =============================================================================
 run_task "Build Plugin JAR" \

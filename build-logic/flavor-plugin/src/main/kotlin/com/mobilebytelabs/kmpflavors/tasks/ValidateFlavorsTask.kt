@@ -110,7 +110,7 @@ abstract class ValidateFlavorsTask : DefaultTask() {
         if (dimensions.isNotEmpty()) {
             for ((flavor, dimension) in flavorDims) {
                 when {
-                    dimension == null -> {
+                    dimension == null || dimension.isEmpty() -> {
                         errors.add("Flavor '$flavor' has no dimension. Use dimension.set(\"...\") to assign one.")
                     }
                     dimension !in dimensions -> {

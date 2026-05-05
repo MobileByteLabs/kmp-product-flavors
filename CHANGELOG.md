@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-02-25
+
+### Fixed
+
+- Fixed source set dependency warnings ("Invalid Dependency on Default Compilation Source Set")
+- Platform flavor source sets now correctly depend only on commonFlavor (not platformMain)
+- Intermediate flavor source sets no longer depend on compilation default source sets
+
+### Changed
+
+- Renamed `kmp-template-integration` sample to `kmp-project-template`
+- Improved convention plugin integration in kmp-project-template sample
+
+### Documentation
+
+- Updated build-logic README with comprehensive KMP flavors documentation
+- Added detailed integration guide in samples README
+- Documented automatic kmp.flavors application in convention plugins
+
+## [1.0.0] - 2026-02-25
+
+### Changed
+
+- Stable release - all features from alpha are now stable
+- Updated Kotlin to 2.2.21
+- Updated AGP to 8.12.3
+- Updated Compose Multiplatform to 1.9.3
+
+### Added
+
+- **Variant filtering** - Exclude specific variant combinations
+- **matchingFallbacks** - Dependency resolution fallback support
+- **kmpFlavorInit task** - Initialize source directories
+- **Platform-specific suffixes** - applicationIdSuffix, bundleIdSuffix, desktopWindowTitleSuffix, webTitleSuffix
+- **Build types support** - debug/release configuration
+- **Convention plugin integration** - Ready-to-use files for kmp-project-template
+- **kmp-project-template sample** - Full sample showing convention plugin usage
+
 ## [1.0.0-alpha01] - 2026-02-25
 
 ### Added
@@ -57,5 +95,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Serializable data classes for task input caching
 - `afterEvaluate` pattern for consumer script evaluation
 
-[Unreleased]: https://github.com/MobileByteLabs/kmp-product-flavors/compare/v1.0.0-alpha01...HEAD
+[Unreleased]: https://github.com/MobileByteLabs/kmp-product-flavors/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/MobileByteLabs/kmp-product-flavors/releases/tag/v1.0.1
+[1.0.0]: https://github.com/MobileByteLabs/kmp-product-flavors/releases/tag/v1.0.0
 [1.0.0-alpha01]: https://github.com/MobileByteLabs/kmp-product-flavors/releases/tag/v1.0.0-alpha01

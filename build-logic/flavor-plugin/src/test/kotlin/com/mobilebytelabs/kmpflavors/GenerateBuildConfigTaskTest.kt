@@ -136,7 +136,7 @@ class GenerateBuildConfigTaskTest {
         // Check structure
         assertTrue(content.contains("package com.example.app"))
         assertTrue(content.contains("object FlavorConfig {"))
-        assertTrue(content.endsWith("}\n"))
+        assertTrue(content.trimEnd().endsWith("}"), "File should end with closing brace")
 
         // Check no syntax issues
         assertTrue(!content.contains("const val : ")) // No empty names

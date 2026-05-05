@@ -111,4 +111,28 @@ data class FlavorVariant(val name: String, val flavors: List<FlavorConfig>) {
     val flavorNames: List<String> by lazy {
         flavors.map { it.name }
     }
+
+    /**
+     * Merged matching fallbacks from all flavors in this variant.
+     * This is used for dependency resolution when a dependency module
+     * doesn't have a matching flavor configuration.
+     *
+     * Example: If "paid" flavor has matchingFallbacks = ["free"],
+     * then when depending on a module that only has "free" flavor,
+     * the dependency will resolve to the "free" variant.
+     */
+    val mergedMatchingFallbacks: List<String> by lazy {
+        flavors.flatMap { it.matchingFallbacks.getOrElse(emptyList()) }.distinct()
+    }
+
+    /**
+     * Gets the matchingFallbacks for a specific dimension.
+     *
+     * @param dimensionName The dimension to get fallbacks for
+     * @return List of fallback flavor names for that dimension
+     */
+    fun getMatchingFallbacksForDimension(dimensionName: String): List<String> {
+        val dimensionFlavor = flavors.find { it.dimension.orNull == dimensionName }
+        return dimensionFlavor?.matchingFallbacks?.getOrElse(emptyList()) ?: emptyList()
+    }
 }

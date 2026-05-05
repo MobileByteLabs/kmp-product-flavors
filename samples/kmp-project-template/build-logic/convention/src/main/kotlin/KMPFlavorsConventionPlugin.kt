@@ -1,11 +1,17 @@
 /*
- * Copyright 2024 Mifos Initiative
+ * Copyright 2026 Mifos Initiative
  *
- * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * See https://github.com/openMF/kmp-project-template/blob/main/LICENSE
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 import com.mobilebytelabs.kmpflavors.KmpFlavorExtension
@@ -35,44 +41,44 @@ class KMPFlavorsConventionPlugin : Plugin<Project> {
                     register("internal") {
                         dimension.set("consumer")
                         isDefault.set(true)
-                        buildConfigField("String", "CLIENT_ID", "\"internal\"")
-                        buildConfigField("String", "API_URL_DEBUG",   "\"https://dev.yourdomain.com\"")
-                        buildConfigField("String", "API_URL_STAGING", "\"https://staging.yourdomain.com\"")
-                        buildConfigField("String", "API_URL_RELEASE", "\"https://api.yourdomain.com\"")
-                        buildConfigField("Boolean", "ALLOW_URL_OVERRIDE", "false")
+                        buildConfigField("String", "CLIENT_ID",        "\"internal\"")
+                        buildConfigField("String", "API_URL_DEBUG",    "\"https://dev.yourdomain.com\"")
+                        buildConfigField("String", "API_URL_STAGING",  "\"https://staging.yourdomain.com\"")
+                        buildConfigField("String", "API_URL_RELEASE",  "\"https://api.yourdomain.com\"")
+                        buildConfigField("Boolean","ALLOW_URL_OVERRIDE","false")
                     }
 
                     register("demo") {
                         dimension.set("consumer")
                         applicationIdSuffix.set(".demo")
                         bundleIdSuffix.set(".demo")
-                        buildConfigField("String", "CLIENT_ID", "\"demo\"")
-                        buildConfigField("String", "API_URL_DEBUG",   "\"https://dev.yourdomain.com\"")
-                        buildConfigField("String", "API_URL_STAGING", "\"https://staging.yourdomain.com\"")
-                        buildConfigField("String", "API_URL_RELEASE", "\"https://demo.yourdomain.com\"")
-                        buildConfigField("Boolean", "ALLOW_URL_OVERRIDE", "true")
+                        buildConfigField("String", "CLIENT_ID",        "\"demo\"")
+                        buildConfigField("String", "API_URL_DEBUG",    "\"https://dev.yourdomain.com\"")
+                        buildConfigField("String", "API_URL_STAGING",  "\"https://staging.yourdomain.com\"")
+                        buildConfigField("String", "API_URL_RELEASE",  "\"https://demo.yourdomain.com\"")
+                        buildConfigField("Boolean","ALLOW_URL_OVERRIDE","true")
                     }
 
                     register("clientA") {
                         dimension.set("consumer")
                         applicationIdSuffix.set(".clienta")
                         bundleIdSuffix.set(".clienta")
-                        buildConfigField("String", "CLIENT_ID", "\"clientA\"")
-                        buildConfigField("String", "API_URL_DEBUG",   "\"https://dev.banka.com\"")
-                        buildConfigField("String", "API_URL_STAGING", "\"https://staging.banka.com\"")
-                        buildConfigField("String", "API_URL_RELEASE", "\"https://api.banka.com\"")
-                        buildConfigField("Boolean", "ALLOW_URL_OVERRIDE", "false")
+                        buildConfigField("String", "CLIENT_ID",        "\"clientA\"")
+                        buildConfigField("String", "API_URL_DEBUG",    "\"https://dev.banka.com\"")
+                        buildConfigField("String", "API_URL_STAGING",  "\"https://staging.banka.com\"")
+                        buildConfigField("String", "API_URL_RELEASE",  "\"https://api.banka.com\"")
+                        buildConfigField("Boolean","ALLOW_URL_OVERRIDE","false")
                     }
 
                     register("clientB") {
                         dimension.set("consumer")
                         applicationIdSuffix.set(".clientb")
                         bundleIdSuffix.set(".clientb")
-                        buildConfigField("String", "CLIENT_ID", "\"clientB\"")
-                        buildConfigField("String", "API_URL_DEBUG",   "\"https://dev.bankb.com\"")
-                        buildConfigField("String", "API_URL_STAGING", "\"https://staging.bankb.com\"")
-                        buildConfigField("String", "API_URL_RELEASE", "\"https://api.bankb.com\"")
-                        buildConfigField("Boolean", "ALLOW_URL_OVERRIDE", "false")
+                        buildConfigField("String", "CLIENT_ID",        "\"clientB\"")
+                        buildConfigField("String", "API_URL_DEBUG",    "\"https://dev.bankb.com\"")
+                        buildConfigField("String", "API_URL_STAGING",  "\"https://staging.bankb.com\"")
+                        buildConfigField("String", "API_URL_RELEASE",  "\"https://api.bankb.com\"")
+                        buildConfigField("Boolean","ALLOW_URL_OVERRIDE","false")
                     }
 
                     register("advanced") {

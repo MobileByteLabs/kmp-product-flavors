@@ -38,15 +38,16 @@ kotlin {
 }
 
 dependencies {
-    // Kotlin Gradle Plugin - only needed at compile time to access KMP APIs
-    compileOnly(libs.kotlin.gradle.plugin)
+    // Kotlin Gradle Plugin - needed at runtime to access KMP APIs
+    // Must be 'implementation' (not compileOnly) because TestKit needs it on the plugin classpath
+    implementation(libs.kotlin.gradle.plugin)
 
     // Gradle API
     implementation(gradleApi())
 
-    // Testing
+    // Testing - use embeddedKotlin to match kotlin-dsl compiler version (Gradle's embedded Kotlin)
     testImplementation(gradleTestKit())
-    testImplementation(libs.kotlin.test)
+    testImplementation(kotlin("test"))
     testImplementation(libs.mockk)
     testImplementation(libs.junit)
     // Kotlin Gradle Plugin for tests (needed to mock KMP extension)
@@ -71,7 +72,12 @@ gradlePlugin {
 
 mavenPublishing {
     publishToMavenCentral(com.vanniktech.maven.publish.SonatypeHost.CENTRAL_PORTAL)
-    signAllPublications()
+    // Only sign if signing key is available (skip for local development)
+    if (project.findProperty("signing.keyId") != null ||
+        project.findProperty("signingInMemoryKeyId") != null
+    ) {
+        signAllPublications()
+    }
 
     coordinates(group.toString(), "flavor-plugin", version.toString())
 
@@ -110,4 +116,13 @@ mavenPublishing {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+// Disable signing tasks if no signing key is configured (for local development)
+tasks.withType<Sign>().configureEach {
+    val hasSigningKey =
+        project.findProperty("signing.keyId") != null ||
+            project.findProperty("signingInMemoryKeyId") != null ||
+            System.getenv("ORG_GRADLE_PROJECT_signingInMemoryKeyId") != null
+    onlyIf { hasSigningKey }
 }

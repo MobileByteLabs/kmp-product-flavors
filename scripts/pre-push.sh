@@ -91,6 +91,24 @@ build_plugin() {
     fi
 }
 
+# Function to run tests
+run_tests() {
+    printf "\n🧪 Running unit tests...\n"
+
+    if ! ./gradlew :build-logic:flavor-plugin:test --daemon > /tmp/test-result 2>&1; then
+        cat /tmp/test-result
+        rm -f /tmp/test-result
+        printf "\n*********************************************************************************\n"
+        echo "   💥 Unit tests failed!"
+        echo "   💡 Fix the failing tests before pushing."
+        printf "*********************************************************************************\n"
+        exit 1
+    else
+        rm -f /tmp/test-result
+        echo "✅ Unit tests passed! 🧪"
+    fi
+}
+
 # Function to build sample (quick verification)
 build_sample() {
     printf "\n📦 Building sample project...\n"
@@ -125,6 +143,7 @@ check_current_branch
 run_spotless_checks
 run_detekt_checks
 build_plugin
+run_tests
 build_sample
 print_success_message
 

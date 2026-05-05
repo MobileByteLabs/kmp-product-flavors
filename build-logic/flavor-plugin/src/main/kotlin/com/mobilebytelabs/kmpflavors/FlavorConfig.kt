@@ -171,4 +171,23 @@ open class FlavorConfig @Inject constructor(private val flavorName: String, obje
     fun dependency(configuration: String, notation: String) {
         flavorDependencies.add(FlavorDependency(configuration, notation))
     }
+
+    /**
+     * Sets matching fallbacks for dependency resolution.
+     *
+     * When a dependency module doesn't have a variant for this flavor,
+     * Gradle will try to find a variant matching one of the fallback flavors.
+     *
+     * Example:
+     * ```kotlin
+     * register("paid") {
+     *     matchingFallbacks("free") // Falls back to "free" if module doesn't have "paid"
+     * }
+     * ```
+     *
+     * @param fallbacks The fallback flavor names in order of preference
+     */
+    fun matchingFallbacks(vararg fallbacks: String) {
+        matchingFallbacks.addAll(fallbacks.toList())
+    }
 }

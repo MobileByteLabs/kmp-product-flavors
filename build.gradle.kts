@@ -40,7 +40,7 @@ spotless {
             "**/build/**/*.kt",
             "**/.gradle/**/*.kt",
             // Exclude git subtree samples (external code we don't control)
-            "**/samples/kmp-template-integration/**/*.kt",
+            "**/samples/kmp-project-template/**/*.kt",
         )
         ktlint(libs.versions.ktlint.get())
             .editorConfigOverride(
@@ -65,7 +65,7 @@ spotless {
         targetExclude(
             "**/build/**/*.gradle.kts",
             // Exclude git subtree samples
-            "**/samples/kmp-template-integration/**/*.gradle.kts",
+            "**/samples/kmp-project-template/**/*.gradle.kts",
         )
         ktlint(libs.versions.ktlint.get())
         trimTrailingWhitespace()
@@ -79,7 +79,7 @@ spotless {
             "**/build/**",
             "**/.gradle/**",
             // Exclude git subtree samples
-            "**/samples/kmp-template-integration/**",
+            "**/samples/kmp-project-template/**",
         )
         trimTrailingWhitespace()
         indentWithSpaces(4)
