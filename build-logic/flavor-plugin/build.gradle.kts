@@ -71,7 +71,7 @@ gradlePlugin {
 }
 
 mavenPublishing {
-    publishToMavenCentral(com.vanniktech.maven.publish.SonatypeHost.CENTRAL_PORTAL)
+    publishToMavenCentral()
     // Only sign if signing key is available (skip for local development)
     if (project.findProperty("signing.keyId") != null ||
         project.findProperty("signingInMemoryKeyId") != null

@@ -48,7 +48,7 @@ abstract class ValidateFlavorsTask : DefaultTask() {
      * Map of flavor name to its dimension (null if no dimension set).
      */
     @get:Input
-    abstract val flavorDimensions: MapProperty<String, String?>
+    abstract val flavorDimensions: MapProperty<String, String>
 
     /**
      * Map of flavor name to whether it's marked as default.
