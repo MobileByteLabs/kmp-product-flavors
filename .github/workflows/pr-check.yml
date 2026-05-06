@@ -1,0 +1,27 @@
+# PR Check Workflow — fast gate on pull requests
+# Runs quality + JVM tests on the plugin module (iOS/Linux skipped for speed).
+# Full build runs on push to development/main via ci.yml.
+
+name: PR Check
+
+on:
+  pull_request:
+    branches: [ "development", "main" ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pr-check:
+    uses: MobileByteLabs/mbl-actionhub/.github/workflows/ci-kmp-library.yml@v1.1.1
+    with:
+      module-pattern: 'flavor-plugin'
+      java-version: '21'
+      java-distribution: 'zulu'
+      run-quality: true
+      run-ios-tests: false
+      run-linux-tests: false

@@ -24,7 +24,12 @@ plugins {
 }
 
 group = "io.github.mobilebytelabs.kmpflavors"
-version = libs.versions.kmpProductFlavors.get()
+// gradle.properties lives in the root project, not the composite build — read it directly.
+version = rootProject.file("../gradle.properties")
+    .readLines()
+    .firstOrNull { it.startsWith("kmpflavors.version=") }
+    ?.substringAfter("=")?.trim()
+    ?: error("kmpflavors.version not set in root gradle.properties")
 
 java {
     sourceCompatibility = JavaVersion.VERSION_17
@@ -70,11 +75,10 @@ gradlePlugin {
     }
 }
 
-// Signing is opt-in: pass -PsignPublications=true (or set env SIGN_PUBLICATIONS=true) for CI/release.
-// Never sign for local development to avoid gnupg keyring issues.
-val signPublications = project.findProperty("signPublications")?.toString()?.toBoolean()
-    ?: System.getenv("SIGN_PUBLICATIONS")?.toBoolean()
-    ?: false
+// Auto-enable signing when ORG_GRADLE_PROJECT_signingInMemoryKey env var is present (CI).
+// Opt-in locally via -PsignPublications=true. Never signs on local dev by default.
+val signPublications = System.getenv("ORG_GRADLE_PROJECT_signingInMemoryKey") != null
+    || project.findProperty("signPublications")?.toString()?.toBoolean() == true
 
 mavenPublishing {
     publishToMavenCentral()
