@@ -84,7 +84,6 @@ val signPublications =
         project.findProperty("signPublications")?.toString()?.toBoolean() == true
 
 mavenPublishing {
-    publishToMavenCentral(com.vanniktech.maven.publish.SonatypeHost.CENTRAL_PORTAL)
     if (signPublications) {
         signAllPublications()
     }
