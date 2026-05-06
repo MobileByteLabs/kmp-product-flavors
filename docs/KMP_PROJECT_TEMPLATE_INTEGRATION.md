@@ -439,7 +439,7 @@ actual object ContentRepository {
 }
 ```
 
-**`cmp-shared/src/commonClientA/kotlin/cmp/shared/flavor/ContentRepository.kt`** and  
+**`cmp-shared/src/commonClientA/kotlin/cmp/shared/flavor/ContentRepository.kt`** and
 **`cmp-shared/src/commonClientB/kotlin/cmp/shared/flavor/ContentRepository.kt`**:
 Follow the same pattern as `commonInternal`, substituting the relevant client URLs.
 

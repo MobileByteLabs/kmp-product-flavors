@@ -113,6 +113,7 @@ abstract class ValidateFlavorsTask : DefaultTask() {
                     dimension == null || dimension.isEmpty() -> {
                         errors.add("Flavor '$flavor' has no dimension. Use dimension.set(\"...\") to assign one.")
                     }
+
                     dimension !in dimensions -> {
                         errors.add("Flavor '$flavor' references unknown dimension '$dimension'. Available: ${dimensions.joinToString(", ")}")
                     }
