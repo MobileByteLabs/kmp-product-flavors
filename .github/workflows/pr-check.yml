@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   pr-check:
-    uses: MobileByteLabs/mbl-actionhub/.github/workflows/ci-kmp-library.yml@v1.5.2
+    uses: MobileByteLabs/mbl-actionhub/.github/workflows/ci-kmp-library.yml@v1.5.3
     with:
       module-path: 'build-logic/flavor-plugin'
       java-version: '21'
