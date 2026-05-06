@@ -1,7 +1,7 @@
 pluginManagement {
     includeBuild("build-logic")
+    includeBuild("../../build-logic")
     repositories {
-        mavenLocal() // For local development with ./MavenLocalRelease.sh
         google {
             content {
                 includeGroupByRegex("com\\.android.*")
@@ -17,7 +17,6 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode = RepositoriesMode.PREFER_PROJECT
     repositories {
-        mavenLocal() // For local development
         google {
             content {
                 includeGroupByRegex("com\\.android.*")

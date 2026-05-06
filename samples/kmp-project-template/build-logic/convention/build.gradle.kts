@@ -32,8 +32,7 @@ dependencies {
     compileOnly(libs.androidx.room.gradle.plugin)
     compileOnly(libs.firebase.crashlytics.gradlePlugin)
     compileOnly(libs.firebase.performance.gradlePlugin)
-    // KMP Product Flavors plugin - from Maven Central (mavenLocal for local development)
-    implementation("io.github.mobilebytelabs.kmpflavors:flavor-plugin:1.0.0")
+    compileOnly("io.github.mobilebytelabs.kmpflavors:flavor-plugin")
 }
 
 tasks {
@@ -97,11 +96,6 @@ gradlePlugin {
             id = "org.convention.kmp.core.base.library"
             implementationClass = "KMPCoreBaseLibraryConventionPlugin"
         }
-        register("kmpFlavors") {
-            id = "org.convention.kmp.flavors"
-            implementationClass = "KMPFlavorsConventionPlugin"
-            description = "Configures KMP Product Flavors with project-wide defaults"
-        }
 
         // Static Analysis & Formatting Plugins
         register("detekt") {
@@ -130,6 +124,11 @@ gradlePlugin {
             id = "mifos.kmp.room"
             implementationClass = "KMPRoomConventionPlugin"
             description = "Configures Room for the project"
+        }
+
+        register("kmpFlavors") {
+            id = "org.convention.kmp.flavors"
+            implementationClass = "KMPFlavorsConventionPlugin"
         }
 
     }

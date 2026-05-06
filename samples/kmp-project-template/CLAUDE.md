@@ -22,11 +22,6 @@
 - [Secrets Management](docs/claude/secrets-management.md)
 - [Version Handling](docs/claude/version-handling.md)
 
-🍦 **Product Flavors & Build Variants:**
-- [Product Flavors Integration Guide](docs/claude/product-flavors-integration.md) - Step-by-step guide for integrating kmp-product-flavors into any KMP project
-- [Product Flavors Design](docs/PRODUCT_FLAVORS.md) - Dimension design, variant matrix, source set hierarchy
-- [Build Variants & CI/CD](docs/BUILD_VARIANTS.md) - CI/CD pipeline, deployment targets, app IDs
-
 🐛 **Known Issues:**
 - [Infrastructure Bugs & Workarounds](docs/analysis/BUGS_AND_ISSUES.md)
 

@@ -13,11 +13,6 @@ This directory contains comprehensive guides for understanding and working with 
 - **[Onboarding Guide](onboarding.md)** - For new developers joining the project
 - **[Deployment Playbook](deployment-playbook.md)** - Step-by-step deployment instructions
 
-### Product Flavors & Build Variants
-- **[Product Flavors Integration](product-flavors-integration.md)** - Step-by-step guide for integrating kmp-product-flavors into any KMP project
-- **[Product Flavors Design](../PRODUCT_FLAVORS.md)** - Dimension design, variant matrix, source set hierarchy
-- **[Build Variants & CI/CD](../BUILD_VARIANTS.md)** - CI/CD pipeline, deployment targets, application IDs
-
 ### Deep Technical Guides
 - **[Version Handling](version-handling.md)** - Understanding version sanitization across platforms
 - **[Secrets Management](secrets-management.md)** - Complete guide to managing secrets and credentials
@@ -123,11 +118,8 @@ This directory contains comprehensive guides for understanding and working with 
 
 ```
 docs/
-├── PRODUCT_FLAVORS.md               # Dimension design, variant matrix, source sets
-├── BUILD_VARIANTS.md                # CI/CD pipeline, deployment targets, app IDs
 ├── claude/                          # Deep-dive guides (you are here)
 │   ├── README.md                    # This file
-│   ├── product-flavors-integration.md # kmp-product-flavors integration guide
 │   ├── onboarding.md               # New developer guide
 │   ├── deployment-playbook.md      # Deployment reference
 │   ├── version-handling.md         # Version formats explained

@@ -59,36 +59,6 @@ Parameters:
 - First parameter: Package name (e.g., `org.example.myapp`)
 - Second parameter: Project name (e.g., `MyKMPProject`)
 
-### 3. Configure Product Flavors
-
-The project is pre-configured with a `consumer × tier × buildType` flavor system via the `kmp-product-flavors` plugin. Before building, update the server URLs in the convention plugin to match your environments:
-
-`build-logic/convention/src/main/kotlin/KMPFlavorsConventionPlugin.kt`:
-
-```kotlin
-register("internal") {
-    dimension.set("consumer")
-    buildConfigField("String", "API_URL_DEBUG",   "\"https://dev.yourapp.com\"")
-    buildConfigField("String", "API_URL_STAGING", "\"https://staging.yourapp.com\"")
-    buildConfigField("String", "API_URL_RELEASE", "\"https://api.yourapp.com\"")
-}
-```
-
-To add a white-label client, register a new `consumer` flavor with their server URLs. See the [Product Flavors Design](PRODUCT_FLAVORS.md) for the full guide.
-
-**Select your variant at build time:**
-
-```bash
-# Default: internalAdvancedDebug (set in gradle.properties)
-./gradlew assemble
-
-# Specific variant
-./gradlew -PkmpVariant=clientAAdvancedRelease assemble
-
-# List all 24 available variants
-./gradlew listFlavors
-```
-
 > **Note**: This branch is designed for partial customization. It doesn't rename application modules but changes all `core` and `feature` module namespaces and packages. For full customization, use the `full-customizable` branch.
 
 ### 3. Install Dependencies

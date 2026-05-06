@@ -29,12 +29,8 @@ class KMPFlavorsConventionPlugin : Plugin<Project> {
                 buildConfigClassName.set("FlavorConfig")
 
                 flavorDimensions {
-                    register("consumer") {
-                        priority.set(0)
-                    }
-                    register("tier") {
-                        priority.set(1)
-                    }
+                    register("consumer") { priority.set(0) }
+                    register("tier")     { priority.set(1) }
                 }
 
                 flavors {
@@ -104,28 +100,28 @@ class KMPFlavorsConventionPlugin : Plugin<Project> {
                         isDefault.set(true)
                         isDebuggable.set(true)
                         applicationIdSuffix.set(".debug")
-                        buildConfigField("Boolean", "ENABLE_LOGGING",    "true")
-                        buildConfigField("Boolean", "SHOW_DEBUG_OVERLAY","true")
-                        buildConfigField("Boolean", "ALLOW_ENV_SWITCH",  "true")
-                        buildConfigField("String",  "LOG_TAG",           "\"KMPTemplate-DEBUG\"")
+                        buildConfigField("Boolean","ENABLE_LOGGING",    "true")
+                        buildConfigField("Boolean","SHOW_DEBUG_OVERLAY","true")
+                        buildConfigField("Boolean","ALLOW_ENV_SWITCH",  "true")
+                        buildConfigField("String", "LOG_TAG",           "\"KMPTemplate-DEBUG\"")
                     }
 
                     register("staging") {
                         isDebuggable.set(false)
                         applicationIdSuffix.set(".staging")
-                        buildConfigField("Boolean", "ENABLE_LOGGING",    "true")
-                        buildConfigField("Boolean", "SHOW_DEBUG_OVERLAY","false")
-                        buildConfigField("Boolean", "ALLOW_ENV_SWITCH",  "false")
-                        buildConfigField("String",  "LOG_TAG",           "\"KMPTemplate-STAGING\"")
+                        buildConfigField("Boolean","ENABLE_LOGGING",    "true")
+                        buildConfigField("Boolean","SHOW_DEBUG_OVERLAY","false")
+                        buildConfigField("Boolean","ALLOW_ENV_SWITCH",  "false")
+                        buildConfigField("String", "LOG_TAG",           "\"KMPTemplate-STAGING\"")
                     }
 
                     register("release") {
                         isDebuggable.set(false)
                         isMinifyEnabled.set(true)
-                        buildConfigField("Boolean", "ENABLE_LOGGING",    "false")
-                        buildConfigField("Boolean", "SHOW_DEBUG_OVERLAY","false")
-                        buildConfigField("Boolean", "ALLOW_ENV_SWITCH",  "false")
-                        buildConfigField("String",  "LOG_TAG",           "\"KMPTemplate\"")
+                        buildConfigField("Boolean","ENABLE_LOGGING",    "false")
+                        buildConfigField("Boolean","SHOW_DEBUG_OVERLAY","false")
+                        buildConfigField("Boolean","ALLOW_ENV_SWITCH",  "false")
+                        buildConfigField("String", "LOG_TAG",           "\"KMPTemplate\"")
                     }
                 }
 

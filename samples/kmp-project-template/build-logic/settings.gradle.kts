@@ -1,6 +1,7 @@
+includeBuild("../../../build-logic")
+
 dependencyResolutionManagement {
     repositories {
-        mavenLocal() // For local development with ./MavenLocalRelease.sh
         google()
         mavenCentral()
         gradlePluginPortal()
