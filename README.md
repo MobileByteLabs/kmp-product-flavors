@@ -8,7 +8,7 @@
 A Gradle plugin that brings Android-style product flavor support to **all Kotlin Multiplatform targets**.
 
 <p align="center">
-  <a href="https://github.com/MobileByteLabs/kmp-product-flavors/actions/workflows/build.yml"><img src="https://github.com/MobileByteLabs/kmp-product-flavors/actions/workflows/build.yml/badge.svg" alt="Build Status"></a>
+  <a href="https://github.com/MobileByteLabs/kmp-product-flavors/actions/workflows/ci.yml"><img src="https://github.com/MobileByteLabs/kmp-product-flavors/actions/workflows/ci.yml/badge.svg" alt="Build Status"></a>
   <a href="https://central.sonatype.com/artifact/io.github.mobilebytelabs.kmpflavors/flavor-plugin"><img src="https://img.shields.io/maven-central/v/io.github.mobilebytelabs.kmpflavors/flavor-plugin?label=Maven%20Central" alt="Maven Central"></a>
   <a href="https://plugins.gradle.org/plugin/io.github.mobilebytelabs.kmp-product-flavors"><img src="https://img.shields.io/gradle-plugin-portal/v/io.github.mobilebytelabs.kmp-product-flavors?label=Gradle%20Plugin%20Portal" alt="Gradle Plugin Portal"></a>
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License"></a>
