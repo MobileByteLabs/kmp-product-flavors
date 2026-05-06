@@ -1,5 +1,5 @@
 [versions]
-kmpProductFlavors = "0.1.0"
+kmpProductFlavors = "1.0.1"
 
 # Android
 androidDesugarJdkLibs = "2.1.5"
@@ -330,6 +330,8 @@ roborazzi-accessibility-check = { group = "io.github.takahirom.roborazzi", name 
 aboutlibraries-core = { module = "com.mikepenz:aboutlibraries-core", version.ref = "aboutLibraries" }
 aboutlibraries-compose-core = { module = "com.mikepenz:aboutlibraries-compose", version.ref = "aboutLibraries" }
 aboutlibraries-compose-m3 = { module = "com.mikepenz:aboutlibraries-compose-m3", version.ref = "aboutLibraries" }
+
+kmp-product-flavors-plugin = { group = "io.github.mobilebytelabs.kmpflavors", name = "flavor-plugin", version.ref = "kmpProductFlavors" }
 
 [bundles]
 androidx-compose-ui-test = [

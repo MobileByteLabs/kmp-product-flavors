@@ -15,6 +15,7 @@
  */
 
 import com.mobilebytelabs.kmpflavors.KmpFlavorExtension
+import com.mobilebytelabs.kmpflavors.KmpFlavorPlugin
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.configure
@@ -22,7 +23,7 @@ import org.gradle.kotlin.dsl.configure
 class KMPFlavorsConventionPlugin : Plugin<Project> {
     override fun apply(target: Project) {
         with(target) {
-            pluginManager.apply("io.github.mobilebytelabs.kmp-product-flavors")
+            pluginManager.apply(KmpFlavorPlugin::class.java)
 
             extensions.configure<KmpFlavorExtension> {
                 buildConfigPackage.set("org.openmf.kmptemplate")
@@ -125,8 +126,6 @@ class KMPFlavorsConventionPlugin : Plugin<Project> {
                     }
                 }
 
-                bridgeAgpBuildTypes.set(true)
-                bridgeAgpProductFlavors.set(true)
             }
         }
     }

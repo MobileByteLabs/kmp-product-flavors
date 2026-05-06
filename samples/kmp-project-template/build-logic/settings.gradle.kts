@@ -1,7 +1,6 @@
-includeBuild("../../../build-logic")
-
 dependencyResolutionManagement {
     repositories {
+        mavenLocal()
         google()
         mavenCentral()
         gradlePluginPortal()

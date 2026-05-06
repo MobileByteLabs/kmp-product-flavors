@@ -32,7 +32,7 @@ dependencies {
     compileOnly(libs.androidx.room.gradle.plugin)
     compileOnly(libs.firebase.crashlytics.gradlePlugin)
     compileOnly(libs.firebase.performance.gradlePlugin)
-    compileOnly("io.github.mobilebytelabs.kmpflavors:flavor-plugin")
+    implementation(libs.kmp.product.flavors.plugin)
 }
 
 tasks {

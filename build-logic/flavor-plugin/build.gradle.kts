@@ -70,12 +70,15 @@ gradlePlugin {
     }
 }
 
+// Signing is opt-in: pass -PsignPublications=true (or set env SIGN_PUBLICATIONS=true) for CI/release.
+// Never sign for local development to avoid gnupg keyring issues.
+val signPublications = project.findProperty("signPublications")?.toString()?.toBoolean()
+    ?: System.getenv("SIGN_PUBLICATIONS")?.toBoolean()
+    ?: false
+
 mavenPublishing {
     publishToMavenCentral()
-    // Only sign if signing key is available (skip for local development)
-    if (project.findProperty("signing.keyId") != null ||
-        project.findProperty("signingInMemoryKeyId") != null
-    ) {
+    if (signPublications) {
         signAllPublications()
     }
 
@@ -118,11 +121,6 @@ tasks.test {
     useJUnitPlatform()
 }
 
-// Disable signing tasks if no signing key is configured (for local development)
 tasks.withType<Sign>().configureEach {
-    val hasSigningKey =
-        project.findProperty("signing.keyId") != null ||
-            project.findProperty("signingInMemoryKeyId") != null ||
-            System.getenv("ORG_GRADLE_PROJECT_signingInMemoryKeyId") != null
-    onlyIf { hasSigningKey }
+    onlyIf { signPublications }
 }

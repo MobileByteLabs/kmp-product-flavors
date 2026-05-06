@@ -29,7 +29,7 @@ object KmpFlavors {
         val applicationIdSuffix: String? = null,
         val bundleIdSuffix: String? = null,
     ) {
-        internal(isDefault = true),
+        internalClient(isDefault = true),
         demo(applicationIdSuffix = ".demo", bundleIdSuffix = ".demo"),
         clientA(applicationIdSuffix = ".clienta", bundleIdSuffix = ".clienta"),
         clientB(applicationIdSuffix = ".clientb", bundleIdSuffix = ".clientb"),
