@@ -1,4 +1,4 @@
-# Publish Workflow — delegates to mbl-actionhub reusable publish workflow
+# Publish Workflow
 #
 # Triggers:
 #   - Schedule: every Monday 00:00 UTC
@@ -6,8 +6,7 @@
 #   - Manual dispatch: workflow_dispatch (optional version override)
 #
 # Version source of truth: gradle.properties → kmpflavors.version
-#   The committed value is what gets published. Bumping the version is a code
-#   review concern. Maven Central is consulted only as a sanity check.
+# After a successful publish, opens a bump PR to increment the patch version.
 
 name: Publish
 
@@ -23,26 +22,98 @@ on:
         type: string
 
 permissions:
-  contents: write          # release creation, tag push, branch push for bump PR
-  pull-requests: write     # bump-after-release opens a PR
+  contents: write
+  pull-requests: write
 
 jobs:
   publish:
-    uses: MobileByteLabs/mbl-actionhub/.github/workflows/publish-kmp-library.yml@v1.4.0
-    with:
-      module-pattern: 'flavor-plugin'
-      group-id: 'io.github.mobilebytelabs.kmpflavors'
-      artifact-id: 'flavor-plugin'
-      version: ${{ inputs.version || '' }}
-      gradle-properties-key: 'kmpflavors.version'
-      verify-against-maven: true
-      bump-after-release: true
-      next-bump-type: 'patch'
-      java-version: '21'
-      java-distribution: 'zulu'
-      sonatype-host: 'CENTRAL_PORTAL'
-      create-github-release: true
-    secrets: inherit
+    name: Publish to Maven Central
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Read version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION=$(grep '^kmpflavors\.version=' gradle.properties | cut -d'=' -f2 | tr -d '[:space:]')
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Publishing version: $VERSION"
+
+      - name: Check Maven Central (avoid re-publish)
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          URL="https://repo1.maven.org/maven2/io/github/mobilebytelabs/kmpflavors/flavor-plugin/${VERSION}/flavor-plugin-${VERSION}.pom"
+          if curl --silent --head --fail "$URL" > /dev/null 2>&1; then
+            echo "::error::Version $VERSION already exists on Maven Central. Bump kmpflavors.version first."
+            exit 1
+          fi
+          echo "Version $VERSION not on Maven Central — proceeding."
+
+      - name: Publish to Maven Central
+        env:
+          ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.SIGNING_KEY_ID }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_KEY_CONTENTS }}
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+        run: |
+          ./gradlew :build-logic:flavor-plugin:publishAllPublicationsToMavenCentralRepository \
+            --no-daemon \
+            --no-configuration-cache
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          generate_release_notes: true
+          files: build-logic/flavor-plugin/build/libs/*.jar
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Bump version (open PR for next cycle)
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          NEXT_PATCH=$((PATCH + 1))
+          NEXT_VERSION="${MAJOR}.${MINOR}.${NEXT_PATCH}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          BRANCH="chore/bump-version-${NEXT_VERSION}"
+          git checkout -b "$BRANCH"
+
+          sed -i "s/^kmpflavors\.version=.*/kmpflavors.version=${NEXT_VERSION}/" gradle.properties
+          sed -i "s/# Current: .*/# Current: ${NEXT_VERSION}. Next patch: ${MAJOR}.${MINOR}.$((NEXT_PATCH + 1)) | minor: ${MAJOR}.$((MINOR + 1)).0 | major: $((MAJOR + 1)).0.0/" gradle.properties
+
+          git add gradle.properties
+          git commit -m "chore(release): bump version to ${NEXT_VERSION}"
+          git push origin "$BRANCH"
+
+          gh pr create \
+            --base development \
+            --head "$BRANCH" \
+            --title "chore(release): bump version to ${NEXT_VERSION}" \
+            --body "Auto-generated after publishing v${VERSION} to Maven Central. Merging this prepares the next release cycle."
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   publish-plugin-portal:
     name: Publish to Gradle Plugin Portal
