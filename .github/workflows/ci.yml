@@ -22,9 +22,9 @@ concurrency:
 
 jobs:
   ci:
-    uses: MobileByteLabs/mbl-actionhub/.github/workflows/ci-kmp-library.yml@v1.1.1
+    uses: MobileByteLabs/mbl-actionhub/.github/workflows/ci-kmp-library.yml@v1.5.0
     with:
-      module-pattern: 'flavor-plugin'
+      module-path: 'build-logic/flavor-plugin'
       java-version: '21'
       java-distribution: 'zulu'
       run-quality: true
