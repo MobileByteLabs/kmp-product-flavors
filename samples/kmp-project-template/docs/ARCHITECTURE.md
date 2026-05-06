@@ -96,6 +96,54 @@ Foundational components that provide essential infrastructure:
 ### Build Logic
 
 - **build-logic**: Custom Gradle plugins and build configuration
+  - `KMPFlavorsConventionPlugin` — configures `consumer × tier × buildType` product flavors via [kmp-product-flavors](https://github.com/MobileByteLabs/kmp-product-flavors)
+  - `org.convention.KmpFlavors` — central enum definitions for flavor dimensions and values
+
+## Product Flavors
+
+The project uses a two-dimension flavor system that produces **24 build variants** from a single codebase.
+
+### Dimensions
+
+```
+consumer × tier × buildType = 4 × 2 × 3 = 24 variants
+```
+
+| Dimension | Values | What it controls |
+|-----------|--------|-----------------|
+| `consumer` | `internal`, `demo`, `clientA`, `clientB` | Server URLs compiled in; URL override capability |
+| `tier` | `advanced`, `basic` | Feature flags — absent from binary when off, not just hidden |
+| Build type | `debug`, `staging`, `release` | Active URL, signing, minification, dev screens |
+
+### Flavor source sets
+
+The plugin automatically wires flavor-specific source sets for `expect`/`actual` implementations:
+
+```
+cmp-shared/src/
+├── commonMain/            ← shared code + expect declarations
+├── commonInternal/        ← ContentRepository actual (your app)
+├── commonDemo/            ← ContentRepository actual + server URL override screen
+├── commonClientA/         ← ContentRepository actual (Bank A)
+├── commonClientB/         ← ContentRepository actual (Bank B)
+├── commonAdvanced/        ← FeatureFlags actual (all features true)
+└── commonBasic/           ← FeatureFlags actual (all features false)
+```
+
+The `demo` URL override screen is compiled **only** into `commonDemo/` — it is physically absent from `internal`, `clientA`, and `clientB` binaries.
+
+### Accessing flavor config in code
+
+```kotlin
+import cmp.shared.flavor.AppVariant
+
+val url = AppVariant.activeApiUrl          // resolves debug/staging/release automatically
+val tier = AppVariant.clientTier           // "advanced" or "basic"
+val canOverride = AppVariant.allowUrlOverride  // true only for demo consumer
+if (AppVariant.featureAnalytics) { /* only compiled in for advanced tier */ }
+```
+
+See [docs/PRODUCT_FLAVORS.md](PRODUCT_FLAVORS.md) for the full design reference and [docs/claude/product-flavors-integration.md](claude/product-flavors-integration.md) for the integration guide.
 
 ## Clean Architecture Layers
 
