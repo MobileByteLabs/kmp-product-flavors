@@ -133,10 +133,15 @@ object PlatformDetector {
      * @param platforms The detected platforms
      */
     fun wireIntermediateSourceSets(kotlin: KotlinMultiplatformExtension, platforms: List<PlatformGroup>) {
+        // Apply the default hierarchy template first so Kotlin owns nativeMain and its
+        // platform→nativeMain edges. The plugin only adds dependsOn for its own custom
+        // flavor source sets (commonDev, nativeFree, etc.) on top of that.
+        kotlin.applyDefaultHierarchyTemplate()
+
         val sourceSets = kotlin.sourceSets
         val commonMain = sourceSets.getByName("commonMain")
 
-        // Create webMain if needed
+        // Create webMain if needed (not part of default hierarchy — wire it manually).
         if (platforms.any { it.prefix == "web" && it.isIntermediate }) {
             val webMain = sourceSets.maybeCreate("webMain").apply {
                 this.kotlin.srcDir("src/webMain/kotlin")
@@ -151,19 +156,16 @@ object PlatformDetector {
             }
         }
 
-        // Create nativeMain if needed
+        // nativeMain and its platform→nativeMain edges are owned by the default hierarchy
+        // template (applied above). Only register source dirs so the plugin can resolve
+        // nativeMain when creating flavor intermediates (nativeDev, nativeFree, etc.).
         if (platforms.any { it.prefix == "native" && it.isIntermediate }) {
-            val nativeMain = sourceSets.maybeCreate("nativeMain").apply {
+            sourceSets.maybeCreate("nativeMain").apply {
                 this.kotlin.srcDir("src/nativeMain/kotlin")
                 resources.srcDir("src/nativeMain/resources")
             }
-            nativeMain.dependsOn(commonMain)
-
-            // Wire native platforms to nativeMain
-            platforms.filter { it.parent == "native" }.forEach { platform ->
-                val platformSourceSet = sourceSets.findByName(platform.mainSourceSet)
-                platformSourceSet?.dependsOn(nativeMain)
-            }
+            // dependsOn(commonMain) and platform→nativeMain edges intentionally omitted —
+            // the default hierarchy template already manages them.
         }
     }
 
