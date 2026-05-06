@@ -24,7 +24,12 @@ plugins {
 }
 
 group = "io.github.mobilebytelabs.kmpflavors"
-version = libs.versions.kmpProductFlavors.get()
+// gradle.properties lives in the root project, not the composite build — read it directly.
+version = rootProject.file("../gradle.properties")
+    .readLines()
+    .firstOrNull { it.startsWith("kmpflavors.version=") }
+    ?.substringAfter("=")?.trim()
+    ?: error("kmpflavors.version not set in root gradle.properties")
 
 java {
     sourceCompatibility = JavaVersion.VERSION_17
@@ -70,12 +75,14 @@ gradlePlugin {
     }
 }
 
+// Auto-enable signing when ORG_GRADLE_PROJECT_signingInMemoryKey env var is present (CI).
+// Opt-in locally via -PsignPublications=true. Never signs on local dev by default.
+val signPublications = System.getenv("ORG_GRADLE_PROJECT_signingInMemoryKey") != null
+    || project.findProperty("signPublications")?.toString()?.toBoolean() == true
+
 mavenPublishing {
-    publishToMavenCentral(com.vanniktech.maven.publish.SonatypeHost.CENTRAL_PORTAL)
-    // Only sign if signing key is available (skip for local development)
-    if (project.findProperty("signing.keyId") != null ||
-        project.findProperty("signingInMemoryKeyId") != null
-    ) {
+    publishToMavenCentral()
+    if (signPublications) {
         signAllPublications()
     }
 
@@ -118,11 +125,6 @@ tasks.test {
     useJUnitPlatform()
 }
 
-// Disable signing tasks if no signing key is configured (for local development)
 tasks.withType<Sign>().configureEach {
-    val hasSigningKey =
-        project.findProperty("signing.keyId") != null ||
-            project.findProperty("signingInMemoryKeyId") != null ||
-            System.getenv("ORG_GRADLE_PROJECT_signingInMemoryKeyId") != null
-    onlyIf { hasSigningKey }
+    onlyIf { signPublications }
 }

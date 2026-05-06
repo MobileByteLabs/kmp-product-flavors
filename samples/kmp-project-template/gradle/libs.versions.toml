@@ -1,4 +1,6 @@
 [versions]
+kmpProductFlavors = "1.0.1"
+
 # Android
 androidDesugarJdkLibs = "2.1.5"
 androidGradlePlugin = "8.12.3"
@@ -329,6 +331,8 @@ aboutlibraries-core = { module = "com.mikepenz:aboutlibraries-core", version.ref
 aboutlibraries-compose-core = { module = "com.mikepenz:aboutlibraries-compose", version.ref = "aboutLibraries" }
 aboutlibraries-compose-m3 = { module = "com.mikepenz:aboutlibraries-compose-m3", version.ref = "aboutLibraries" }
 
+kmp-product-flavors-plugin = { group = "io.github.mobilebytelabs.kmpflavors", name = "flavor-plugin", version.ref = "kmpProductFlavors" }
+
 [bundles]
 androidx-compose-ui-test = [
     "androidx-compose-ui-test",
@@ -368,7 +372,6 @@ cmp-feature-convention = { id = "org.convention.cmp.feature", version = "unspeci
 kmp-koin-convention = { id = "org.convention.kmp.koin", version = "unspecified" }
 kmp-library-convention = { id = "org.convention.kmp.library", version = "unspecified" }
 kmp-core-base-library-convention = { id = "org.convention.kmp.core.base.library", version = "unspecified" }
-kmp-flavors-convention = { id = "org.convention.kmp.flavors", version = "unspecified" }
 
 android-application-firebase = { id = "org.convention.android.application.firebase" }
 android-lint = { id = "org.convention.android.application.lint" }
@@ -389,3 +392,5 @@ spotless = { id = "com.diffplug.spotless", version.ref = "spotlessVersion" }
 #Room Plugin
 room = { id = "androidx.room", version.ref = "room" }
 mifos-kmp-room = { id = "mifos.kmp.room", version = "unspecified" }
+kmp-product-flavors = { id = "io.github.mobilebytelabs.kmp-product-flavors", version.ref = "kmpProductFlavors" }
+kmp-flavors-convention = { id = "org.convention.kmp.flavors", version = "unspecified" }

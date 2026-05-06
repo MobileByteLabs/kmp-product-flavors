@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 Anthropic, Inc.
+ * Copyright 2026 Mifos Initiative
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,26 +14,11 @@
  * limitations under the License.
  */
 
-pluginManagement {
-    includeBuild("build-logic")
-    repositories {
-        google()
-        mavenCentral()
-        gradlePluginPortal()
-    }
+package cmp.shared.flavor
+
+actual object FeatureFlags {
+    actual val tier: String = "advanced"
+    actual val analytics: Boolean = true
+    actual val reports: Boolean = true
+    actual val bulkOperations: Boolean = true
 }
-
-dependencyResolutionManagement {
-    repositories {
-        google()
-        mavenCentral()
-    }
-}
-
-rootProject.name = "kmp-product-flavors"
-
-// Samples demonstrating the KMP Product Flavors plugin
-include(":samples:basic-flavors")
-
-// Note: samples/kmp-project-template is a standalone project with its own build
-// Build it separately: cd samples/kmp-project-template && ./gradlew build

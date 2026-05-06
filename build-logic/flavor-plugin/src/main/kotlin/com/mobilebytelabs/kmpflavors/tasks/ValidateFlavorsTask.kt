@@ -48,7 +48,7 @@ abstract class ValidateFlavorsTask : DefaultTask() {
      * Map of flavor name to its dimension (null if no dimension set).
      */
     @get:Input
-    abstract val flavorDimensions: MapProperty<String, String?>
+    abstract val flavorDimensions: MapProperty<String, String>
 
     /**
      * Map of flavor name to whether it's marked as default.
@@ -113,6 +113,7 @@ abstract class ValidateFlavorsTask : DefaultTask() {
                     dimension == null || dimension.isEmpty() -> {
                         errors.add("Flavor '$flavor' has no dimension. Use dimension.set(\"...\") to assign one.")
                     }
+
                     dimension !in dimensions -> {
                         errors.add("Flavor '$flavor' references unknown dimension '$dimension'. Available: ${dimensions.joinToString(", ")}")
                     }

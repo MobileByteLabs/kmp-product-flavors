@@ -1,6 +1,6 @@
 dependencyResolutionManagement {
     repositories {
-        mavenLocal() // For local development with ./MavenLocalRelease.sh
+        mavenLocal()
         google()
         mavenCentral()
         gradlePluginPortal()

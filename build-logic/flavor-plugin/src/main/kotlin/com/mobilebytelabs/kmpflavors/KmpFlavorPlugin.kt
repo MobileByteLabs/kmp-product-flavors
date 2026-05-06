@@ -250,7 +250,7 @@ class KmpFlavorPlugin : Plugin<Project> {
             ValidateFlavorsTask::class.java,
         ) {
             dimensionNames.set(dimensions.map { it.name }.toSet())
-            flavorDimensions.set(flavors.associate { it.name to it.dimension.orNull })
+            flavorDimensions.set(flavors.associate { it.name to (it.dimension.orNull ?: "") })
             flavorDefaults.set(flavors.associate { it.name to it.isDefault.getOrElse(false) })
             validVariantNames.set(allVariants.map { it.name }.toSet())
             activeVariantName.set(activeVariant.name)

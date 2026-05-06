@@ -1,20 +1,17 @@
 [versions]
-# KMP Product Flavors Plugin Version (Single Source of Truth)
-kmpProductFlavors = "1.0.1"
-
 # Core Dependencies (aligned with kmp-project-template)
 agp = "8.12.3"
-kotlin = "2.2.21"
-compose-multiplatform = "1.9.3"
+kotlin = "2.3.0"
+compose-multiplatform = "1.10.3"
 android-minSdk = "24"
 android-compileSdk = "36"
 android-targetSdk = "36"
-vanniktechMavenPublish = "0.30.0"
+vanniktechMavenPublish = "0.36.0"
 
 # Code Quality (aligned with kmp-project-template)
 detekt = "1.23.8"
-spotless = "7.0.2"
-ktlint = "1.5.0"
+spotless = "7.0.3"
+ktlint = "1.8.0"
 
 # Testing
 junit = "4.13.2"
