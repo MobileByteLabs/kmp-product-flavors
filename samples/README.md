@@ -7,9 +7,46 @@ This directory contains sample projects demonstrating the KMP Product Flavors pl
 | Sample | Description | Platforms |
 |--------|-------------|-----------|
 | [basic-flavors](basic-flavors) | Minimal plugin demo with multi-dimensional flavors | Desktop, iOS |
-| [compose-multiplatform](compose-multiplatform) | Full Compose Multiplatform app (WIP) | Android, iOS, Desktop, WASM |
+| [compose-multiplatform](compose-multiplatform) | Full Compose Multiplatform app | Android, iOS, Desktop, WASM |
 | [kmp-project-template](kmp-project-template) | Production KMP template from openMF | All platforms |
 | [convention-integration](convention-integration) | Standalone convention plugin demo | JVM, iOS |
+
+## Capability Matrix
+
+Use this table to find where a specific capability is demonstrated.
+
+| Capability | basic-flavors | compose-multiplatform | kmp-project-template | convention-integration |
+|---|:---:|:---:|:---:|:---:|
+| Multi-dimensional flavors | ✅ | ✅ | ✅ | ✅ |
+| `flavorDimensions { register {} }` | ✅ | ✅ | ✅ | ✅ |
+| `flavors { register {} }` with `applicationIdSuffix` | ✅ | ✅ | ✅ | ✅ |
+| `buildTypes { register {} }` | ✅ | — | ✅ | — |
+| `FlavorConfig` codegen + `IS_<FLAVOR>` flags | ✅ | ✅ | ✅ | ✅ |
+| `commonFlavor/` flavor source sets | ✅ | ✅ | ✅ | ✅ |
+| `<platform>Flavor/` platform-flavor source sets | ✅ | ✅ | ✅ | — |
+| `webMain` / `nativeMain` intermediates | ✅ | ✅ | ✅ | — |
+| Per-flavor `composeResources/` (v1.1.0) | — | 🟡 v1.1.1 | 🟡 v1.1.1 | — |
+| `bridgeAgpProductFlavors` (v1.1.0) | — | ✅ | 🟡 v1.1.1 | — |
+| `bridgeAgpBuildTypes` (v1.1.0) | — | — | 🟡 v1.1.1 | — |
+| SPM `Package.swift` generator (v1.1.0) | — | — | — | — |
+| `matchingFallbacks(...)` AGP propagation (v1.1.0) | — | 🟡 v1.1.1 | 🟡 v1.1.1 | — |
+| tvOS / watchOS targets (v1.1.0) | — | — | — | — |
+| Convention plugin pattern (`build-logic/convention/`) | — | — | ✅ | ✅ |
+| `customizer.sh` / consumer-project rebrand workflow | — | — | ✅ | — |
+
+> **Legend:** ✅ implemented and demonstrated · 🟡 planned (v1.1.1+) · — not applicable to this sample
+>
+> The capability columns marked 🟡 are intentionally deferred to a v1.1.1 follow-up. The capabilities themselves are shipped in the plugin (Phases B–G of `PLAN-gaps-fix-260510-191003`); the samples just don't exercise them yet.
+
+## Roadmap
+
+| Sample | Status | Demonstrates |
+|---|---|---|
+| `samples/spm-distribution/` | 🟡 planned for v1.1.1 | `kmpFlavors { spm { … } }` LOCAL + REMOTE distribution + `swift package describe` validation on macos-latest |
+| `samples/full-apple-targets/` | 🟡 planned for v1.1.1 | iOS + macOS + tvOS + watchOS in one module — exercises the v1.1.0 Apple-family detection end-to-end |
+| `samples/multi-module/` | 🟡 planned for v1.2.0 (Phase M) | Cross-module variant matching with mismatched dimensions across modules |
+| `samples/library-with-flavors/` | 🟡 planned for v1.2.0 (Phase L) | Per-flavor Maven publication strategy |
+| `samples/android-resources-per-flavor/` | 🟡 planned for v1.2.0 (Phase K) | Per-flavor `AndroidManifest.xml` + `res/` + signing configs |
 
 ---
 
