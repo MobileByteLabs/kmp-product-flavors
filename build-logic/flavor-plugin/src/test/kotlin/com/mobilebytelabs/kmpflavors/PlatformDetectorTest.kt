@@ -143,6 +143,70 @@ class PlatformDetectorTest {
     }
 
     @Test
+    fun `detect finds tvOS targets`() {
+        val kotlin = createMockKotlin("tvosArm64", "tvosSimulatorArm64")
+
+        val platforms = PlatformDetector.detect(kotlin, logger)
+
+        val tvos = platforms.find { it.prefix == "tvos" }
+        assertNotNull(tvos)
+        assertEquals("tvosMain", tvos?.mainSourceSet)
+        assertEquals("native", tvos?.parent)
+        assertNotNull(platforms.find { it.prefix == "native" && it.isIntermediate })
+    }
+
+    @Test
+    fun `detect finds watchOS targets including watchosDeviceArm64`() {
+        val kotlin = createMockKotlin("watchosArm64", "watchosSimulatorArm64", "watchosDeviceArm64")
+
+        val platforms = PlatformDetector.detect(kotlin, logger)
+
+        val watchos = platforms.find { it.prefix == "watchos" }
+        assertNotNull(watchos)
+        assertEquals("watchosMain", watchos?.mainSourceSet)
+        assertEquals("native", watchos?.parent)
+    }
+
+    @Test
+    fun `detect finds wasmWasi target alongside js and wasmJs`() {
+        val kotlin = createMockKotlin("js", "wasmJs", "wasmWasi")
+
+        val platforms = PlatformDetector.detect(kotlin, logger)
+
+        val wasmWasi = platforms.find { it.prefix == "wasmWasi" }
+        assertNotNull(wasmWasi)
+        assertEquals("wasmWasiMain", wasmWasi?.mainSourceSet)
+        assertEquals("web", wasmWasi?.parent)
+
+        // All three web targets share a single webMain intermediate
+        val web = platforms.find { it.prefix == "web" && it.isIntermediate }
+        assertNotNull(web)
+    }
+
+    @Test
+    fun `detect finds Android Native targets`() {
+        val kotlin = createMockKotlin("androidNativeArm64", "androidNativeX64")
+
+        val platforms = PlatformDetector.detect(kotlin, logger)
+
+        val androidNative = platforms.find { it.prefix == "androidNative" }
+        assertNotNull(androidNative)
+        assertEquals("androidNativeMain", androidNative?.mainSourceSet)
+        assertEquals("native", androidNative?.parent)
+    }
+
+    @Test
+    fun `detect does not confuse Android Native with Android target`() {
+        val kotlin = createMockKotlin("androidNativeArm64")
+
+        val platforms = PlatformDetector.detect(kotlin, logger)
+
+        // androidTarget() not declared — only the native variant
+        assertTrue(platforms.none { it.prefix == "android" })
+        assertNotNull(platforms.find { it.prefix == "androidNative" })
+    }
+
+    @Test
     fun `detect handles full KMP project with all targets`() {
         val kotlin = createMockKotlin(
             "android",

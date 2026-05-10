@@ -37,9 +37,22 @@ object PlatformDetector {
 
     private val IOS_TARGETS = setOf("iosX64", "iosArm64", "iosSimulatorArm64")
     private val MACOS_TARGETS = setOf("macosX64", "macosArm64")
+    private val TVOS_TARGETS = setOf("tvosX64", "tvosArm64", "tvosSimulatorArm64")
+    private val WATCHOS_TARGETS = setOf(
+        "watchosX64",
+        "watchosArm64",
+        "watchosSimulatorArm64",
+        "watchosDeviceArm64",
+    )
     private val LINUX_TARGETS = setOf("linuxX64", "linuxArm64")
     private val MINGW_TARGETS = setOf("mingwX64")
     private val DESKTOP_TARGETS = setOf("desktop", "jvm")
+    private val ANDROID_NATIVE_TARGETS = setOf(
+        "androidNativeArm64",
+        "androidNativeX64",
+        "androidNativeArm32",
+        "androidNativeX86",
+    )
 
     /**
      * Detects all active platforms in the Kotlin Multiplatform project.
@@ -76,6 +89,20 @@ object PlatformDetector {
             logger.info("[KMP Flavors] Detected macOS target(s)")
         }
 
+        // tvOS
+        if (targetNames.any { it in TVOS_TARGETS }) {
+            platforms.add(PlatformGroup("tvos", "tvosMain", parent = "native"))
+            needsNativeIntermediate.add("tvos")
+            logger.info("[KMP Flavors] Detected tvOS target(s)")
+        }
+
+        // watchOS
+        if (targetNames.any { it in WATCHOS_TARGETS }) {
+            platforms.add(PlatformGroup("watchos", "watchosMain", parent = "native"))
+            needsNativeIntermediate.add("watchos")
+            logger.info("[KMP Flavors] Detected watchOS target(s)")
+        }
+
         // Linux
         if (targetNames.any { it in LINUX_TARGETS }) {
             platforms.add(PlatformGroup("linux", "linuxMain", parent = "native"))
@@ -88,6 +115,13 @@ object PlatformDetector {
             platforms.add(PlatformGroup("mingw", "mingwMain", parent = "native"))
             needsNativeIntermediate.add("mingw")
             logger.info("[KMP Flavors] Detected Windows (MinGW) target(s)")
+        }
+
+        // Android Native (server-side native binaries on Android NDK toolchains)
+        if (targetNames.any { it in ANDROID_NATIVE_TARGETS }) {
+            platforms.add(PlatformGroup("androidNative", "androidNativeMain", parent = "native"))
+            needsNativeIntermediate.add("androidNative")
+            logger.info("[KMP Flavors] Detected Android Native target(s)")
         }
 
         // Desktop (JVM)
@@ -110,6 +144,13 @@ object PlatformDetector {
             platforms.add(PlatformGroup("wasmJs", "wasmJsMain", parent = "web"))
             needsWebIntermediate.add("wasmJs")
             logger.info("[KMP Flavors] Detected WasmJS target")
+        }
+
+        // WasmWasi
+        if ("wasmWasi" in targetNames) {
+            platforms.add(PlatformGroup("wasmWasi", "wasmWasiMain", parent = "web"))
+            needsWebIntermediate.add("wasmWasi")
+            logger.info("[KMP Flavors] Detected WasmWasi target")
         }
 
         // Add intermediate groups if needed
