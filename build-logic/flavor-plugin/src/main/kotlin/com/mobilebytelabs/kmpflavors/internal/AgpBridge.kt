@@ -85,18 +85,12 @@ internal object AgpBridge {
         }
     }
 
-    private fun findApplicationExtension(project: Project): Any? =
-        runCatching {
-            val cls = Class.forName("com.android.build.api.dsl.ApplicationExtension")
-            project.extensions.findByType(cls)
-        }.getOrNull()
+    private fun findApplicationExtension(project: Project): Any? = runCatching {
+        val cls = Class.forName("com.android.build.api.dsl.ApplicationExtension")
+        project.extensions.findByType(cls)
+    }.getOrNull()
 
-    private fun propagateFlavors(
-        androidExt: Any,
-        kmpDimensions: List<FlavorDimension>,
-        kmpFlavors: List<FlavorConfig>,
-        logger: Logger,
-    ) {
+    private fun propagateFlavors(androidExt: Any, kmpDimensions: List<FlavorDimension>, kmpFlavors: List<FlavorConfig>, logger: Logger) {
         if (kmpDimensions.isEmpty() || kmpFlavors.isEmpty()) {
             logger.info("[KMP Flavors] No KMP dimensions/flavors to propagate to AGP.")
             return
@@ -131,11 +125,7 @@ internal object AgpBridge {
         )
     }
 
-    private fun propagateBuildTypes(
-        androidExt: Any,
-        kmpBuildTypes: List<BuildTypeConfig>,
-        logger: Logger,
-    ) {
+    private fun propagateBuildTypes(androidExt: Any, kmpBuildTypes: List<BuildTypeConfig>, logger: Logger) {
         if (kmpBuildTypes.isEmpty()) {
             logger.info("[KMP Flavors] No KMP buildTypes to propagate to AGP.")
             return
@@ -169,6 +159,7 @@ internal object AgpBridge {
     private fun appendDimensions(androidExt: Any, names: List<String>) {
         val getter = androidExt.javaClass.methods.firstOrNull { it.name == "getFlavorDimensions" }
             ?: return
+
         @Suppress("UNCHECKED_CAST")
         val mutable = getter.invoke(androidExt) as? MutableList<String> ?: return
         for (name in names) {
