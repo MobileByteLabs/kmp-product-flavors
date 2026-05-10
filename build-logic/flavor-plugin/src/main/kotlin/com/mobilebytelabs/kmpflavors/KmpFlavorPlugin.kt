@@ -316,6 +316,7 @@ class KmpFlavorPlugin : Plugin<Project> {
             createIntermediates.set(extension.createIntermediateSourceSets)
             createGitKeep.set(true)
             createExampleFiles.set(false)
+            createReadmePerSourceSet.set(true)
             examplePackage.set(extension.buildConfigPackage)
             sourceDirectory.set(project.layout.projectDirectory.dir("src"))
         }
