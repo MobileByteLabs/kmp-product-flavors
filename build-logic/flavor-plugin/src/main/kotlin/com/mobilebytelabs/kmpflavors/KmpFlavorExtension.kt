@@ -253,6 +253,22 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
         action.execute(buildTypes)
     }
 
+    /**
+     * SPM (Swift Package Manager) iOS framework distribution configuration.
+     * See [SpmConfig] for available properties.
+     *
+     * CocoaPods is intentionally **not** supported — JetBrains has deprecated CocoaPods
+     * in the KMP roadmap. Use SPM via [spm] for iOS framework distribution.
+     */
+    val spm: SpmConfig = objects.newInstance(SpmConfig::class.java)
+
+    /**
+     * Configure the SPM manifest generator using a DSL block.
+     */
+    fun spm(action: Action<SpmConfig>) {
+        action.execute(spm)
+    }
+
     init {
         // Set conventions
         generateBuildConfig.convention(true)
