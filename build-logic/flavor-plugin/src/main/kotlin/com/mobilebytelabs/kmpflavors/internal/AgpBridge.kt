@@ -206,6 +206,26 @@ internal object AgpBridge {
         kmp.dimension.orNull?.let { setProperty(agpFlavor, "setDimension", it) }
         kmp.applicationIdSuffix.orNull?.let { setProperty(agpFlavor, "setApplicationIdSuffix", it) }
         kmp.versionNameSuffix.orNull?.let { setProperty(agpFlavor, "setVersionNameSuffix", it) }
+
+        // matchingFallbacks: Gradle's getMatchingFallbacks() returns a mutable list — we
+        // append to it so AGP defaults are preserved.
+        val fallbacks = kmp.matchingFallbacks.getOrElse(emptyList())
+        if (fallbacks.isNotEmpty()) {
+            appendMatchingFallbacks(agpFlavor, fallbacks)
+        }
+    }
+
+    private fun appendMatchingFallbacks(agpFlavor: Any, fallbacks: List<String>) {
+        runCatching {
+            val getter = agpFlavor.javaClass.methods.firstOrNull { it.name == "getMatchingFallbacks" }
+                ?: return
+
+            @Suppress("UNCHECKED_CAST")
+            val list = getter.invoke(agpFlavor) as? MutableList<String> ?: return
+            for (fb in fallbacks) {
+                if (fb !in list) list.add(fb)
+            }
+        }
     }
 
     private fun registerAgpBuildType(container: Any, kmp: BuildTypeConfig) {

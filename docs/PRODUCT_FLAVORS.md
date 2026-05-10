@@ -1,6 +1,6 @@
 # Product Flavors
 
-> **Related:** [BUILD_VARIANTS](BUILD_VARIANTS.md) · [Integration guide for kmp-project-template](KMP_PROJECT_TEMPLATE_INTEGRATION.md)
+> **Related:** [BUILD_VARIANTS](BUILD_VARIANTS.md) · [VARIANT_FILTERS](VARIANT_FILTERS.md) · [IOS_DISTRIBUTION](IOS_DISTRIBUTION.md) · [Integration guide for kmp-project-template](KMP_PROJECT_TEMPLATE_INTEGRATION.md)
 
 
 The plugin supports N flavor dimensions. Each dimension is an independent axis of variation — the active variant is the cartesian product of all dimensions plus a build type.

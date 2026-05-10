@@ -1,6 +1,6 @@
 # Build Variants & CI/CD
 
-> **Related:** [PRODUCT_FLAVORS](PRODUCT_FLAVORS.md) · [Integration guide for kmp-project-template](KMP_PROJECT_TEMPLATE_INTEGRATION.md)
+> **Related:** [PRODUCT_FLAVORS](PRODUCT_FLAVORS.md) · [VARIANT_FILTERS](VARIANT_FILTERS.md) · [IOS_DISTRIBUTION](IOS_DISTRIBUTION.md) · [Integration guide for kmp-project-template](KMP_PROJECT_TEMPLATE_INTEGRATION.md)
 
 
 ## The rule: build type = environment = deployment target

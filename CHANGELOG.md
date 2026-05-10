@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **G9** Per-flavor test source-set creation — `SourceSetConfigurator` now also creates `common<Flavor>Test` and `<platform><Flavor>Test` source sets (mirroring `*Main` structure) when `commonTest` exists. Plugin-side wiring rule: `<flavor>Test` `dependsOn(commonTest)` ONLY when active, so non-active flavor test sources never reach the test classpath of another variant.
 - **G18** `InitFlavorSourceSetsTask` — new `createReadmePerSourceSet` property (default `true`). Each generated flavor source directory now gets a per-source-set `README.md` explaining what code belongs there, with a link back to `docs/PRODUCT_FLAVORS.md`. Replaces the previous "empty dir + .gitkeep" first-time-user experience.
 - **G19** `KmpFlavorPluginIntegrationTest` — new case asserting the plugin gracefully no-ops on a Java-only project (no KMP plugin applied). Plugin emits a `WARN` log and returns silently rather than crashing.
+- **G10** `matchingFallbacks` propagation through the AGP bridge — when `bridgeAgpProductFlavors.set(true)`, per-flavor `matchingFallbacks(...)` declarations now flow into AGP's `productFlavor.matchingFallbacks` automatically. No separate `android { productFlavors { … } }` block needed.
+- **G11** New `docs/VARIANT_FILTERS.md` — practical recipes for `variantFilter { … }` (excluding impossible combinations, time-boxed pilots, per-buildType filters) and `matchingFallbacks(...)` (single, chained, AGP-bridged). Includes a decision tree mapping symptoms → fixes.
 
 ### Added
 
