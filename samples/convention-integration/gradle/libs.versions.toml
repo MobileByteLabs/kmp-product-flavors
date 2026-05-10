@@ -1,6 +1,6 @@
 [versions]
 kotlin = "2.2.21"
-kmpProductFlavors = "1.0.0"
+kmpProductFlavors = "1.0.5"
 
 [libraries]
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }

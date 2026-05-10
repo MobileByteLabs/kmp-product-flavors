@@ -1,5 +1,8 @@
 # kmp-product-flavors: Integration Guide for kmp-project-template
 
+> **Related:** [PRODUCT_FLAVORS](PRODUCT_FLAVORS.md) · [BUILD_VARIANTS](BUILD_VARIANTS.md)
+
+
 **Machine-readable agent playbook.** This document is structured for AI agents (Claude Code, etc.) to read and execute without ambiguity. Every file path is absolute relative to the project root. Every code block is copy-paste ready.
 
 ---
@@ -8,7 +11,7 @@
 
 ```yaml
 plugin_id: io.github.mobilebytelabs.kmp-product-flavors
-plugin_version: 0.1.0
+plugin_version: 1.0.5
 artifact_group: io.github.mobilebytelabs.kmpflavors
 artifact_name: flavor-plugin
 extension_class: com.mobilebytelabs.kmpflavors.KmpFlavorExtension
@@ -26,8 +29,8 @@ sample_reference: samples/kmp-project-template/
 | **Flavor dimensions** | N independent axes of variation (e.g. consumer × tier) | `flavorDimensions { register(...) { priority } }` |
 | **Flavor source sets** | Wires `commonFoo/` source set into the compilation for each flavor | automatic once a flavor named `foo` is declared |
 | **Build types** | Debug/staging/release with per-type constants and flags | `buildTypes { register(...) { isDebuggable, isMinifyEnabled, applicationIdSuffix, ... } }` |
-| **AGP bridge — product flavors** | Propagates KMP flavor dimensions + product flavors to Android's AGP | `bridgeAgpProductFlavors.set(true)` |
-| **AGP bridge — build types** | Propagates KMP build types to AGP (replaces manual `buildTypes {}` in `cmp-android`) | `bridgeAgpBuildTypes.set(true)` |
+| **AGP bridge — product flavors** 🟡 *Planned (v1.1.0)* | Propagates KMP flavor dimensions + product flavors to Android's AGP | `bridgeAgpProductFlavors.set(true)` |
+| **AGP bridge — build types** 🟡 *Planned (v1.1.0)* | Propagates KMP build types to AGP (replaces manual `buildTypes {}` in `cmp-android`) | `bridgeAgpBuildTypes.set(true)` |
 | **AppID / BundleID suffixes** | Appends per-flavor suffix to Android `applicationId` and iOS `CFBundleIdentifier` | `applicationIdSuffix`, `bundleIdSuffix` on a flavor |
 | **IS_xxx boolean flags** | Auto-generates `IS_INTERNAL`, `IS_DEMO`, `IS_ADVANCED`, `IS_BASIC`, `IS_DEBUG`, etc. from flavor/buildType names | automatic |
 | **expect/actual compile-time exclusion** | Flavor source sets can hold `actual` implementations — code not in a source set is absent from the binary (not just hidden) | flavor source set pattern |
@@ -55,7 +58,7 @@ Add exactly these entries:
 
 ```toml
 [versions]
-kmpProductFlavors = "0.1.0"
+kmpProductFlavors = "1.0.5"
 
 [plugins]
 kmp-product-flavors = { id = "io.github.mobilebytelabs.kmp-product-flavors", version.ref = "kmpProductFlavors" }
@@ -698,3 +701,85 @@ cmp-shared/
     └── commonBasic/kotlin/cmp/shared/flavor/
         └── FeatureFlags.kt                      NEW (actual)
 ```
+
+---
+
+## CONFIGURATION EXTRAS
+
+These DSL surfaces exist in `v1.0.5` but were missing from the capability index. They are documented here for completeness.
+
+### Desktop / Web title suffixes
+
+For Compose Multiplatform desktop and web builds, a per-flavor title suffix is appended at the window/page level:
+
+```kotlin
+kmpFlavors {
+    flavors {
+        register("demo") {
+            dimension.set("tier")
+            desktopTitleSuffix.set(" (Demo)")
+            webTitleSuffix.set(" — Demo")
+        }
+    }
+}
+```
+
+These properties are declared on `FlavorConfig` and surfaced by the `printFlavorProperties` Gradle task. Consumers wire the resolved suffix into `Window(title = ...)` (desktop) and `<title>` (web).
+
+### Active variant override via Gradle property
+
+Override the active flavor variant per invocation without editing build files:
+
+```bash
+./gradlew :app:assembleProdDebug -PkmpFlavor=prodAdvancedProdRelease
+```
+
+The property is read by `KmpFlavorPlugin` during `afterEvaluate` and routes which variant's `FlavorConfig` constants are baked into the build. Useful for CI matrices that build many variants from the same checkout. Default behaviour (no `-PkmpFlavor`): the variant formed by each dimension's `isDefault.set(true)` flavor.
+
+---
+
+## PITFALLS
+
+### afterEvaluate ordering
+
+The plugin defers all configuration work to `project.afterEvaluate { … }`. Consumers who reference plugin-created source sets directly inside their build script will hit ordering issues:
+
+```kotlin
+// ❌ Will fail — commonDemoMain doesn't exist yet at this point
+kotlin {
+    sourceSets {
+        getByName("commonDemoMain").dependencies {
+            implementation(libs.demo.fixtures)
+        }
+    }
+}
+```
+
+**Workaround** — wrap the access in `afterEvaluate { }` or use the `kmpFlavors.flavors.named("demo") { dependencies { … } }` DSL instead:
+
+```kotlin
+// ✅ Correct — runs after the plugin has created the source set
+afterEvaluate {
+    kotlin.sourceSets.getByName("commonDemoMain").dependencies {
+        implementation(libs.demo.fixtures)
+    }
+}
+```
+
+The `kmpFlavors { flavors { register("demo") { dependencies { … } } } }` DSL handles ordering correctly — prefer it when possible.
+
+### Plugin application order
+
+Apply plugins in this exact order in your module's `build.gradle.kts`:
+
+```kotlin
+plugins {
+    kotlin("multiplatform")                            // 1. KMP first
+    id("com.android.application")                       // 2. then Android plugin (or library)
+    id("io.github.mobilebytelabs.kmp-product-flavors")  // 3. then this plugin
+}
+```
+
+Reversing 1 and 3 makes the plugin's `KotlinMultiplatformExtension` lookup fail, producing only a `WARN` log line and no error. Confusing for first-time users.
+
+---
