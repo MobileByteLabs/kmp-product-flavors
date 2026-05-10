@@ -24,6 +24,7 @@ import com.mobilebytelabs.kmpflavors.internal.PlatformPropertiesConfigurator
 import com.mobilebytelabs.kmpflavors.internal.SourceSetConfigurator
 import com.mobilebytelabs.kmpflavors.tasks.GenerateBuildConfigTask
 import com.mobilebytelabs.kmpflavors.tasks.GenerateRunConfigurationsTask
+import com.mobilebytelabs.kmpflavors.tasks.GenerateSpmManifestTask
 import com.mobilebytelabs.kmpflavors.tasks.InitFlavorSourceSetsTask
 import com.mobilebytelabs.kmpflavors.tasks.ListFlavorsTask
 import com.mobilebytelabs.kmpflavors.tasks.PrintFlavorPropertiesTask
@@ -193,6 +194,11 @@ class KmpFlavorPlugin : Plugin<Project> {
             logger = logger,
         )
 
+        // SPM manifest generator — opt-in via spm { generateManifest.set(true) }
+        if (extension.spm.generateManifest.get()) {
+            registerSpmTask(project, extension, activeVariant)
+        }
+
         // Configure platform-specific properties
         val platformPropertiesConfigurator = PlatformPropertiesConfigurator(logger)
         platformPropertiesConfigurator.configure(project, activeVariant)
@@ -335,6 +341,35 @@ class KmpFlavorPlugin : Plugin<Project> {
             webTitleSuffix.set(
                 activeVariant.combinedWebTitleSuffix.ifEmpty { null },
             )
+        }
+    }
+
+    private fun registerSpmTask(project: org.gradle.api.Project, extension: KmpFlavorExtension, activeVariant: FlavorVariant) {
+        // Resolve the active flavor's name. activeVariant.flavors holds the list of
+        // FlavorConfig objects forming this variant; we use the first dimension's flavor
+        // for {flavor} interpolation, matching the convention applicationIdSuffix uses.
+        val flavorName = activeVariant.flavors.firstOrNull()?.name ?: activeVariant.name
+
+        project.tasks.register(
+            "generateSpmManifest",
+            GenerateSpmManifestTask::class.java,
+        ).configure {
+            group = "kmp flavors"
+            description = "Generate Package.swift manifest for SPM distribution of the active flavor variant"
+            variantName.set(activeVariant.name)
+            this.flavorName.set(flavorName)
+            xcframeworkName.set(extension.spm.xcframeworkName)
+            distribution.set(extension.spm.distribution)
+            binaryUrlTemplate.set(extension.spm.binaryUrlTemplate)
+            xcframeworkPath.set(extension.spm.xcframeworkPath)
+            projectVersion.set(project.provider { project.version.toString() })
+            checksumStrategy.set(extension.spm.checksumStrategy)
+            outputDirectory.set(project.layout.buildDirectory.dir("spm/${activeVariant.name}"))
+        }
+
+        // Hook into :assemble so generation happens automatically alongside builds.
+        project.tasks.matching { it.name == "assemble" }.configureEach {
+            dependsOn("generateSpmManifest")
         }
     }
 

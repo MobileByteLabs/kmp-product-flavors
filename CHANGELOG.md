@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **G6** AGP bridge implementation — `bridgeAgpProductFlavors` and `bridgeAgpBuildTypes` properties on `kmpFlavors {}`. When `true` and the consumer applies `com.android.application`, KMP flavor dimensions, flavors, and build types are propagated into AGP's `ApplicationExtension`, carrying `applicationIdSuffix` and `versionNameSuffix`. Reflection-based — no compile-time AGP dependency added to the plugin.
 - Defensive behaviour: when AGP `productFlavors` or `buildTypes` are already populated by the consumer's hand-written DSL, the bridge logs a warning and skips propagation rather than silently overriding.
 - `AgpBridgeTest` covering (a) no-op when both flags disabled, (b) silent skip when `com.android.application` not applied (v1.1.0 scope; library + KMP-library variants land in v1.2.0).
+- **G7** SPM iOS framework distribution helper — new `kmpFlavors { spm { … } }` DSL block and `generateSpmManifest` Gradle task that writes a per-flavor `Package.swift` under `build/spm/<variant>/`. Two distribution modes: `LOCAL` (path-based) and `REMOTE` (URL + SHA-256 checksum with `{flavor}` / `{variant}` / `{version}` placeholder interpolation). Three checksum strategies: `AUTO` (sidecar then sha256-on-the-fly), `REQUIRE_FILE` (sidecar mandatory), `SKIP` (placeholder for samples / smoke tests). Linux-CI compatible — task generation runs in pure JVM with no Xcode toolchain dependency.
+- New `docs/IOS_DISTRIBUTION.md` — SPM-first guidance, explicit "CocoaPods is deprecated and unsupported" note, distribution-mode + checksum-strategy reference, roadmap.
+- `GenerateSpmManifestTaskTest` — three string-match cases covering LOCAL path emission, REMOTE placeholder interpolation, and REMOTE failure when `binaryUrlTemplate` is unset.
 
 ### Added
 
