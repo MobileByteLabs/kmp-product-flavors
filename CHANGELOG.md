@@ -9,10 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **G6** AGP bridge implementation — `bridgeAgpProductFlavors` and `bridgeAgpBuildTypes` properties on `kmpFlavors {}`. When `true` and the consumer applies `com.android.application`, KMP flavor dimensions, flavors, and build types are propagated into AGP's `ApplicationExtension`, carrying `applicationIdSuffix` and `versionNameSuffix`. Reflection-based — no compile-time AGP dependency added to the plugin.
+- Defensive behaviour: when AGP `productFlavors` or `buildTypes` are already populated by the consumer's hand-written DSL, the bridge logs a warning and skips propagation rather than silently overriding.
+- `AgpBridgeTest` covering (a) no-op when both flags disabled, (b) silent skip when `com.android.application` not applied (v1.1.0 scope; library + KMP-library variants land in v1.2.0).
+
+### Added
+
 - **G1 / G2** Apple-family target detection extended: tvOS (`tvosX64`, `tvosArm64`, `tvosSimulatorArm64`) and watchOS (`watchosX64`, `watchosArm64`, `watchosSimulatorArm64`, `watchosDeviceArm64`). Each gets a flavor-aware source set wired under `nativeMain`.
 - **G3** WasmWasi target detection (`wasmWasi`) — joins `js` + `wasmJs` under the `webMain` intermediate.
 - **G4** Android Native target detection (`androidNativeArm64`, `androidNativeX64`, `androidNativeArm32`, `androidNativeX86`) — for server-side native binaries on Android NDK toolchains.
 - `PlatformDetectorTest` — five new test cases covering the four new target families plus a regression test asserting `androidNativeArm64` is not confused with the `android` target.
+
+
+
+### Changed
+
+- Integration doc capability index promotes `bridgeAgpProductFlavors` / `bridgeAgpBuildTypes` from 🟡 Planned to active capabilities.
 
 ### Documentation
 

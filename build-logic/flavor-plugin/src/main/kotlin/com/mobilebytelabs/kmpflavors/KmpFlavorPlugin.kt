@@ -16,6 +16,7 @@
 
 package com.mobilebytelabs.kmpflavors
 
+import com.mobilebytelabs.kmpflavors.internal.AgpBridge
 import com.mobilebytelabs.kmpflavors.internal.DependencyConfigurator
 import com.mobilebytelabs.kmpflavors.internal.FlavorVariantResolver
 import com.mobilebytelabs.kmpflavors.internal.PlatformDetector
@@ -178,6 +179,19 @@ class KmpFlavorPlugin : Plugin<Project> {
         // Configure dependencies
         val dependencyConfigurator = DependencyConfigurator(logger)
         dependencyConfigurator.configure(project, activeVariant)
+
+        // AGP bridge — propagate KMP flavors / build types into the Android
+        // Gradle Plugin extension when consumer opts in via bridgeAgp* flags.
+        // v1.1.0 scope: com.android.application only.
+        AgpBridge.apply(
+            project = project,
+            bridgeProductFlavors = extension.bridgeAgpProductFlavors.get(),
+            bridgeBuildTypes = extension.bridgeAgpBuildTypes.get(),
+            kmpDimensions = dimensions,
+            kmpFlavors = flavors,
+            kmpBuildTypes = extension.buildTypes.toList(),
+            logger = logger,
+        )
 
         // Configure platform-specific properties
         val platformPropertiesConfigurator = PlatformPropertiesConfigurator(logger)
