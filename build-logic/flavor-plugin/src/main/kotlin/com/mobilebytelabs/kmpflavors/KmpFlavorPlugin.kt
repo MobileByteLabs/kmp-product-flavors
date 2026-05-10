@@ -44,7 +44,7 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
  * ```kotlin
  * plugins {
  *     kotlin("multiplatform")
- *     id("io.github.anthropic.kmp-product-flavors")
+ *     id("io.github.mobilebytelabs.kmp-product-flavors")
  * }
  *
  * kmpFlavors {
