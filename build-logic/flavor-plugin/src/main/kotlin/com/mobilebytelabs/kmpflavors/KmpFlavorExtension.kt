@@ -154,6 +154,43 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
     abstract val enableBuildTypes: Property<Boolean>
 
     /**
+     * Whether to propagate KMP flavor dimensions and product flavors into the
+     * Android Gradle Plugin (AGP) extension on modules that apply
+     * `com.android.application`.
+     *
+     * When `true` and the consumer module applies `com.android.application`:
+     * - KMP `flavorDimensions {}` are appended to AGP `flavorDimensions += [...]`.
+     * - KMP `flavors {}` are registered as AGP product flavors with matching
+     *   dimension, `applicationIdSuffix`, and `versionNameSuffix`.
+     * - If AGP `productFlavors {}` is already populated by hand, the bridge
+     *   logs a warning and skips propagation rather than silently overriding.
+     *
+     * In v1.1.0 the bridge supports `com.android.application` only. Library
+     * (`com.android.library`) and KMP-library (`com.android.kotlin.multiplatform.library`)
+     * support is planned for v1.2.0.
+     *
+     * Convention: false
+     */
+    abstract val bridgeAgpProductFlavors: Property<Boolean>
+
+    /**
+     * Whether to propagate KMP build types into AGP `buildTypes {}` on modules
+     * that apply `com.android.application`.
+     *
+     * When `true` and the consumer module applies `com.android.application`:
+     * - KMP `buildTypes {}` are registered as AGP build types with `isDebuggable`,
+     *   `isMinifyEnabled`, and `applicationIdSuffix` carried over.
+     * - The default AGP `debug` and `release` build types are preserved (the
+     *   bridge calls `maybeCreate`).
+     * - If AGP `buildTypes {}` already declares custom flavor-style content
+     *   beyond `debug`/`release`, the bridge logs a warning and skips the
+     *   propagation rather than overriding.
+     *
+     * Convention: false
+     */
+    abstract val bridgeAgpBuildTypes: Property<Boolean>
+
+    /**
      * Internal list of variant filter actions.
      */
     internal val variantFilterActions = mutableListOf<Action<VariantFilter>>()
@@ -222,5 +259,7 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
         buildConfigClassName.convention("FlavorConfig")
         createIntermediateSourceSets.convention(true)
         enableBuildTypes.convention(false)
+        bridgeAgpProductFlavors.convention(false)
+        bridgeAgpBuildTypes.convention(false)
     }
 }

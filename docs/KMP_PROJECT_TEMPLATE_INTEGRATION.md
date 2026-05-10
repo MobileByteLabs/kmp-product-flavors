@@ -29,8 +29,8 @@ sample_reference: samples/kmp-project-template/
 | **Flavor dimensions** | N independent axes of variation (e.g. consumer × tier) | `flavorDimensions { register(...) { priority } }` |
 | **Flavor source sets** | Wires `commonFoo/` source set into the compilation for each flavor | automatic once a flavor named `foo` is declared |
 | **Build types** | Debug/staging/release with per-type constants and flags | `buildTypes { register(...) { isDebuggable, isMinifyEnabled, applicationIdSuffix, ... } }` |
-| **AGP bridge — product flavors** 🟡 *Planned (v1.1.0)* | Propagates KMP flavor dimensions + product flavors to Android's AGP | `bridgeAgpProductFlavors.set(true)` |
-| **AGP bridge — build types** 🟡 *Planned (v1.1.0)* | Propagates KMP build types to AGP (replaces manual `buildTypes {}` in `cmp-android`) | `bridgeAgpBuildTypes.set(true)` |
+| **AGP bridge — product flavors** | Propagates KMP flavor dimensions + product flavors to Android's AGP | `bridgeAgpProductFlavors.set(true)` |
+| **AGP bridge — build types** | Propagates KMP build types to AGP (replaces manual `buildTypes {}` in `cmp-android`) | `bridgeAgpBuildTypes.set(true)` |
 | **AppID / BundleID suffixes** | Appends per-flavor suffix to Android `applicationId` and iOS `CFBundleIdentifier` | `applicationIdSuffix`, `bundleIdSuffix` on a flavor |
 | **IS_xxx boolean flags** | Auto-generates `IS_INTERNAL`, `IS_DEMO`, `IS_ADVANCED`, `IS_BASIC`, `IS_DEBUG`, etc. from flavor/buildType names | automatic |
 | **expect/actual compile-time exclusion** | Flavor source sets can hold `actual` implementations — code not in a source set is absent from the binary (not just hidden) | flavor source set pattern |
