@@ -527,4 +527,41 @@ class KmpFlavorPluginIntegrationTest {
         assertTrue(result.output.contains("Variant: free"))
         assertTrue(result.output.contains("Suffix: .free"))
     }
+
+    @Test
+    fun `plugin no-ops gracefully on a non-KMP project`() {
+        // G19 — applying the plugin to a Java-only / Android-only project (no KMP
+        // plugin applied) must NOT crash. The plugin logs a WARN and returns silently.
+        buildFile.writeText(
+            """
+            plugins {
+                id("io.github.mobilebytelabs.kmp-product-flavors")
+                java
+            }
+
+            // No kotlin("multiplatform") on purpose — plain JVM project.
+
+            kmpFlavors {
+                flavors {
+                    register("demo") { isDefault.set(true) }
+                }
+            }
+            """.trimIndent(),
+        )
+
+        val result = GradleRunner.create()
+            .withProjectDir(testProjectDir)
+            .withArguments("help", "--stacktrace")
+            .withPluginClasspath()
+            .build()
+
+        // help should succeed — no exception thrown by the plugin.
+        assertEquals(TaskOutcome.SUCCESS, result.task(":help")?.outcome)
+        // The plugin emitted the expected WARN line (we accept either spelling).
+        assertTrue(
+            result.output.contains("Kotlin Multiplatform plugin not found") ||
+                result.output.contains("Skipping flavor configuration"),
+            "Expected WARN log about missing KMP plugin; got:\n${'$'}{result.output}",
+        )
+    }
 }

@@ -58,3 +58,47 @@ commonMain
 1. Register a new `consumer` flavor in your convention plugin
 2. Create `commonClientC/` source set with actual implementations
 3. Sync — `IS_CLIENT_C`, all URL constants, and the source set chain are wired automatically
+
+## Per-flavor compose resources
+
+Compose Multiplatform's `composeResources/` directory is inherited from a source set's parent chain. Drop flavor-specific assets under the appropriate source set:
+
+```
+src/
+├── commonMain/
+│   └── composeResources/
+│       └── drawable/
+│           └── logo.png            ← shared default
+├── commonDemo/
+│   └── composeResources/
+│       └── drawable/
+│           └── logo.png            ← overrides the default in demo builds
+└── commonProd/
+    └── composeResources/
+        └── drawable/
+            └── logo.png            ← overrides the default in prod builds
+```
+
+When the `demo` flavor is active, Compose's `Res.drawable.logo` resolves to `commonDemo/composeResources/drawable/logo.png`. When `prod` is active, it resolves to `commonProd/...`. The plugin's `dependsOn` wiring (only the active variant's flavor source sets are on the compile path) ensures **only one resource entry per logical name** ever ships in the final binary — there's no runtime selection cost and no name collision.
+
+Same pattern works for nested directories (`drawable-night/`, `font/`, `string/`) and for platform-flavor combinations (e.g. `androidDemo/composeResources/` for Android-only demo overrides).
+
+## Per-flavor tests
+
+When the consumer module declares any test compilation (i.e. `commonTest` exists), the plugin also creates per-flavor *Test* source sets mirroring the *Main* hierarchy:
+
+```
+src/
+├── commonTest/
+│   └── kotlin/                    ← shared test infrastructure
+├── commonDemoTest/
+│   └── kotlin/                    ← tests / fixtures specific to the demo flavor
+├── commonProdTest/
+│   └── kotlin/
+├── iosDemoTest/
+│   └── kotlin/                    ← iOS-only tests for the demo flavor
+└── androidDemoTest/
+    └── kotlin/
+```
+
+`<flavor>Test` source sets `dependsOn(commonTest)` only when the flavor is active, so non-active flavor test sources never reach the test classpath of another variant. This mirrors the production-code wiring rules.

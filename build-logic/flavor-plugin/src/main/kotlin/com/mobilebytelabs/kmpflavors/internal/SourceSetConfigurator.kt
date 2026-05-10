@@ -52,6 +52,7 @@ class SourceSetConfigurator(private val logger: Logger) {
     ) {
         val sourceSets = kotlin.sourceSets
         val commonMain = sourceSets.getByName("commonMain")
+        val commonTest = sourceSets.findByName("commonTest")
         val activeFlavorNames = activeVariant.flavorNames.toSet()
 
         logger.lifecycle("[KMP Flavors] Configuring source sets for ${allFlavors.size} flavors")
@@ -115,6 +116,29 @@ class SourceSetConfigurator(private val logger: Logger) {
                         // No intermediate parent, wire directly to commonFlavor
                         platformFlavor.dependsOn(commonFlavor)
                         logger.info("[KMP Flavors] Wired $platformFlavorName -> $commonFlavorName")
+                    }
+                }
+            }
+
+            // Test source sets — mirror the *Main* structure under *Test*.
+            // Only created when commonTest exists (i.e. the KMP module declares any test
+            // compilation). Plugin-side wiring rule: <flavor>Test depends on commonTest
+            // ONLY when active, so non-active flavor test sources never reach the test
+            // classpath of another variant.
+            if (commonTest != null) {
+                val commonFlavorTestName = "common${capitalizedFlavor}Test"
+                val commonFlavorTest = createSourceSet(sourceSets, commonFlavorTestName)
+                if (isActiveFlavor) {
+                    commonFlavorTest.dependsOn(commonTest)
+                    logger.info("[KMP Flavors] Wired $commonFlavorTestName -> commonTest")
+                }
+
+                for (platform in leafPlatforms) {
+                    val platformFlavorTestName = "${platform.prefix}${capitalizedFlavor}Test"
+                    val platformFlavorTest = createSourceSet(sourceSets, platformFlavorTestName)
+                    if (isActiveFlavor) {
+                        platformFlavorTest.dependsOn(commonFlavorTest)
+                        logger.info("[KMP Flavors] Wired $platformFlavorTestName -> $commonFlavorTestName")
                     }
                 }
             }
