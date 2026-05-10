@@ -26,22 +26,22 @@ A Gradle plugin that brings Android-style product flavor support to **all Kotlin
 
 ## Supported Platforms
 
-This plugin supports the following Kotlin Multiplatform targets in the current published version (`v1.0.5`). The status column reflects what `PlatformDetector.kt` actually recognises today — see roadmap below for planned additions.
+This plugin supports the following Kotlin Multiplatform targets in the current published version (`v1.1.0`). The status column reflects what `PlatformDetector.kt` actually recognises today — see roadmap below for planned additions.
 
-| Platform | Targets | Status (v1.0.5) |
+| Platform | Targets | Status (v1.1.0) |
 |----------|---------|-----------------|
 | **Android** | `androidTarget()` | ✅ Detected |
 | **iOS** | `iosArm64()`, `iosX64()`, `iosSimulatorArm64()` | ✅ Detected |
 | **macOS** | `macosArm64()`, `macosX64()` | ✅ Detected |
-| **tvOS** | `tvosArm64()`, `tvosX64()`, `tvosSimulatorArm64()` | 🟡 Planned (v1.1.0) |
-| **watchOS** | `watchosArm64()`, `watchosX64()`, `watchosSimulatorArm64()`, `watchosDeviceArm64()` | 🟡 Planned (v1.1.0) |
+| **tvOS** | `tvosArm64()`, `tvosX64()`, `tvosSimulatorArm64()` | ✅ Detected |
+| **watchOS** | `watchosArm64()`, `watchosX64()`, `watchosSimulatorArm64()`, `watchosDeviceArm64()` | ✅ Detected |
 | **Desktop/JVM** | `jvm()`, `jvm("desktop")` | ✅ Detected |
 | **Linux** | `linuxX64()`, `linuxArm64()` | ✅ Detected |
 | **Windows** | `mingwX64()` | ✅ Detected |
 | **JavaScript** | `js()` | ✅ Detected |
 | **WebAssembly (wasmJs)** | `wasmJs()` | ✅ Detected |
-| **WebAssembly (wasmWasi)** | `wasmWasi()` | 🟡 Planned (v1.1.0) |
-| **Android Native** | `androidNativeArm64()`, `androidNativeX64()`, `androidNativeArm32()`, `androidNativeX86()` | 🟡 Planned (v1.1.0) |
+| **WebAssembly (wasmWasi)** | `wasmWasi()` | ✅ Detected |
+| **Android Native** | `androidNativeArm64()`, `androidNativeX64()`, `androidNativeArm32()`, `androidNativeX86()` | ✅ Detected |
 
 > **Status legend:** ✅ Detected = `PlatformDetector.kt` registers the target and creates flavor source sets. 🟡 Planned = roadmapped for the next minor release; declaring the target today is silently ignored.
 
@@ -338,6 +338,7 @@ See the full [Convention Plugin Integration Guide](integration/convention-plugin
 | `kmp-product-flavors` version | Kotlin | AGP (if Android consumer) | Gradle | JDK | Compose Multiplatform |
 |---|---|---|---|---|---|
 | `1.0.5` | `2.0.0`+ (built/tested against `2.3.0`) | `8.0`+ (built against `8.12.3`) | `8.0`+ | `17`+ | `1.6`+ (samples on `1.7.x`) |
+| `1.1.0` | `2.0.0`+ (built/tested against `2.3.0`) | `8.0`+ (built against `8.12.3`) | `8.0`+ | `17`+ | `1.6`+ (samples on `1.7.x`) |
 
 > Verified combinations are those exercised by `samples/` builds in CI. Combinations outside this matrix may work but are not actively tested. A multi-version CI matrix is planned for `v1.2.0` (Phase Q in `plan-layer/plans/PLAN-gaps-fix-260510-191003.md`).
 

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **G1 / G2** Apple-family target detection extended: tvOS (`tvosX64`, `tvosArm64`, `tvosSimulatorArm64`) and watchOS (`watchosX64`, `watchosArm64`, `watchosSimulatorArm64`, `watchosDeviceArm64`). Each gets a flavor-aware source set wired under `nativeMain`.
+- **G3** WasmWasi target detection (`wasmWasi`) — joins `js` + `wasmJs` under the `webMain` intermediate.
+- **G4** Android Native target detection (`androidNativeArm64`, `androidNativeX64`, `androidNativeArm32`, `androidNativeX86`) — for server-side native binaries on Android NDK toolchains.
+- `PlatformDetectorTest` — five new test cases covering the four new target families plus a regression test asserting `androidNativeArm64` is not confused with the `android` target.
+
+### Documentation
+
+- README "Supported Platforms" table promotes tvOS / watchOS / wasmWasi / androidNative from 🟡 Planned to ✅ Detected. Compatibility Matrix updated with `1.1.0` row.
+
+### Notes
+
+Decision **D2** resolved: Kotlin's `applyDefaultHierarchyTemplate()` (already invoked at `PlatformDetector.kt:139`) owns `appleMain` — the plugin does **not** call `maybeCreate("appleMain")`, only adds flavor-axis intermediates on top. This keeps changes additive (no breaking source-set hierarchy change) → v1.1.0 minor remains correct, no v2.0.0 needed.
+
+Driving plan: `plan-layer/plans/PLAN-gaps-fix-260510-191003.md` Phases B + C.
+
 ## [1.0.5] - 2026-05-10
 
 ### Fixed
