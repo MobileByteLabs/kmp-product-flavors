@@ -42,6 +42,18 @@ java {
 
 kotlin {
     jvmToolchain(17)
+
+    // Compile against Kotlin 2.0 language/api so the output metadata is readable by
+    // consumers using Gradle <9.5 (whose embedded `kotlin-dsl` compiler is Kotlin 2.0.x).
+    // Without this, the plugin's metadata 2.2 cannot be read and consumers see:
+    //   "Class 'KmpFlavorExtension' was compiled with an incompatible version of Kotlin.
+    //    The actual metadata version is 2.2.0, but the compiler version 2.0.0 can read
+    //    versions up to 2.1.0."
+    // No source-level features depend on Kotlin 2.1+ so this is purely metadata-level.
+    compilerOptions {
+        languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0)
+        apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0)
+    }
 }
 
 dependencies {

@@ -90,6 +90,24 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
     abstract val generateBuildConfig: Property<Boolean>
 
     /**
+     * Explicit override for multi-module codegen.
+     *
+     * When MORE than one module applies this plugin under the same
+     * `buildConfigPackage + buildConfigClassName`, the plugin needs to choose
+     * exactly one module to actually generate the class — otherwise downstream
+     * builds hit duplicate-class errors at DEX merge or compilation.
+     *
+     * - Default (unset / null): claim mechanism — first module configured wins.
+     *   This is non-deterministic across builds, so prefer explicit `set(true)`
+     *   in a designated host module (e.g. `cmp-shared`).
+     * - `set(true)`: this module MUST generate the class. Subsequent claimants
+     *   that aren't host log an info skip.
+     * - `set(false)`: this module MUST NOT generate the class (e.g. a library
+     *   module that consumes the host's output transitively).
+     */
+    abstract val codegenHost: Property<Boolean>
+
+    /**
      * The package name for the generated BuildConfig object.
      * Required when [generateBuildConfig] is true.
      *
@@ -100,7 +118,7 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
     /**
      * The class name for the generated BuildConfig object.
      *
-     * Convention: "FlavorConfig"
+     * Convention: "BuildKonfig"
      */
     abstract val buildConfigClassName: Property<String>
 
@@ -272,10 +290,14 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
     init {
         // Set conventions
         generateBuildConfig.convention(true)
-        buildConfigClassName.convention("FlavorConfig")
+        buildConfigClassName.convention("BuildKonfig")
         createIntermediateSourceSets.convention(true)
         enableBuildTypes.convention(false)
-        bridgeAgpProductFlavors.convention(false)
-        bridgeAgpBuildTypes.convention(false)
+        // Safe defaults: the AGP bridge is idempotent in v1.1.5+. It detects already-
+        // registered product flavors / build types (e.g. consumer convention plugins that
+        // call configureFlavors() synchronously inside a withPlugin callback) and skips
+        // silently. Consumers no longer need to manually toggle these flags.
+        bridgeAgpProductFlavors.convention(true)
+        bridgeAgpBuildTypes.convention(true)
     }
 }

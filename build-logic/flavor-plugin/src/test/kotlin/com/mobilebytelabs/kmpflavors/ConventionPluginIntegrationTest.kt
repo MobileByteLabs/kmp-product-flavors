@@ -244,7 +244,7 @@ class ConventionPluginIntegrationTest {
 
         val generatedFile = File(
             testProjectDir,
-            "build/generated/kmpFlavors/commonMain/kotlin/com/example/module/FlavorConfig.kt",
+            "build/generated/kmpFlavors/commonMain/kotlin/com/example/module/BuildKonfig.kt",
         )
         assertTrue(generatedFile.exists())
 
@@ -300,7 +300,7 @@ class ConventionPluginIntegrationTest {
 
         val generatedFile = File(
             testProjectDir,
-            "build/generated/kmpFlavors/commonMain/kotlin/com/example/shared/FlavorConfig.kt",
+            "build/generated/kmpFlavors/commonMain/kotlin/com/example/shared/BuildKonfig.kt",
         )
         assertTrue(generatedFile.exists())
 

@@ -58,9 +58,6 @@ internal object AgpBridge {
         if (!bridgeProductFlavors && !bridgeBuildTypes) return
 
         if (!project.plugins.hasPlugin(APP_PLUGIN_ID)) {
-            // v1.1.0 scope: only com.android.application is supported. Library
-            // and KMP-library variants land in v1.2.0 (Phase J of
-            // PLAN-gaps-fix-260510-191003).
             logger.info(
                 "[KMP Flavors] bridgeAgp* flag set but com.android.application not " +
                     "applied — skipping AGP bridge (library plugin support arrives in v1.2.0).",
@@ -68,20 +65,55 @@ internal object AgpBridge {
             return
         }
 
-        val androidExt = findApplicationExtension(project)
-        if (androidExt == null) {
-            logger.warn(
-                "[KMP Flavors] com.android.application is applied but ApplicationExtension " +
-                    "could not be resolved — AGP bridge skipped.",
-            )
-            return
-        }
+        // v1.1.3 — register propagation via AGP's androidComponents.finalizeDsl callback
+        // which runs AFTER the consumer's kmpFlavors { } DSL has evaluated but BEFORE
+        // AGP creates its variants. Calling AGP setters directly (as we used to do in
+        // afterEvaluate) was too late — AGP had already read productFlavors and built
+        // its variant matrix.
+        val finalized = runCatching {
+            val componentsClass = Class.forName("com.android.build.api.variant.AndroidComponentsExtension")
+            val components = project.extensions.findByType(componentsClass)
+                ?: return@runCatching false
+            val finalizeDsl = componentsClass.methods.firstOrNull { it.name == "finalizeDsl" && it.parameterCount == 1 }
+                ?: return@runCatching false
+            // finalizeDsl(action: Action<CommonExtension<*,*,*,*,*,*>>) — pass a Java
+            // Action implementation that invokes our reflective propagators.
+            val actionClass = Class.forName("org.gradle.api.Action")
+            val proxy = java.lang.reflect.Proxy.newProxyInstance(
+                actionClass.classLoader,
+                arrayOf(actionClass),
+            ) { _, _, args ->
+                val androidExt = args[0]
+                if (bridgeProductFlavors) {
+                    propagateFlavors(androidExt, kmpDimensions, kmpFlavors, logger)
+                }
+                if (bridgeBuildTypes) {
+                    propagateBuildTypes(androidExt, kmpBuildTypes, logger)
+                }
+                null
+            }
+            finalizeDsl.invoke(components, proxy)
+            true
+        }.getOrDefault(false)
 
-        if (bridgeProductFlavors) {
-            propagateFlavors(androidExt, kmpDimensions, kmpFlavors, logger)
-        }
-        if (bridgeBuildTypes) {
-            propagateBuildTypes(androidExt, kmpBuildTypes, logger)
+        if (!finalized) {
+            // Fallback for very old AGP versions without androidComponents.finalizeDsl —
+            // run the bridge synchronously now. May be too late for variant resolution
+            // on those AGPs, but better than nothing.
+            val androidExt = findApplicationExtension(project)
+            if (androidExt == null) {
+                logger.warn(
+                    "[KMP Flavors] com.android.application is applied but ApplicationExtension " +
+                        "could not be resolved — AGP bridge skipped.",
+                )
+                return
+            }
+            if (bridgeProductFlavors) {
+                propagateFlavors(androidExt, kmpDimensions, kmpFlavors, logger)
+            }
+            if (bridgeBuildTypes) {
+                propagateBuildTypes(androidExt, kmpBuildTypes, logger)
+            }
         }
     }
 
@@ -96,13 +128,30 @@ internal object AgpBridge {
             return
         }
 
-        // Collision check — if AGP productFlavors already populated, warn and bail.
+        // Collision check.
+        // - If AGP productFlavors already contains every KMP flavor name (e.g. the
+        //   consumer's convention plugin called configureFlavors() synchronously inside
+        //   a withPlugin("com.android.application") callback) the bridge is a no-op:
+        //   log info and return silently — bridge stays idempotent.
+        // - If existing flavors differ (consumer wrote a manual android { productFlavors {} }
+        //   block that conflicts), warn so the user knows the kmpFlavors {} DSL won't drive
+        //   AGP for those flavors.
         val existing = readAgpProductFlavors(androidExt)
         if (existing.isNotEmpty()) {
+            val kmpNames = kmpFlavors.map { it.name }.toSet()
+            if (existing.toSet().containsAll(kmpNames)) {
+                logger.info(
+                    "[KMP Flavors] AGP productFlavors already registered (${existing.joinToString()}) — " +
+                        "bridge is a no-op (idempotent).",
+                )
+                return
+            }
             logger.warn(
-                "[KMP Flavors] AGP productFlavors already declares: ${existing.joinToString()} — " +
-                    "skipping bridge propagation. Remove the hand-written android { productFlavors {} } " +
-                    "block to let kmpFlavors {} drive AGP, or set bridgeAgpProductFlavors.set(false).",
+                "[KMP Flavors] AGP productFlavors already declares: ${existing.joinToString()} " +
+                    "which does not cover the kmpFlavors {} set (${kmpNames.joinToString()}) — " +
+                    "skipping bridge propagation to avoid corrupting the existing config. " +
+                    "Remove the hand-written android { productFlavors {} } block to let " +
+                    "kmpFlavors {} drive AGP, or set bridgeAgpProductFlavors.set(false).",
             )
             return
         }
@@ -136,12 +185,28 @@ internal object AgpBridge {
             return
         }
 
-        // Detect non-default custom build types and warn (debug/release are AGP defaults).
+        // Idempotency check for build types.
+        // - 'debug' and 'release' are AGP defaults (always present) so they don't count
+        //   as a consumer-authored collision.
+        // - If the remaining (non-default) AGP build types already cover every KMP
+        //   buildType, treat as no-op (e.g. consumer's convention plugin already
+        //   registered them synchronously). Bridge is idempotent.
+        // - Else warn — the consumer has hand-written android { buildTypes {} } that
+        //   conflicts and we don't want to corrupt it.
         val existingNames = readAgpBuildTypeNames(androidExt)
         val nonDefault = existingNames.filterNot { it == "debug" || it == "release" }
         if (nonDefault.isNotEmpty()) {
+            val kmpNames = kmpBuildTypes.map { it.name }.filterNot { it == "debug" || it == "release" }.toSet()
+            if (existingNames.toSet().containsAll(kmpNames)) {
+                logger.info(
+                    "[KMP Flavors] AGP buildTypes already registered (${existingNames.joinToString()}) — " +
+                        "bridge is a no-op (idempotent).",
+                )
+                return
+            }
             logger.warn(
-                "[KMP Flavors] AGP buildTypes already declares custom types: ${nonDefault.joinToString()} — " +
+                "[KMP Flavors] AGP buildTypes already declares custom types: ${nonDefault.joinToString()} " +
+                    "which does not cover the kmpFlavors {} set (${kmpNames.joinToString()}) — " +
                     "skipping bridge propagation. Remove the hand-written android { buildTypes {} } " +
                     "additions to let kmpFlavors {} drive AGP, or set bridgeAgpBuildTypes.set(false).",
             )

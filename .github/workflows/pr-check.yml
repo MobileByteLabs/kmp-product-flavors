@@ -78,13 +78,17 @@ jobs:
       - name: Build cmp-shared (composite-include resolves flavor-plugin from THIS branch)
         working-directory: samples/kmp-project-template
         run: ./gradlew :cmp-shared:compileKotlinDesktop :cmp-shared:compileKotlinJs :cmp-shared:compileKotlinWasmJs --no-daemon --no-configuration-cache
-      - name: Validate FlavorConfig codegen (buildType axis)
+      - name: Validate FlavorConfig codegen (default variant)
         working-directory: samples/kmp-project-template
         run: |
           ./gradlew :cmp-shared:generateFlavorBuildConfig --rerun-tasks --no-daemon --no-configuration-cache
           GEN=cmp-shared/build/generated/kmpFlavors/commonMain/kotlin/org/openmf/kmptemplate/FlavorConfig.kt
           test -f "$GEN" || { echo "::error::FlavorConfig.kt missing"; exit 1; }
-          for needle in 'IS_INTERNAL: Boolean = true' 'IS_ADVANCED: Boolean = true' 'BUILD_TYPE: String = "debug"' 'IS_DEBUG: Boolean = true' 'ENABLE_LOGGING: Boolean = true' 'LOG_TAG: String = "KMPTemplate-DEBUG"'; do
+          # Sample's default variant resolves to demoBankADebug from:
+          #   tier (base):       demo (default) | prod
+          #   bank (LocalFlavors): bankA (default) | bankB
+          #   buildType (base):  debug (default) | staging | release
+          for needle in 'VARIANT_NAME: String = "demoBankADebug"' 'IS_DEMO: Boolean = true' 'IS_BANKA: Boolean = true' 'BUILD_TYPE: String = "debug"' 'IS_DEBUG: Boolean = true' 'ENABLE_LOGGING: Boolean = true' 'LOG_TAG: String = "KMPTemplate-DEBUG"' 'BANK_ID: String = "bankA"'; do
             if ! grep -qF "$needle" "$GEN"; then
               echo "::error::Missing expected line: $needle"
               cat "$GEN"
@@ -92,12 +96,12 @@ jobs:
             fi
           done
           echo "✓ FlavorConfig.kt contains all expected flavor + buildType constants"
-      - name: Validate variant override (-PkmpFlavor=clientaBasicStaging)
+      - name: Validate variant override (-PkmpFlavor=prodBankBStaging)
         working-directory: samples/kmp-project-template
         run: |
-          ./gradlew :cmp-shared:generateFlavorBuildConfig -PkmpFlavor=clientaBasicStaging --rerun-tasks --no-daemon --no-configuration-cache
+          ./gradlew :cmp-shared:generateFlavorBuildConfig -PkmpFlavor=prodBankBStaging --rerun-tasks --no-daemon --no-configuration-cache
           GEN=cmp-shared/build/generated/kmpFlavors/commonMain/kotlin/org/openmf/kmptemplate/FlavorConfig.kt
-          for needle in 'VARIANT_NAME: String = "clientaBasicStaging"' 'IS_CLIENTA: Boolean = true' 'IS_BASIC: Boolean = true' 'BUILD_TYPE: String = "staging"' 'IS_STAGING: Boolean = true' 'CLIENT_ID: String = "clientA"'; do
+          for needle in 'VARIANT_NAME: String = "prodBankBStaging"' 'IS_PROD: Boolean = true' 'IS_BANKB: Boolean = true' 'BUILD_TYPE: String = "staging"' 'IS_STAGING: Boolean = true' 'BANK_ID: String = "bankB"'; do
             if ! grep -qF "$needle" "$GEN"; then
               echo "::error::Override missing line: $needle"
               cat "$GEN"
