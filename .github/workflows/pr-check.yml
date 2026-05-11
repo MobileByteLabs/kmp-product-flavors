@@ -74,12 +74,25 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           cache-read-only: true
-      - name: Write Android SDK stub
+      - name: Publish flavor-plugin to mavenLocal (this PR's version)
+        working-directory: build-logic
+        run: ./gradlew :flavor-plugin:publishToMavenLocal --no-daemon --no-configuration-cache
+      - name: Write Android SDK stub + enable mavenLocal in sample
         run: |
-          # The kmp-project-template sample has Android consumers; CI Android SDK
-          # is provided by the runner's ANDROID_HOME (set automatically on
-          # ubuntu-latest with android-sdk preinstalled).
           echo "sdk.dir=${ANDROID_HOME}" > samples/kmp-project-template/local.properties
+          # Inject mavenLocal so the sample's build-logic and root repositories pick
+          # up this PR's version of flavor-plugin instead of waiting for Maven
+          # Central. Idempotent: only adds if not already present.
+          if ! grep -q 'mavenLocal()' samples/kmp-project-template/build-logic/settings.gradle.kts; then
+            sed -i 's|repositories {|repositories {\n        mavenLocal()|' \
+              samples/kmp-project-template/build-logic/settings.gradle.kts
+          fi
+          if ! grep -q 'mavenLocal()' samples/kmp-project-template/settings.gradle.kts; then
+            sed -i '0,/repositories {/s|repositories {|repositories {\n        mavenLocal()|' \
+              samples/kmp-project-template/settings.gradle.kts
+            sed -i '0,/repositories {/!{s|repositories {|repositories {\n        mavenLocal()|;}' \
+              samples/kmp-project-template/settings.gradle.kts
+          fi
       - name: cmp-shared compile (default variant)
         working-directory: samples/kmp-project-template
         run: ./gradlew :cmp-shared:assemble --no-daemon --no-configuration-cache
