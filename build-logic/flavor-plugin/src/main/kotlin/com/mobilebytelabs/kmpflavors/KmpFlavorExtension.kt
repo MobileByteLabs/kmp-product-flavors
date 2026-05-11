@@ -90,6 +90,24 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
     abstract val generateBuildConfig: Property<Boolean>
 
     /**
+     * Explicit override for multi-module codegen.
+     *
+     * When MORE than one module applies this plugin under the same
+     * `buildConfigPackage + buildConfigClassName`, the plugin needs to choose
+     * exactly one module to actually generate the class — otherwise downstream
+     * builds hit duplicate-class errors at DEX merge or compilation.
+     *
+     * - Default (unset / null): claim mechanism — first module configured wins.
+     *   This is non-deterministic across builds, so prefer explicit `set(true)`
+     *   in a designated host module (e.g. `cmp-shared`).
+     * - `set(true)`: this module MUST generate the class. Subsequent claimants
+     *   that aren't host log an info skip.
+     * - `set(false)`: this module MUST NOT generate the class (e.g. a library
+     *   module that consumes the host's output transitively).
+     */
+    abstract val codegenHost: Property<Boolean>
+
+    /**
      * The package name for the generated BuildConfig object.
      * Required when [generateBuildConfig] is true.
      *

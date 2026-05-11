@@ -8,11 +8,23 @@
  * See https://github.com/openMF/kmp-project-template/blob/main/LICENSE
  */
 
+import com.mobilebytelabs.kmpflavors.KmpFlavorExtension
+
 plugins {
     alias(libs.plugins.kmp.library.convention)
     alias(libs.plugins.cmp.feature.convention)
     alias(libs.plugins.kotlinCocoapods)
     alias(libs.plugins.kmp.flavors.convention)
+}
+
+// Designate :cmp-shared as the FlavorConfig codegen host (v1.1.5+).
+// Without this, claim resolution is non-deterministic across configuration
+// order — any module applying kmp.flavors could win the first-come-first-served
+// claim. Setting codegenHost = true guarantees this module always wins, so
+// downstream code and CI can reliably reference :cmp-shared's generated
+// FlavorConfig.kt.
+extensions.configure<KmpFlavorExtension> {
+    codegenHost.set(true)
 }
 
 kotlin {

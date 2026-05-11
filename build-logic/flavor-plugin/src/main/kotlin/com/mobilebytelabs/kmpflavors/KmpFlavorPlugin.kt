@@ -247,16 +247,41 @@ class KmpFlavorPlugin : Plugin<Project> {
      */
     private fun shouldGenerateCodegen(project: Project, extension: KmpFlavorExtension): Boolean {
         if (!extension.generateBuildConfig.get()) return false
+
+        // Explicit per-module override via kmpFlavors { codegenHost.set(false) }.
+        // Module declares it will NOT generate codegen even if it would have
+        // claimed under the auto mechanism below.
+        val explicitHost = extension.codegenHost.orNull
+        if (explicitHost == false) {
+            project.logger.info(
+                "[KMP Flavors] ${project.path} skipping codegen — codegenHost = false",
+            )
+            return false
+        }
+
         val pkg = extension.buildConfigPackage.orNull
         if (pkg.isNullOrBlank()) return true // No conflict possible without a package.
         val cls = extension.buildConfigClassName.orNull ?: "FlavorConfig"
         val key = "kmpFlavors.codegenClaim:$pkg.$cls"
         val rootExtras = project.rootProject.extensions.extraProperties
         val existing = if (rootExtras.has(key)) rootExtras.get(key) as? String else null
+
+        // Explicit host always wins, even over an earlier non-explicit claim:
+        // override the claim if codegenHost.set(true).
+        if (explicitHost == true) {
+            if (existing != null && existing != project.path) {
+                project.logger.info(
+                    "[KMP Flavors] ${project.path} taking over codegen claim from $existing (codegenHost = true)",
+                )
+            }
+            rootExtras.set(key, project.path)
+            return true
+        }
+
         if (existing == null) {
             rootExtras.set(key, project.path)
             project.logger.info(
-                "[KMP Flavors] ${project.path} claimed FlavorConfig codegen for $pkg.$cls",
+                "[KMP Flavors] ${project.path} claimed FlavorConfig codegen for $pkg.$cls (auto)",
             )
             return true
         }
