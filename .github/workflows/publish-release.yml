@@ -71,25 +71,23 @@ jobs:
         id: extract
         run: |
           VERSION="${{ steps.ver.outputs.version }}"
-          python3 <<PYEOF >/tmp/release-body.md
+          python3 - "$VERSION" >/tmp/release-body.md <<'PYEOF'
           import re, pathlib, sys
-          version = "$VERSION"
+          version = sys.argv[1]
           changelog = pathlib.Path("CHANGELOG.md").read_text()
-          # Match the version section up to the next "## [" or EOF
-          pattern = rf"## \[{re.escape(version)}\][^
-]*
-
-(.*?)(?=
-## \[|\Z)"
+          # Match "## [<version>] ..." up to the next "## [" header or EOF.
+          # Pattern kept on ONE source line so the outer YAML `run: |` block
+          # scalar isn't terminated by an unindented continuation. The prior
+          # multi-line rf"..." form left a stray "]*" at column 0 which broke
+          # YAML parsing — that's why the workflow registry never picked up
+          # name: Publish or the workflow_dispatch trigger.
+          pattern = rf"## \[{re.escape(version)}\][^\n]*\n\n(.*?)(?=\n## \[|\Z)"
           m = re.search(pattern, changelog, re.DOTALL)
           if not m:
-              print(f"# v{version}
-
-No CHANGELOG entry found for this version.")
+              print(f"# v{version}\n\nNo CHANGELOG entry found for this version.")
               sys.exit(0)
           body = m.group(1).rstrip()
-          print(f"# v{version}
-")
+          print(f"# v{version}\n")
           print(body)
           print()
           print("---")
