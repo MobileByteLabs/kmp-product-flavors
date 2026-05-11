@@ -3,7 +3,9 @@
 # Triggers:
 #   - Schedule: every Monday 00:00 UTC
 #   - Schedule: 1st of every month 00:00 UTC
-#   - Manual dispatch: workflow_dispatch (optional version override)
+#   - Manual dispatch: workflow_dispatch (optional version override) — force a
+#     release by triggering from the Actions tab UI or via
+#     `gh workflow run publish.yml --repo MobileByteLabs/kmp-product-flavors --ref development`.
 #
 # Version source of truth: gradle.properties → kmpflavors.version
 # After a successful publish, opens a bump PR to increment the patch version.
