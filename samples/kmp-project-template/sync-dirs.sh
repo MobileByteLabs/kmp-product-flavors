@@ -53,6 +53,12 @@ declare -A EXCLUSIONS=(
     ["fastlane-config"]="project_config.rb:file extract_config.rb:file"
     [".github"]="workflows/sync-dirs.yaml:file"
     ["root"]="secrets.env:file"
+    # DO NOT REMOVE — preserves consumer-specific flavor extensions across syncs.
+    # Each downstream consumer (mifos-mobile, mifos-pay, mifos-x-group-banking, ...)
+    # may create build-logic/convention/src/main/kotlin/local/LocalFlavors.kt to
+    # add their own flavors / dimensions / overrides on top of the synced base.
+    # See docs/FLAVORS_EXTENSION.md for the pattern.
+    ["build-logic"]="convention/src/main/kotlin/local:dir"
 )
 
 # Display help information
