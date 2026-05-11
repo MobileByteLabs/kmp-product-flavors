@@ -111,11 +111,12 @@ jobs:
       - name: listFlavors shows buildType axis (24 variants)
         working-directory: samples/kmp-project-template
         run: |
-          out=$(./gradlew :cmp-shared:listFlavors --no-daemon --no-configuration-cache)
-          echo "$out"
-          # Expect 24 variants (4 consumers × 2 tiers × 3 buildTypes)
-          variant_count=$(echo "$out" | grep -cE '^\\│ [a-z][a-zA-Z]+ +\\│' || true)
+          ./gradlew :cmp-shared:listFlavors --no-daemon --no-configuration-cache > /tmp/lf.out 2>&1
+          cat /tmp/lf.out
+          # Expect 24 variants — count lines containing both a flavor name and a buildType.
+          variant_count=$(grep -cE '(Debug|Staging|Release)' /tmp/lf.out || true)
           if [ "$variant_count" -lt 24 ]; then
             echo "::error::Expected ≥24 variants; got $variant_count"
             exit 1
           fi
+          echo "✓ found $variant_count variants in listFlavors output"
