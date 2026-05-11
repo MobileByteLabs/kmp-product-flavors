@@ -23,6 +23,7 @@ import io.mockk.mockk
 import io.mockk.verify
 import org.gradle.api.NamedDomainObjectContainer
 import org.gradle.api.file.SourceDirectorySet
+import org.gradle.api.Project
 import org.gradle.api.logging.Logger
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.MapProperty
@@ -36,6 +37,7 @@ class SourceSetConfiguratorTest {
 
     private lateinit var logger: Logger
     private lateinit var configurator: SourceSetConfigurator
+    private lateinit var project: Project
     private lateinit var kotlin: KotlinMultiplatformExtension
     private lateinit var sourceSets: NamedDomainObjectContainer<KotlinSourceSet>
     private lateinit var commonMain: KotlinSourceSet
@@ -44,12 +46,15 @@ class SourceSetConfiguratorTest {
     fun setup() {
         logger = mockk(relaxed = true)
         configurator = SourceSetConfigurator(logger)
+        project = mockk(relaxed = true)
         kotlin = mockk()
         sourceSets = mockk()
         commonMain = createMockSourceSet("commonMain")
 
         every { kotlin.sourceSets } returns sourceSets
         every { sourceSets.getByName("commonMain") } returns commonMain
+        // commonTest may be queried lazily — return null by default (no test sets created)
+        every { sourceSets.findByName("commonTest") } returns null
     }
 
     @Test
@@ -66,6 +71,7 @@ class SourceSetConfiguratorTest {
         every { sourceSets.findByName(any()) } returns null
 
         configurator.configure(
+            project = project,
             kotlin = kotlin,
             activeVariant = activeVariant,
             allFlavors = listOf(freeFlavor, paidFlavor),
@@ -75,7 +81,10 @@ class SourceSetConfiguratorTest {
         )
 
         verify { sourceSets.maybeCreate("commonFree") }
-        verify { sourceSets.maybeCreate("commonPaid") }
+        // Lazy contract (v1.1.5+): inactive flavor with no on-disk content
+        // src/commonPaid/{kotlin,resources} is NOT auto-created. Devs opt-in by
+        // dropping files into the src dir.
+        verify(exactly = 0) { sourceSets.maybeCreate("commonPaid") }
     }
 
     @Test
@@ -88,6 +97,7 @@ class SourceSetConfiguratorTest {
         every { sourceSets.findByName(any()) } returns null
 
         configurator.configure(
+            project = project,
             kotlin = kotlin,
             activeVariant = activeVariant,
             allFlavors = listOf(freeFlavor),
@@ -113,6 +123,7 @@ class SourceSetConfiguratorTest {
         every { sourceSets.findByName(any()) } returns null
 
         configurator.configure(
+            project = project,
             kotlin = kotlin,
             activeVariant = activeVariant,
             allFlavors = listOf(freeFlavor, paidFlavor),
@@ -143,6 +154,7 @@ class SourceSetConfiguratorTest {
         every { sourceSets.findByName("androidMain") } returns androidMain
 
         configurator.configure(
+            project = project,
             kotlin = kotlin,
             activeVariant = activeVariant,
             allFlavors = listOf(freeFlavor),
@@ -182,6 +194,7 @@ class SourceSetConfiguratorTest {
         every { sourceSets.findByName("nativeFree") } returns nativeFree
 
         configurator.configure(
+            project = project,
             kotlin = kotlin,
             activeVariant = activeVariant,
             allFlavors = listOf(freeFlavor),

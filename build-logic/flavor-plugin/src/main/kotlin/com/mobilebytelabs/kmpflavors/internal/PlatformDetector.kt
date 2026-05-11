@@ -180,26 +180,16 @@ object PlatformDetector {
         kotlin.applyDefaultHierarchyTemplate()
 
         val sourceSets = kotlin.sourceSets
-        val commonMain = sourceSets.getByName("commonMain")
 
-        // Create webMain if needed. Note: Kotlin 2.1+ default hierarchy template
-        // already wires web→commonMain and js/wasmJs→webMain edges. We only
-        // register the src/resource directories here and skip the dependsOn
-        // calls to avoid the "Redundant dependsOn Kotlin Source Sets" warning.
+        // webMain and its platform→webMain edges are owned by the default hierarchy
+        // template (applied above) on Kotlin 2.1+. We only register source dirs so
+        // consumers can drop code into src/webMain/kotlin/. No explicit dependsOn —
+        // the probe in earlier versions was racy with the template's lazy edge
+        // installation and produced spurious "Redundant dependsOn" warnings.
         if (platforms.any { it.prefix == "web" && it.isIntermediate }) {
-            val webMain = sourceSets.maybeCreate("webMain").apply {
+            sourceSets.maybeCreate("webMain").apply {
                 this.kotlin.srcDir("src/webMain/kotlin")
                 resources.srcDir("src/webMain/resources")
-            }
-            // Probe whether commonMain<-webMain is already wired by the hierarchy
-            // template (Kotlin 2.1+). If not (older Kotlin or non-standard layout),
-            // wire it explicitly. Same check for platform<-webMain.
-            wireIfMissing(webMain, commonMain)
-            platforms.filter { it.parent == "web" }.forEach { platform ->
-                val platformSourceSet = sourceSets.findByName(platform.mainSourceSet)
-                if (platformSourceSet != null) {
-                    wireIfMissing(platformSourceSet, webMain)
-                }
             }
         }
 

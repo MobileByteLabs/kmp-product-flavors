@@ -100,7 +100,7 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
     /**
      * The class name for the generated BuildConfig object.
      *
-     * Convention: "FlavorConfig"
+     * Convention: "BuildKonfig"
      */
     abstract val buildConfigClassName: Property<String>
 
@@ -272,10 +272,14 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
     init {
         // Set conventions
         generateBuildConfig.convention(true)
-        buildConfigClassName.convention("FlavorConfig")
+        buildConfigClassName.convention("BuildKonfig")
         createIntermediateSourceSets.convention(true)
         enableBuildTypes.convention(false)
-        bridgeAgpProductFlavors.convention(false)
-        bridgeAgpBuildTypes.convention(false)
+        // Safe defaults: the AGP bridge is idempotent in v1.1.5+. It detects already-
+        // registered product flavors / build types (e.g. consumer convention plugins that
+        // call configureFlavors() synchronously inside a withPlugin callback) and skips
+        // silently. Consumers no longer need to manually toggle these flags.
+        bridgeAgpProductFlavors.convention(true)
+        bridgeAgpBuildTypes.convention(true)
     }
 }

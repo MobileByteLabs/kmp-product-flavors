@@ -281,7 +281,7 @@ class KmpFlavorPluginIntegrationTest {
 
         val generatedFile = File(
             testProjectDir,
-            "build/generated/kmpFlavors/commonMain/kotlin/com/example/test/FlavorConfig.kt",
+            "build/generated/kmpFlavors/commonMain/kotlin/com/example/test/BuildKonfig.kt",
         )
         val content = generatedFile.readText()
         assertTrue(content.contains("const val VARIANT_NAME: String = \"paid\""))
@@ -321,6 +321,15 @@ class KmpFlavorPluginIntegrationTest {
             }
             """.trimIndent(),
         )
+
+        // Opt the inactive 'paid' flavor in by adding on-disk content. Lazy creation
+        // (v1.1.5+) only auto-creates source sets for the ACTIVE flavor; inactive
+        // flavors must have src/commonPaid/{kotlin,resources} content for the plugin
+        // to wire them up.
+        File(testProjectDir, "src/commonPaid/kotlin").mkdirs()
+        File(testProjectDir, "src/commonPaid/kotlin/Marker.kt").writeText("package marker")
+        File(testProjectDir, "src/desktopPaid/kotlin").mkdirs()
+        File(testProjectDir, "src/desktopPaid/kotlin/Marker.kt").writeText("package marker")
 
         val result = GradleRunner.create()
             .withProjectDir(testProjectDir)
