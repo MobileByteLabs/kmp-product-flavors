@@ -216,7 +216,7 @@ class KmpFlavorPlugin : Plugin<Project> {
 
         // Wire build config generation to compilation if enabled.
         // Multi-module-safe: in a build with multiple subprojects applying this
-            // plugin under the same buildConfigPackage+ClassName, only the FIRST
+        // plugin under the same buildConfigPackage+ClassName, only the FIRST
         // subproject to apply (in Gradle's configuration order) generates the
         // class. Subsequent applications skip silently to prevent DEX-merge
         // duplicate-class collisions. See shouldGenerateCodegen() below.
@@ -224,7 +224,6 @@ class KmpFlavorPlugin : Plugin<Project> {
             wireGenerateBuildConfigToCompilation(project, kotlin)
         }
     }
-
 
     /**
      * Decide whether this project should generate FlavorConfig codegen.

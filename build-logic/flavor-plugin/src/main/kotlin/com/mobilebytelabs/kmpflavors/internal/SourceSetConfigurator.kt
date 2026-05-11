@@ -190,12 +190,7 @@ class SourceSetConfigurator(private val logger: Logger) {
      * the warning while still letting devs opt-in by simply dropping a file
      * into `src/<name>/kotlin/`.
      */
-    private fun maybeCreateLazy(
-        project: Project,
-        sourceSets: org.gradle.api.NamedDomainObjectContainer<KotlinSourceSet>,
-        name: String,
-        isActive: Boolean,
-    ): KotlinSourceSet? {
+    private fun maybeCreateLazy(project: Project, sourceSets: org.gradle.api.NamedDomainObjectContainer<KotlinSourceSet>, name: String, isActive: Boolean): KotlinSourceSet? {
         val existing = sourceSets.findByName(name)
         // Lazy: skip creation entirely when the source set doesn't exist, isn't active,
         // and has no on-disk content. Returning null lets the caller skip wiring.
