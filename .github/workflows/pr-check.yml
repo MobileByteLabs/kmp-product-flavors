@@ -75,8 +75,9 @@ jobs:
         with:
           cache-read-only: true
       - name: Publish flavor-plugin to mavenLocal (this PR's version)
-        working-directory: build-logic
-        run: ./gradlew :flavor-plugin:publishToMavenLocal --no-daemon --no-configuration-cache
+        run: |
+          cd build-logic
+          ../gradlew -p . :flavor-plugin:publishToMavenLocal --no-daemon --no-configuration-cache
       - name: Write Android SDK stub + enable mavenLocal in sample
         run: |
           echo "sdk.dir=${ANDROID_HOME}" > samples/kmp-project-template/local.properties
