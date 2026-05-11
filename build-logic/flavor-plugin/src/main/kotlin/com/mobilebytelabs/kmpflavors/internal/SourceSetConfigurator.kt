@@ -117,6 +117,18 @@ class SourceSetConfigurator(private val logger: Logger) {
                         platformFlavor.dependsOn(commonFlavor)
                         logger.info("[KMP Flavors] Wired $platformFlavorName -> $commonFlavorName")
                     }
+
+                    // F8 — Wire the platform's main source set to dependsOn the
+                    // flavor source set so `actual` declarations there are reachable
+                    // from `compileKotlin<Target>`. This is what consumers actually
+                    // expect when they put actuals under src/commonInternal/kotlin or
+                    // src/desktopInternal/kotlin.
+                    val platformMain = sourceSets.findByName(platform.mainSourceSet)
+                    if (platformMain != null) {
+                        wireIfMissing(platformMain, platformFlavor)
+                        wireIfMissing(platformMain, commonFlavor)
+                        logger.info("[KMP Flavors] Wired ${platform.mainSourceSet} -> $platformFlavorName + $commonFlavorName (active flavor)")
+                    }
                 }
             }
 
@@ -151,5 +163,22 @@ class SourceSetConfigurator(private val logger: Logger) {
     private fun createSourceSet(sourceSets: org.gradle.api.NamedDomainObjectContainer<KotlinSourceSet>, name: String): KotlinSourceSet = sourceSets.maybeCreate(name).apply {
         kotlin.srcDir("src/$name/kotlin")
         resources.srcDir("src/$name/resources")
+    }
+
+    /**
+     * Add a dependsOn edge from [from] to [target] only if it isn't already present
+     * directly or transitively. Prevents "Redundant dependsOn" warnings.
+     */
+    private fun wireIfMissing(from: KotlinSourceSet, target: KotlinSourceSet) {
+        if (from == target || target in from.dependsOn) return
+        val seen = mutableSetOf<KotlinSourceSet>()
+        val queue = ArrayDeque(from.dependsOn)
+        while (queue.isNotEmpty()) {
+            val next = queue.removeFirst()
+            if (!seen.add(next)) continue
+            if (next == target) return
+            queue.addAll(next.dependsOn)
+        }
+        from.dependsOn(target)
     }
 }

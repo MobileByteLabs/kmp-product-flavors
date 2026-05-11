@@ -28,6 +28,7 @@ class KMPFlavorsConventionPlugin : Plugin<Project> {
             extensions.configure<KmpFlavorExtension> {
                 buildConfigPackage.set("org.openmf.kmptemplate")
                 buildConfigClassName.set("FlavorConfig")
+                enableBuildTypes.set(true)
 
                 flavorDimensions {
                     register("consumer") { priority.set(0) }

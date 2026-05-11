@@ -180,6 +180,106 @@ class FlavorVariantResolverTest {
         assertNull(result)
     }
 
+    // ----- v1.1.1 — buildType axis tests ---------------------------------------------
+
+    @Test
+    fun `resolveAllVariants without enableBuildTypes returns flavor-only matrix`() {
+        val dimensions = listOf(createMockDimension("tier", 0))
+        val flavors = listOf(
+            createMockFlavorConfig("free", "tier", isDefault = true),
+            createMockFlavorConfig("paid", "tier"),
+        )
+        val buildTypes = listOf(
+            createMockBuildType("debug", isDefault = true),
+            createMockBuildType("release"),
+        )
+
+        // enableBuildTypes=false (default) — buildTypes ignored
+        val result = FlavorVariantResolver.resolveAllVariants(dimensions, flavors, buildTypes = buildTypes, enableBuildTypes = false)
+
+        assertEquals(2, result.size)
+        assertEquals(setOf("free", "paid"), result.map { it.name }.toSet())
+    }
+
+    @Test
+    fun `resolveAllVariants with enableBuildTypes expands by buildType axis`() {
+        val dimensions = listOf(createMockDimension("tier", 0))
+        val flavors = listOf(
+            createMockFlavorConfig("free", "tier", isDefault = true),
+            createMockFlavorConfig("paid", "tier"),
+        )
+        val buildTypes = listOf(
+            createMockBuildType("debug", isDefault = true),
+            createMockBuildType("release"),
+        )
+
+        val result = FlavorVariantResolver.resolveAllVariants(
+            dimensions = dimensions,
+            flavors = flavors,
+            buildTypes = buildTypes,
+            enableBuildTypes = true,
+        )
+
+        assertEquals(4, result.size)
+        assertEquals(
+            setOf("freeDebug", "freeRelease", "paidDebug", "paidRelease"),
+            result.map { it.name }.toSet(),
+        )
+        // Each variant carries its buildType
+        assertEquals("debug", result.first { it.name == "freeDebug" }.buildType?.name)
+        assertEquals("release", result.first { it.name == "paidRelease" }.buildType?.name)
+    }
+
+    @Test
+    fun `resolveDefaultVariant returns flavor-only when enableBuildTypes is false`() {
+        val dimensions = listOf(createMockDimension("tier", 0))
+        val flavors = listOf(
+            createMockFlavorConfig("free", "tier", isDefault = true),
+            createMockFlavorConfig("paid", "tier"),
+        )
+        val buildTypes = listOf(createMockBuildType("debug", isDefault = true))
+
+        val result = FlavorVariantResolver.resolveDefaultVariant(dimensions, flavors, buildTypes, enableBuildTypes = false)
+
+        assertEquals("free", result?.name)
+        assertNull(result?.buildType)
+    }
+
+    @Test
+    fun `resolveDefaultVariant picks default buildType when enableBuildTypes is true`() {
+        val dimensions = listOf(createMockDimension("tier", 0))
+        val flavors = listOf(
+            createMockFlavorConfig("free", "tier", isDefault = true),
+            createMockFlavorConfig("paid", "tier"),
+        )
+        val buildTypes = listOf(
+            createMockBuildType("debug", isDefault = true),
+            createMockBuildType("release"),
+        )
+
+        val result = FlavorVariantResolver.resolveDefaultVariant(dimensions, flavors, buildTypes, enableBuildTypes = true)
+
+        assertEquals("freeDebug", result?.name)
+        assertEquals("debug", result?.buildType?.name)
+    }
+
+    @Test
+    fun `enableBuildTypes with no buildTypes declared falls back to flavor-only`() {
+        val dimensions = listOf(createMockDimension("tier", 0))
+        val flavors = listOf(createMockFlavorConfig("free", "tier", isDefault = true))
+
+        val result = FlavorVariantResolver.resolveAllVariants(
+            dimensions = dimensions,
+            flavors = flavors,
+            buildTypes = emptyList(),
+            enableBuildTypes = true,
+        )
+
+        assertEquals(1, result.size)
+        assertEquals("free", result.first().name)
+        assertNull(result.first().buildType)
+    }
+
     // Helper functions to create mock objects
 
     private fun createMockFlavorConfig(name: String, dimension: String?, isDefault: Boolean = false): FlavorConfig {
@@ -216,6 +316,20 @@ class FlavorVariantResolverTest {
         val mock = mockk<FlavorDimension>()
         every { mock.name } returns name
         every { mock.priority } returns mockProperty(priority)
+        return mock
+    }
+
+    private fun createMockBuildType(name: String, isDefault: Boolean = false): BuildTypeConfig {
+        val mock = mockk<BuildTypeConfig>()
+        every { mock.name } returns name
+        every { mock.isDefault } returns mockProperty(isDefault)
+        every { mock.isDebuggable } returns mockProperty(false)
+        every { mock.isMinifyEnabled } returns mockProperty(false)
+        every { mock.applicationIdSuffix } returns mockProperty(null)
+        every { mock.matchingFallbacks } returns mockListProperty(emptyList())
+        every { mock.buildConfigFields } returns mockk {
+            every { get() } returns emptyMap()
+        }
         return mock
     }
 

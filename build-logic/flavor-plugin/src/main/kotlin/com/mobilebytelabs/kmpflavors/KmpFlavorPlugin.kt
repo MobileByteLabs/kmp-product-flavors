@@ -127,11 +127,17 @@ class KmpFlavorPlugin : Plugin<Project> {
 
         logger.lifecycle("[KMP Flavors] Configuring ${flavors.size} flavors across ${dimensions.size} dimensions")
 
-        // Resolve all variants (with filtering)
+        val buildTypesList = extension.buildTypes.toList()
+        val enableBuildTypesFlag = extension.enableBuildTypes.get()
+
+        // Resolve all variants (with filtering). When enableBuildTypes is true and
+        // at least one buildType is declared, the matrix expands by buildType axis.
         val allVariants = FlavorVariantResolver.resolveAllVariants(
-            dimensions,
-            flavors,
-            extension.variantFilterActions,
+            dimensions = dimensions,
+            flavors = flavors,
+            variantFilters = extension.variantFilterActions,
+            buildTypes = buildTypesList,
+            enableBuildTypes = enableBuildTypesFlag,
         )
         if (allVariants.isEmpty()) {
             logger.warn("[KMP Flavors] No variants resolved. Check dimension assignments or variant filters.")
@@ -139,19 +145,20 @@ class KmpFlavorPlugin : Plugin<Project> {
         }
 
         // Log filtered variants if any were excluded
-        val totalPossible = if (dimensions.isEmpty()) {
+        val baseTotal = if (dimensions.isEmpty()) {
             flavors.size
         } else {
             dimensions.fold(1) { acc, dim ->
                 acc * flavors.count { it.dimension.orNull == dim.name }
             }
         }
+        val totalPossible = if (enableBuildTypesFlag && buildTypesList.isNotEmpty()) baseTotal * buildTypesList.size else baseTotal
         if (allVariants.size < totalPossible) {
             logger.lifecycle("[KMP Flavors] Variant filter excluded ${totalPossible - allVariants.size} variants")
         }
 
         // Determine active variant
-        val activeVariant = resolveActiveVariant(project, extension, dimensions, flavors, allVariants)
+        val activeVariant = resolveActiveVariant(project, extension, dimensions, flavors, allVariants, buildTypesList, enableBuildTypesFlag)
         logger.lifecycle("[KMP Flavors] Active variant: ${activeVariant.name}")
 
         // Detect platforms
@@ -218,6 +225,8 @@ class KmpFlavorPlugin : Plugin<Project> {
         dimensions: List<FlavorDimension>,
         flavors: List<FlavorConfig>,
         allVariants: List<FlavorVariant>,
+        buildTypes: List<BuildTypeConfig>,
+        enableBuildTypes: Boolean,
     ): FlavorVariant {
         // Priority: 1) Gradle property, 2) Extension property, 3) Default variant
         val gradleProperty = project.findProperty("kmpFlavor")?.toString()
@@ -232,7 +241,7 @@ class KmpFlavorPlugin : Plugin<Project> {
                         "Available variants: ${allVariants.joinToString(", ") { it.name }}",
                 )
         } else {
-            FlavorVariantResolver.resolveDefaultVariant(dimensions, flavors)
+            FlavorVariantResolver.resolveDefaultVariant(dimensions, flavors, buildTypes, enableBuildTypes)
                 ?: allVariants.first()
         }
     }
@@ -257,6 +266,8 @@ class KmpFlavorPlugin : Plugin<Project> {
                 variantName.set(activeVariant.name)
                 allFlavorNames.set(flavors.map { it.name }.toSet())
                 activeFlavorNames.set(activeVariant.flavorNames.toSet())
+                allBuildTypeNames.set(extension.buildTypes.map { it.name }.toSet())
+                activeBuildTypeName.set(activeVariant.buildType?.name ?: "")
                 buildConfigFields.set(activeVariant.mergedBuildConfigFields)
                 outputDirectory.set(
                     project.layout.buildDirectory.dir("generated/kmpFlavors/commonMain/kotlin"),

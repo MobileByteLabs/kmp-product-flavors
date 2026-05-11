@@ -182,18 +182,24 @@ object PlatformDetector {
         val sourceSets = kotlin.sourceSets
         val commonMain = sourceSets.getByName("commonMain")
 
-        // Create webMain if needed (not part of default hierarchy — wire it manually).
+        // Create webMain if needed. Note: Kotlin 2.1+ default hierarchy template
+        // already wires web→commonMain and js/wasmJs→webMain edges. We only
+        // register the src/resource directories here and skip the dependsOn
+        // calls to avoid the "Redundant dependsOn Kotlin Source Sets" warning.
         if (platforms.any { it.prefix == "web" && it.isIntermediate }) {
             val webMain = sourceSets.maybeCreate("webMain").apply {
                 this.kotlin.srcDir("src/webMain/kotlin")
                 resources.srcDir("src/webMain/resources")
             }
-            webMain.dependsOn(commonMain)
-
-            // Wire js and wasmJs to webMain
+            // Probe whether commonMain<-webMain is already wired by the hierarchy
+            // template (Kotlin 2.1+). If not (older Kotlin or non-standard layout),
+            // wire it explicitly. Same check for platform<-webMain.
+            wireIfMissing(webMain, commonMain)
             platforms.filter { it.parent == "web" }.forEach { platform ->
                 val platformSourceSet = sourceSets.findByName(platform.mainSourceSet)
-                platformSourceSet?.dependsOn(webMain)
+                if (platformSourceSet != null) {
+                    wireIfMissing(platformSourceSet, webMain)
+                }
             }
         }
 
@@ -208,6 +214,26 @@ object PlatformDetector {
             // dependsOn(commonMain) and platform→nativeMain edges intentionally omitted —
             // the default hierarchy template already manages them.
         }
+    }
+
+    /**
+     * Add a [from] dependsOn(target) edge only if it isn't already present (directly
+     * or transitively) in [from]'s dependsOn chain. Prevents the
+     * "Redundant dependsOn Kotlin Source Sets" warning when Kotlin's default
+     * hierarchy template already manages an edge.
+     */
+    private fun wireIfMissing(from: KotlinSourceSet, target: KotlinSourceSet) {
+        if (target in from.dependsOn) return
+        // Walk transitive dependsOn to catch edges added by the hierarchy template.
+        val seen = mutableSetOf<KotlinSourceSet>()
+        val queue = ArrayDeque(from.dependsOn)
+        while (queue.isNotEmpty()) {
+            val next = queue.removeFirst()
+            if (!seen.add(next)) continue
+            if (next == target) return
+            queue.addAll(next.dependsOn)
+        }
+        from.dependsOn(target)
     }
 
     /**

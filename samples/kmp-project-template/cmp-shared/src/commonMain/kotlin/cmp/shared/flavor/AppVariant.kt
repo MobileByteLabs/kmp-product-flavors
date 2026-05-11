@@ -26,8 +26,8 @@ object AppVariant {
     val isRelease: Boolean   get() = FlavorConfig.IS_RELEASE
     val isInternal: Boolean  get() = FlavorConfig.IS_INTERNAL
     val isDemo: Boolean      get() = FlavorConfig.IS_DEMO
-    val isClientA: Boolean   get() = FlavorConfig.IS_CLIENT_A
-    val isClientB: Boolean   get() = FlavorConfig.IS_CLIENT_B
+    val isClientA: Boolean   get() = FlavorConfig.IS_CLIENTA
+    val isClientB: Boolean   get() = FlavorConfig.IS_CLIENTB
     val isAdvanced: Boolean  get() = FlavorConfig.IS_ADVANCED
     val isBasic: Boolean     get() = FlavorConfig.IS_BASIC
     val clientId: String     get() = FlavorConfig.CLIENT_ID

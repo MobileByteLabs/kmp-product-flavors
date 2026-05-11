@@ -1,5 +1,5 @@
 [versions]
-kmpProductFlavors = "1.0.5"
+kmpProductFlavors = "1.1.2"
 
 # Android
 androidDesugarJdkLibs = "2.1.5"

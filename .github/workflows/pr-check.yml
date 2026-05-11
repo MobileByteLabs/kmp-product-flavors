@@ -59,3 +59,49 @@ jobs:
 
       - name: List Flavors
         run: ./gradlew :samples:basic-flavors:listFlavors --no-daemon --no-configuration-cache
+
+  kmp-project-template-sample:
+    name: kmp-project-template sample build
+    runs-on: ubuntu-latest
+    needs: pr-check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: true
+      - name: Configure Android SDK path
+        run: echo "sdk.dir=${ANDROID_HOME}" > samples/kmp-project-template/local.properties
+      - name: Build cmp-shared (composite-include resolves flavor-plugin from THIS branch)
+        working-directory: samples/kmp-project-template
+        run: ./gradlew :cmp-shared:compileKotlinDesktop :cmp-shared:compileKotlinJs :cmp-shared:compileKotlinWasmJs --no-daemon --no-configuration-cache
+      - name: Validate FlavorConfig codegen (buildType axis)
+        working-directory: samples/kmp-project-template
+        run: |
+          ./gradlew :cmp-shared:generateFlavorBuildConfig --rerun-tasks --no-daemon --no-configuration-cache
+          GEN=cmp-shared/build/generated/kmpFlavors/commonMain/kotlin/org/openmf/kmptemplate/FlavorConfig.kt
+          test -f "$GEN" || { echo "::error::FlavorConfig.kt missing"; exit 1; }
+          for needle in 'IS_INTERNAL: Boolean = true' 'IS_ADVANCED: Boolean = true' 'BUILD_TYPE: String = "debug"' 'IS_DEBUG: Boolean = true' 'ENABLE_LOGGING: Boolean = true' 'LOG_TAG: String = "KMPTemplate-DEBUG"'; do
+            if ! grep -qF "$needle" "$GEN"; then
+              echo "::error::Missing expected line: $needle"
+              cat "$GEN"
+              exit 1
+            fi
+          done
+          echo "✓ FlavorConfig.kt contains all expected flavor + buildType constants"
+      - name: Validate variant override (-PkmpFlavor=clientaBasicStaging)
+        working-directory: samples/kmp-project-template
+        run: |
+          ./gradlew :cmp-shared:generateFlavorBuildConfig -PkmpFlavor=clientaBasicStaging --rerun-tasks --no-daemon --no-configuration-cache
+          GEN=cmp-shared/build/generated/kmpFlavors/commonMain/kotlin/org/openmf/kmptemplate/FlavorConfig.kt
+          for needle in 'VARIANT_NAME: String = "clientaBasicStaging"' 'IS_CLIENTA: Boolean = true' 'IS_BASIC: Boolean = true' 'BUILD_TYPE: String = "staging"' 'IS_STAGING: Boolean = true' 'CLIENT_ID: String = "clientA"'; do
+            if ! grep -qF "$needle" "$GEN"; then
+              echo "::error::Override missing line: $needle"
+              cat "$GEN"
+              exit 1
+            fi
+          done
+          echo "✓ Override variant correctly regenerates FlavorConfig"
