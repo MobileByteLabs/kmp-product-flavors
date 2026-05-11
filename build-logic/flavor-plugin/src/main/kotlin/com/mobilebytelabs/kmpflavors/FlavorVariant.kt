@@ -26,18 +26,19 @@ package com.mobilebytelabs.kmpflavors
  * @property name The combined variant name (e.g., "freeDev")
  * @property flavors The individual flavors that make up this variant, ordered by dimension priority
  */
-data class FlavorVariant(val name: String, val flavors: List<FlavorConfig>) {
+data class FlavorVariant(val name: String, val flavors: List<FlavorConfig>, val buildType: BuildTypeConfig? = null) {
     /**
-     * Merged build config fields from all flavors in this variant.
-     * Later dimensions (higher priority) override earlier ones.
+     * Merged build config fields from all flavors **and the active buildType** (if any).
+     * Later dimensions (higher priority) override earlier ones; the buildType layer is
+     * applied last so its fields override any same-named flavor-level field.
      */
     val mergedBuildConfigFields: Map<String, BuildConfigField> by lazy {
-        flavors.fold(mutableMapOf<String, BuildConfigField>()) { acc, flavor ->
-            flavor.buildConfigFields.get().forEach { (key, field) ->
-                acc[key] = field
-            }
-            acc
+        val acc = mutableMapOf<String, BuildConfigField>()
+        flavors.forEach { flavor ->
+            flavor.buildConfigFields.get().forEach { (key, field) -> acc[key] = field }
         }
+        buildType?.buildConfigFields?.get()?.forEach { (key, field) -> acc[key] = field }
+        acc
     }
 
     /**
@@ -58,8 +59,9 @@ data class FlavorVariant(val name: String, val flavors: List<FlavorConfig>) {
      * Joins all non-null suffixes in order.
      */
     val combinedApplicationIdSuffix: String by lazy {
-        flavors.mapNotNull { it.applicationIdSuffix.orNull }
-            .joinToString("")
+        val flavorPart = flavors.mapNotNull { it.applicationIdSuffix.orNull }.joinToString("")
+        val buildTypePart = buildType?.applicationIdSuffix?.orNull.orEmpty()
+        flavorPart + buildTypePart
     }
 
     /**

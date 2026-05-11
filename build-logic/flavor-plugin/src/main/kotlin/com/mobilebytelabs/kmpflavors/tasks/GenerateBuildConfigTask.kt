@@ -88,6 +88,21 @@ abstract class GenerateBuildConfigTask : DefaultTask() {
     abstract val activeFlavorNames: SetProperty<String>
 
     /**
+     * Set of all buildType names (for generating IS_<BUILDTYPE> constants).
+     * Empty when no buildTypes are declared.
+     * Example: ["debug", "staging", "release"]
+     */
+    @get:Input
+    abstract val allBuildTypeNames: SetProperty<String>
+
+    /**
+     * The active buildType name. Empty string when no buildType is active.
+     * Example: "debug"
+     */
+    @get:Input
+    abstract val activeBuildTypeName: Property<String>
+
+    /**
      * Custom build config fields merged from active flavors.
      * Key: field name, Value: BuildConfigField(type, name, value)
      */
@@ -151,6 +166,22 @@ abstract class GenerateBuildConfigTask : DefaultTask() {
                 for (flavor in allFlavors.sorted()) {
                     val isActive = flavor in activeFlavors
                     val constName = "IS_${flavor.uppercase()}"
+                    appendLine("    const val $constName: Boolean = $isActive")
+                }
+                appendLine()
+            }
+
+            // BUILD_TYPE + IS_<BUILDTYPE> constants
+            val activeBuildType = activeBuildTypeName.orNull.orEmpty()
+            val allBuildTypes = allBuildTypeNames.get()
+            if (allBuildTypes.isNotEmpty()) {
+                appendLine("    /** The active buildType name (empty if buildTypes are not enabled) */")
+                appendLine("    const val BUILD_TYPE: String = \"$activeBuildType\"")
+                appendLine()
+                appendLine("    // BuildType flags")
+                for (bt in allBuildTypes.sorted()) {
+                    val isActive = bt == activeBuildType
+                    val constName = "IS_${bt.uppercase()}"
                     appendLine("    const val $constName: Boolean = $isActive")
                 }
                 appendLine()

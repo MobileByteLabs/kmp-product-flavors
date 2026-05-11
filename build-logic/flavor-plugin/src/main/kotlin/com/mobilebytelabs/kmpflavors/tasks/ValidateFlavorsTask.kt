@@ -45,7 +45,7 @@ abstract class ValidateFlavorsTask : DefaultTask() {
     abstract val dimensionNames: SetProperty<String>
 
     /**
-     * Map of flavor name to its dimension (null if no dimension set).
+     * Map of flavor name to its dimension (empty string if no dimension set).
      */
     @get:Input
     abstract val flavorDimensions: MapProperty<String, String>
@@ -110,7 +110,7 @@ abstract class ValidateFlavorsTask : DefaultTask() {
         if (dimensions.isNotEmpty()) {
             for ((flavor, dimension) in flavorDims) {
                 when {
-                    dimension == null || dimension.isEmpty() -> {
+                    dimension.isEmpty() -> {
                         errors.add("Flavor '$flavor' has no dimension. Use dimension.set(\"...\") to assign one.")
                     }
 
@@ -125,7 +125,7 @@ abstract class ValidateFlavorsTask : DefaultTask() {
         if (dimensions.isNotEmpty()) {
             val defaultsByDimension = mutableMapOf<String, MutableList<String>>()
             for ((flavor, dimension) in flavorDims) {
-                if (dimension != null && flavorDefs[flavor] == true) {
+                if (dimension.isNotEmpty() && flavorDefs[flavor] == true) {
                     defaultsByDimension.getOrPut(dimension) { mutableListOf() }.add(flavor)
                 }
             }

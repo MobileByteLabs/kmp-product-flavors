@@ -16,6 +16,7 @@
 
 package com.mobilebytelabs.kmpflavors.internal
 
+import com.mobilebytelabs.kmpflavors.BuildTypeConfig
 import com.mobilebytelabs.kmpflavors.FlavorConfig
 import com.mobilebytelabs.kmpflavors.FlavorDimension
 import com.mobilebytelabs.kmpflavors.FlavorVariant
@@ -46,51 +47,53 @@ object FlavorVariantResolver {
         dimensions: Collection<FlavorDimension>,
         flavors: Collection<FlavorConfig>,
         variantFilters: List<Action<VariantFilter>> = emptyList(),
+        buildTypes: Collection<BuildTypeConfig> = emptyList(),
+        enableBuildTypes: Boolean = false,
     ): List<FlavorVariant> {
         if (flavors.isEmpty()) {
             return emptyList()
         }
 
-        // If no dimensions, each flavor is its own variant
-        if (dimensions.isEmpty()) {
-            val singleFlavorVariants = flavors.map { flavor ->
-                FlavorVariant(
-                    name = flavor.name,
-                    flavors = listOf(flavor),
-                )
+        // Step 1 — compute flavor-only variants.
+        val flavorOnlyVariants: List<FlavorVariant> = if (dimensions.isEmpty()) {
+            flavors.map { flavor ->
+                FlavorVariant(name = flavor.name, flavors = listOf(flavor))
             }
-            return applyVariantFilters(singleFlavorVariants, variantFilters)
+        } else {
+            val sortedDimensions = dimensions.sortedBy { it.priority.getOrElse(0) }
+            val flavorsByDimension = sortedDimensions.map { dimension ->
+                val dimensionFlavors = flavors.filter { it.dimension.orNull == dimension.name }
+                if (dimensionFlavors.isEmpty()) {
+                    throw IllegalStateException(
+                        "Dimension '${dimension.name}' has no flavors assigned to it. " +
+                            "Make sure each flavor has dimension.set(\"${dimension.name}\").",
+                    )
+                }
+                dimensionFlavors
+            }
+            cartesianProduct(flavorsByDimension).map { flavorList ->
+                FlavorVariant(name = buildVariantName(flavorList), flavors = flavorList)
+            }
         }
 
-        // Sort dimensions by priority
-        val sortedDimensions = dimensions.sortedBy { it.priority.getOrElse(0) }
-
-        // Group flavors by dimension
-        val flavorsByDimension = sortedDimensions.map { dimension ->
-            val dimensionFlavors = flavors.filter { it.dimension.orNull == dimension.name }
-            if (dimensionFlavors.isEmpty()) {
-                throw IllegalStateException(
-                    "Dimension '${dimension.name}' has no flavors assigned to it. " +
-                        "Make sure each flavor has dimension.set(\"${dimension.name}\").",
-                )
+        // Step 2 — if enableBuildTypes is true and at least one buildType is declared,
+        // expand the flavor-only matrix by buildType.
+        val expanded: List<FlavorVariant> = if (enableBuildTypes && buildTypes.isNotEmpty()) {
+            flavorOnlyVariants.flatMap { flavorVariant ->
+                buildTypes.map { buildType ->
+                    FlavorVariant(
+                        name = flavorVariant.name + buildType.name.replaceFirstChar { it.uppercaseChar() },
+                        flavors = flavorVariant.flavors,
+                        buildType = buildType,
+                    )
+                }
             }
-            dimensionFlavors
-        }
-
-        // Compute cartesian product
-        val combinations = cartesianProduct(flavorsByDimension)
-
-        // Create variants from combinations
-        val allVariants = combinations.map { flavorList ->
-            val variantName = buildVariantName(flavorList)
-            FlavorVariant(
-                name = variantName,
-                flavors = flavorList,
-            )
+        } else {
+            flavorOnlyVariants
         }
 
         // Apply variant filters
-        return applyVariantFilters(allVariants, variantFilters)
+        return applyVariantFilters(expanded, variantFilters)
     }
 
     /**
@@ -129,40 +132,42 @@ object FlavorVariantResolver {
      * @param flavors All configured flavors
      * @return The default variant, or null if no defaults are configured
      */
-    fun resolveDefaultVariant(dimensions: Collection<FlavorDimension>, flavors: Collection<FlavorConfig>): FlavorVariant? {
+    fun resolveDefaultVariant(
+        dimensions: Collection<FlavorDimension>,
+        flavors: Collection<FlavorConfig>,
+        buildTypes: Collection<BuildTypeConfig> = emptyList(),
+        enableBuildTypes: Boolean = false,
+    ): FlavorVariant? {
         if (flavors.isEmpty()) {
             return null
         }
 
-        // If no dimensions, return the first default flavor or first flavor
-        if (dimensions.isEmpty()) {
+        val flavorOnly: FlavorVariant = if (dimensions.isEmpty()) {
             val defaultFlavor = flavors.find { it.isDefault.getOrElse(false) }
                 ?: flavors.firstOrNull()
                 ?: return null
-            return FlavorVariant(
-                name = defaultFlavor.name,
-                flavors = listOf(defaultFlavor),
-            )
+            FlavorVariant(name = defaultFlavor.name, flavors = listOf(defaultFlavor))
+        } else {
+            val sortedDimensions = dimensions.sortedBy { it.priority.getOrElse(0) }
+            val defaultFlavors = sortedDimensions.mapNotNull { dimension ->
+                val dimensionFlavors = flavors.filter { it.dimension.orNull == dimension.name }
+                dimensionFlavors.find { it.isDefault.getOrElse(false) }
+                    ?: dimensionFlavors.firstOrNull()
+            }
+            if (defaultFlavors.size != sortedDimensions.size) return null
+            FlavorVariant(name = buildVariantName(defaultFlavors), flavors = defaultFlavors)
         }
 
-        // Sort dimensions by priority
-        val sortedDimensions = dimensions.sortedBy { it.priority.getOrElse(0) }
+        if (!enableBuildTypes || buildTypes.isEmpty()) return flavorOnly
 
-        // Get default flavor from each dimension
-        val defaultFlavors = sortedDimensions.mapNotNull { dimension ->
-            val dimensionFlavors = flavors.filter { it.dimension.orNull == dimension.name }
-            dimensionFlavors.find { it.isDefault.getOrElse(false) }
-                ?: dimensionFlavors.firstOrNull()
-        }
+        val defaultBuildType = buildTypes.find { it.isDefault.getOrElse(false) }
+            ?: buildTypes.firstOrNull()
+            ?: return flavorOnly
 
-        if (defaultFlavors.size != sortedDimensions.size) {
-            return null
-        }
-
-        val variantName = buildVariantName(defaultFlavors)
         return FlavorVariant(
-            name = variantName,
-            flavors = defaultFlavors,
+            name = flavorOnly.name + defaultBuildType.name.replaceFirstChar { it.uppercaseChar() },
+            flavors = flavorOnly.flavors,
+            buildType = defaultBuildType,
         )
     }
 

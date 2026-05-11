@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-05-11
+
+### Fixed
+
+- **F1** `enableBuildTypes` was declared on `KmpFlavorExtension` but never read anywhere in the plugin — setting it had zero effect. Now wired through `FlavorVariantResolver` so the variant matrix expands by buildType axis (e.g. 8 flavors × 3 buildTypes = 24 variants) when `enableBuildTypes.set(true)` and at least one `buildTypes { register(...) }` block is declared.
+- **F2/F3** `GenerateBuildConfigTask` now emits `BUILD_TYPE: String` plus `IS_<BUILDTYPE>: Boolean` constants per declared buildType, AND merges the active buildType's `buildConfigField(...)` entries into the generated `FlavorConfig.kt`. Previously these declarations were silently dropped.
+- **F5** `PlatformDetector.wireIntermediateSourceSets()` no longer triggers the Kotlin compiler's "Redundant dependsOn Kotlin Source Sets" warning. Web intermediate edges (`webMain → commonMain`, `js/wasmJs/wasmWasi → webMain`) are now added only when not already present in the source set's transitive dependsOn chain (Kotlin 2.1+'s default hierarchy template already adds them).
+- **F8** `SourceSetConfigurator` now wires the active flavor's source sets onto each platform's main compile path. Previously the plugin created `commonInternal/`, `desktopInternal/` etc. source sets and wired their internal dependsOn chain, but **never made them reachable from `compileKotlin<Target>` compilations** — so `expect`/`actual` flavor splits silently failed with "no actual declaration in module <commonMain>". v1.1.2 adds `wireIfMissing(platformMain, commonFlavor)` and `wireIfMissing(platformMain, platformFlavor)` for the active flavor, making actual declarations under `src/commonInternal/kotlin` and `src/desktopInternal/kotlin` reachable from desktop/JS/Wasm/iOS compilations.
+- **F6** Eliminated two long-standing compiler warnings in `ValidateFlavorsTask.kt:113,128` ("Condition is always 'false'/'true'"). The redundant null checks on `MapProperty<String, String>` values were replaced with `String.isEmpty() / isNotEmpty()` checks consistent with the convention that empty string = "no dimension".
+
+### Notes
+
+This is a P0 hotfix. v1.1.0 and the unintentionally-republished v1.1.1's `buildTypes { … }` DSL was accepted but completely inert — variant naming, source-set wiring, codegen, and the AGP bridge handoff all ignored it. v1.1.1 makes the documented behaviour real.
+
+Driving plan: `plan-layer/plans/PLAN-v1.1.0-validation-260511-100908.md`
+Validation report: `plan-layer/plans/VALIDATION_REPORT-v1.1.0-260511.md`
+
+### Migration
+
+If you were on v1.1.0 and your `kmpFlavors { }` block had a `buildTypes { … }` declaration:
+
+1. Add `enableBuildTypes.set(true)` to your `kmpFlavors { }` block (still defaults to `false` for backwards compatibility with consumers that ship a `buildTypes` block but didn't realise it was inert).
+2. Your variant names will now include the buildType suffix (`freeDebug`, `paidRelease`). Update any `-PkmpFlavor=foo` invocations accordingly.
+3. `FlavorConfig` will gain `BUILD_TYPE`, `IS_<BUILDTYPE>`, and any per-buildType `buildConfigField` entries.
+
 ## [1.1.0] - 2026-05-10
 
 ### Added

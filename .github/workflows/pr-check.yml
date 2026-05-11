@@ -59,3 +59,49 @@ jobs:
 
       - name: List Flavors
         run: ./gradlew :samples:basic-flavors:listFlavors --no-daemon --no-configuration-cache
+  kmp-project-template-sample:
+    name: kmp-project-template sample build
+    runs-on: ubuntu-latest
+    needs: pr-check
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '21'
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: true
+      - name: Write Android SDK stub
+        run: |
+          # The kmp-project-template sample has Android consumers; CI Android SDK
+          # is provided by the runner's ANDROID_HOME (set automatically on
+          # ubuntu-latest with android-sdk preinstalled).
+          echo "sdk.dir=${ANDROID_HOME}" > samples/kmp-project-template/local.properties
+      - name: cmp-shared compile (default variant)
+        working-directory: samples/kmp-project-template
+        run: ./gradlew :cmp-shared:assemble --no-daemon --no-configuration-cache
+      - name: cmp-shared codegen with override
+        working-directory: samples/kmp-project-template
+        run: |
+          ./gradlew :cmp-shared:generateFlavorBuildConfig \
+            -PkmpFlavor=clientaBasicDebug --rerun-tasks --no-daemon --no-configuration-cache
+          test -f cmp-shared/build/generated/kmpFlavors/commonMain/kotlin/org/openmf/kmptemplate/FlavorConfig.kt
+          grep -q 'IS_CLIENTA: Boolean = true' cmp-shared/build/generated/kmpFlavors/commonMain/kotlin/org/openmf/kmptemplate/FlavorConfig.kt
+          grep -q 'IS_BASIC: Boolean = true' cmp-shared/build/generated/kmpFlavors/commonMain/kotlin/org/openmf/kmptemplate/FlavorConfig.kt
+          grep -q 'BUILD_TYPE: String = "debug"' cmp-shared/build/generated/kmpFlavors/commonMain/kotlin/org/openmf/kmptemplate/FlavorConfig.kt
+          grep -q 'IS_DEBUG: Boolean = true' cmp-shared/build/generated/kmpFlavors/commonMain/kotlin/org/openmf/kmptemplate/FlavorConfig.kt
+          grep -q 'ENABLE_LOGGING: Boolean = true' cmp-shared/build/generated/kmpFlavors/commonMain/kotlin/org/openmf/kmptemplate/FlavorConfig.kt
+      - name: listFlavors shows buildType axis (24 variants)
+        working-directory: samples/kmp-project-template
+        run: |
+          out=$(./gradlew :cmp-shared:listFlavors --no-daemon --no-configuration-cache)
+          echo "$out"
+          # Expect 24 variants (4 consumers × 2 tiers × 3 buildTypes)
+          variant_count=$(echo "$out" | grep -cE '^\\│ [a-z][a-zA-Z]+ +\\│' || true)
+          if [ "$variant_count" -lt 24 ]; then
+            echo "::error::Expected ≥24 variants; got $variant_count"
+            exit 1
+          fi
