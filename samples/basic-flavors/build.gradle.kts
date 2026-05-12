@@ -24,6 +24,24 @@ kotlin {
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
+
+        // ─── D1 SPIKE — per-variant KotlinCompilation alongside `main` ───
+        // Goal: prove KGP accepts a second compilation on a non-Android
+        // target representing an inactive variant, so v2.0 of the plugin
+        // can register one compilation per variant and build the full
+        // matrix in a single Gradle invocation (like AGP for Android).
+        compilations {
+            val main by getting
+            // Second compilation: the "freeDev" variant alongside main.
+            val freeDev by creating {
+                defaultSourceSet {
+                    kotlin.srcDir("src/commonMain/kotlin")
+                    kotlin.srcDir("src/commonFree/kotlin")
+                    kotlin.srcDir("src/commonDev/kotlin")
+                }
+                associateWith(main)
+            }
+        }
     }
 
     // iOS targets
