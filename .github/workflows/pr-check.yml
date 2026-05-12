@@ -82,8 +82,8 @@ jobs:
         working-directory: samples/kmp-project-template
         run: |
           ./gradlew :cmp-shared:generateFlavorBuildConfig --rerun-tasks --no-daemon --no-configuration-cache
-          GEN=cmp-shared/build/generated/kmpFlavors/commonMain/kotlin/org/openmf/kmptemplate/FlavorConfig.kt
-          test -f "$GEN" || { echo "::error::FlavorConfig.kt missing"; exit 1; }
+          GEN=cmp-shared/build/generated/kmpFlavors/commonMain/kotlin/org/openmf/kmptemplate/BuildKonfig.kt
+          test -f "$GEN" || { echo "::error::BuildKonfig.kt missing"; exit 1; }
           # Sample's default variant resolves to demoBankADebug from:
           #   tier (base):       demo (default) | prod
           #   bank (LocalFlavors): bankA (default) | bankB
@@ -95,12 +95,12 @@ jobs:
               exit 1
             fi
           done
-          echo "✓ FlavorConfig.kt contains all expected flavor + buildType constants"
+          echo "✓ BuildKonfig.kt contains all expected flavor + buildType constants"
       - name: Validate variant override (-PkmpFlavor=prodBankBStaging)
         working-directory: samples/kmp-project-template
         run: |
           ./gradlew :cmp-shared:generateFlavorBuildConfig -PkmpFlavor=prodBankBStaging --rerun-tasks --no-daemon --no-configuration-cache
-          GEN=cmp-shared/build/generated/kmpFlavors/commonMain/kotlin/org/openmf/kmptemplate/FlavorConfig.kt
+          GEN=cmp-shared/build/generated/kmpFlavors/commonMain/kotlin/org/openmf/kmptemplate/BuildKonfig.kt
           for needle in 'VARIANT_NAME: String = "prodBankBStaging"' 'IS_PROD: Boolean = true' 'IS_BANKB: Boolean = true' 'BUILD_TYPE: String = "staging"' 'IS_STAGING: Boolean = true' 'BANK_ID: String = "bankB"'; do
             if ! grep -qF "$needle" "$GEN"; then
               echo "::error::Override missing line: $needle"
