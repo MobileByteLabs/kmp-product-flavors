@@ -369,4 +369,46 @@ class ConventionPluginIntegrationTest {
         // freeProd should be excluded
         assertTrue(!result.output.contains("freeProd") || result.output.contains("Variant filter excluded"))
     }
+
+    // === codegenHost opt-in tests (v1.1.5) =============================================
+
+    @Test
+    fun `codegenHost set false opts module out of codegen entirely`() {
+        // Single-module project that sets codegenHost.set(false). generateBuildConfig
+        // is still true by default — but codegenHost = false must override.
+        buildFile.writeText(
+            """
+            plugins {
+                kotlin("multiplatform") version "2.2.21"
+                id("io.github.mobilebytelabs.kmp-product-flavors")
+            }
+
+            kotlin {
+                jvm("desktop")
+            }
+
+            kmpFlavors {
+                buildConfigPackage.set("com.example.app")
+                codegenHost.set(false)
+
+                flavors {
+                    register("free") { isDefault.set(true) }
+                    register("paid")
+                }
+            }
+            """.trimIndent(),
+        )
+
+        val result = GradleRunner.create()
+            .withProjectDir(testProjectDir)
+            .withArguments("tasks", "--all", "--stacktrace")
+            .withPluginClasspath()
+            .build()
+
+        // generateFlavorBuildConfig task must NOT be registered because codegenHost = false
+        assertTrue(
+            !result.output.contains("generateFlavorBuildConfig"),
+            "codegenHost.set(false) should suppress codegen task registration entirely",
+        )
+    }
 }
