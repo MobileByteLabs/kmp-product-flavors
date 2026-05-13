@@ -100,7 +100,7 @@ class CompilationRegistrarTest {
     }
 
     @Test
-    fun `register associates each variant compilation with main (Q12 isolation prerequisite)`() {
+    fun `register does NOT call associateWith on variant compilations (RFC Q12 isolation invariant)`() {
         CompilationRegistrar.register(
             target = target,
             variantNames = listOf("freeDev", "paidDev"),
@@ -109,8 +109,14 @@ class CompilationRegistrarTest {
 
         val freeDev = createdByName.getValue("freeDev")
         val paidDev = createdByName.getValue("paidDev")
-        verify(exactly = 1) { freeDev.associateWith(main) }
-        verify(exactly = 1) { paidDev.associateWith(main) }
+        // Variant compilations must NOT associateWith(main): doing so would
+        // pull the active variant's source sets into every other variant,
+        // breaking cross-variant isolation (Q12) and producing duplicate
+        // `actual` declarations for the same `expect` (Q11).
+        verify(exactly = 0) { freeDev.associateWith(main) }
+        verify(exactly = 0) { paidDev.associateWith(main) }
+        verify(exactly = 0) { freeDev.associateWith(any<KotlinCompilation<*>>()) }
+        verify(exactly = 0) { paidDev.associateWith(any<KotlinCompilation<*>>()) }
     }
 
     @Test
@@ -126,10 +132,45 @@ class CompilationRegistrarTest {
 
     @Test
     fun `register is idempotent across duplicate calls — same variant name not created twice`() {
-        CompilationRegistrar.register(target, listOf("freeDev"), logger)
-        CompilationRegistrar.register(target, listOf("freeDev"), logger)
+        CompilationRegistrar.register(target, listOf("freeDev"), logger = logger)
+        CompilationRegistrar.register(target, listOf("freeDev"), logger = logger)
 
         // Existing compilation must be re-used, not duplicated
         verify(exactly = 1) { container.create("freeDev") }
+    }
+
+    @Test
+    fun `register wires variant-supplied source dirs into defaultSourceSet (W2 per-variant source-set wiring)`() {
+        CompilationRegistrar.register(
+            target = target,
+            variantNames = listOf("freeDev"),
+            srcDirsFor = { name ->
+                if (name == "freeDev") {
+                    listOf("src/commonMain/kotlin", "src/commonFree/kotlin", "src/commonDev/kotlin")
+                } else {
+                    emptyList()
+                }
+            },
+            logger = logger,
+        )
+
+        val freeDev = createdByName.getValue("freeDev")
+        val kotlinSet = freeDev.defaultSourceSet.kotlin
+        verify(exactly = 1) { kotlinSet.srcDir("src/commonMain/kotlin") }
+        verify(exactly = 1) { kotlinSet.srcDir("src/commonFree/kotlin") }
+        verify(exactly = 1) { kotlinSet.srcDir("src/commonDev/kotlin") }
+    }
+
+    @Test
+    fun `register with empty srcDirs supplied does not call srcDir at all`() {
+        CompilationRegistrar.register(
+            target = target,
+            variantNames = listOf("freeDev"),
+            srcDirsFor = { emptyList() },
+            logger = logger,
+        )
+
+        val freeDev = createdByName.getValue("freeDev")
+        verify(exactly = 0) { freeDev.defaultSourceSet.kotlin.srcDir(any<String>()) }
     }
 }

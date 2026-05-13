@@ -97,8 +97,9 @@ class EdgeCaseMatrixTest {
             .withPluginClasspath()
             .build()
 
-        assertTrue(result.output.contains("compileFreeKotlinDesktop"))
+        // free is active → main; paid is inactive → its own task.
         assertTrue(result.output.contains("compilePaidKotlinDesktop"))
+        assertFalse(result.output.contains("compileFreeKotlinDesktop"))
         assertTrue(result.output.contains("1 non-Android target"))
     }
 
@@ -161,8 +162,8 @@ class EdgeCaseMatrixTest {
             .build()
 
         assertFalse(
-            result.output.contains("compileFreeKotlinDesktop"),
-            "v1.x preserved when buildMatrix opt-in is absent",
+            result.output.contains("compilePaidKotlinDesktop"),
+            "Per-variant tasks must not be registered when buildMatrix opt-in is absent",
         )
         assertFalse(result.output.contains("Matrix mode: registered"))
         // listFlavors task from v1.x still present

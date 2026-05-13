@@ -58,20 +58,30 @@ internal object CompilationRegistrar {
      * Skips reserved names. Idempotent: a duplicate call with the same
      * variant name re-uses the existing compilation instead of throwing.
      *
+     * For each created variant, wires `defaultSourceSet.kotlin.srcDir(path)`
+     * for every directory returned by [srcDirsFor]. This is the W2 piece
+     * that unlocks per-variant `expect`/`actual` and cross-variant
+     * isolation (RFC §3 Q11 + Q12). Pass `srcDirsFor = { _ -> emptyList() }`
+     * for the W1 behaviour of registering compilations without source
+     * dirs (the test suite uses this).
+     *
      * @param target the KMP target (JVM / iOS / JS / etc.) to extend
      * @param variantNames variant names to register, e.g. `["freeDev", "paidProd"]`
+     * @param srcDirsFor for each variant name, returns the list of source
+     *   roots to wire into the variant compilation's defaultSourceSet
+     *   (Kotlin source dirs only; resources land in W4)
      * @param logger optional info logger for telemetry (RFC §3 Q13)
      */
     fun register(
         target: KotlinTarget,
         variantNames: List<String>,
+        srcDirsFor: (variantName: String) -> List<String> = { emptyList() },
         logger: Logger? = null,
     ) {
         if (variantNames.isEmpty()) return
 
         @Suppress("UNCHECKED_CAST")
         val container = target.compilations as NamedDomainObjectContainer<KotlinCompilation<*>>
-        val main = container.getByName("main")
 
         for (variantName in variantNames) {
             if (variantName in RESERVED_NAMES) {
@@ -83,11 +93,28 @@ internal object CompilationRegistrar {
             }
             val existing = container.findByName(variantName)
             val variant = existing ?: container.create(variantName)
-            variant.associateWith(main)
+            // Deliberately NOT associateWith(main): variant compilations are
+            // independent of `main`. associating would (a) pull the active
+            // variant's per-flavor source sets into every other variant
+            // (creating duplicate `actual` declarations for the same `expect`),
+            // and (b) make cross-variant isolation (RFC §3 Q12) impossible.
+            // Per-variant dependency wiring lands in W2 of the v2.0 impl plan
+            // (Q17), where each variant gets its own `compileClasspath` via
+            // DependencyConfigurator's matrix-mode extension.
+            // Wire per-variant source dirs into the variant's defaultSourceSet.
+            // RFC §3 Q2-C hybrid: explicit srcDir for variant-specific roots
+            // (commonFree, commonDev, commonFreeDev, …) + Hierarchy Template
+            // for the common edges. The default source set's `kotlin.srcDir(...)`
+            // call is the same shape the D1 spike used.
+            val srcDirs = srcDirsFor(variantName)
+            srcDirs.forEach { dir ->
+                variant.defaultSourceSet.kotlin.srcDir(dir)
+            }
             if (existing == null) {
                 logger?.info(
                     "[KMP Flavors] Registered variant compilation: " +
-                        "${variantName}Kotlin${target.name.replaceFirstChar { it.uppercase() }}",
+                        "${variantName}Kotlin${target.name.replaceFirstChar { it.uppercase() }} " +
+                        "(srcDirs=${srcDirs.size})",
                 )
             }
         }

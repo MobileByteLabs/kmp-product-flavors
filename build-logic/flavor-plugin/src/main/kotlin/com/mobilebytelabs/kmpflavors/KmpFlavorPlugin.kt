@@ -226,13 +226,47 @@ class KmpFlavorPlugin : Plugin<Project> {
         // ("Can't create custom metadata compilations by name") — skip it too.
         // Both exclusions are name-based following PlatformDetector's convention.
         if (matrixModeEnabled) {
-            val variantNames = allVariants.map { it.name }
+            // Matrix mode adds compilations for INACTIVE variants only — the
+            // active variant continues to compile through the standard `main`
+            // compilation wired by v1.x SourceSetConfigurator above. This
+            // preserves v1.x semantics for the active variant and avoids the
+            // `compile{Active}Kotlin{Target}` naming collision with the
+            // existing source-set wiring (KGP rejects sources being in two
+            // compilations and dependsOn into a default source set).
+            val activeVariantName = activeVariant.name
+            val variantNames = allVariants
+                .map { it.name }
+                .filter { it != activeVariantName }
+            // Index variants by name so the per-variant srcDirs lookup is O(1).
+            val variantByName = allVariants.associateBy { it.name }
+            // RFC §3 Q2-C hybrid source-set strategy. Every variant gets:
+            //   src/commonMain/kotlin
+            //   src/common{Flavor1Capitalized}/kotlin   (one per flavor in the variant)
+            //   src/common{VariantNameCapitalized}/kotlin   (variant-specific overrides)
+            // The full hierarchy template + dependsOn graph lands in W3 once
+            // KmpFlavorVariant (Q19) ships and we can model the source-set DAG
+            // through that API instead of synthesising it inline here.
+            val srcDirsFor: (String) -> List<String> = { name ->
+                val variant = variantByName[name]
+                if (variant == null) {
+                    emptyList()
+                } else {
+                    buildList {
+                        add("src/commonMain/kotlin")
+                        variant.flavors.forEach { flavor ->
+                            add("src/common${flavor.name.replaceFirstChar { it.uppercase() }}/kotlin")
+                        }
+                        add("src/common${name.replaceFirstChar { it.uppercase() }}/kotlin")
+                    }
+                }
+            }
             nonAndroidTargets.forEach { target ->
-                CompilationRegistrar.register(target, variantNames, logger)
+                CompilationRegistrar.register(target, variantNames, srcDirsFor, logger)
             }
             logger.lifecycle(
-                "[KMP Flavors] Matrix mode: registered ${variantNames.size} variant " +
-                    "compilations across ${nonAndroidTargets.size} non-Android target(s)",
+                "[KMP Flavors] Matrix mode: registered ${variantNames.size} inactive-variant " +
+                    "compilations across ${nonAndroidTargets.size} non-Android target(s) " +
+                    "(active variant '$activeVariantName' continues to compile through `main`)",
             )
         }
 
@@ -244,7 +278,12 @@ class KmpFlavorPlugin : Plugin<Project> {
         // Resolve platform source sets
         val platformSourceSets = PlatformDetector.resolveSourceSets(kotlin, platforms)
 
-        // Configure flavor source sets
+        // Configure flavor source sets (v1.x active-variant model). Runs in
+        // BOTH v1.x and v2.0 matrix mode: the active variant always compiles
+        // through the standard `main` compilation. Matrix mode adds
+        // compilations for the INACTIVE variants on top — the active
+        // variant doesn't get a duplicate `compile{Active}Kotlin{Target}`
+        // task because that would collide with v1.x's source-set wiring.
         val sourceSetConfigurator = SourceSetConfigurator(logger)
         sourceSetConfigurator.configure(
             project = project,

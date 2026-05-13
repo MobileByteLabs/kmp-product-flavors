@@ -88,7 +88,7 @@ class MatrixModeJvmRegistrationTest {
     }
 
     @Test
-    fun `matrix mode ON registers per-variant compilation tasks on the JVM target`() {
+    fun `matrix mode ON registers per-variant compilation tasks for inactive variants`() {
         writeBuildFile(matrixModeLine = "buildMatrix.set(true)")
 
         val result = GradleRunner.create()
@@ -97,19 +97,26 @@ class MatrixModeJvmRegistrationTest {
             .withPluginClasspath()
             .build()
 
-        // KGP emits compile{Variant}Kotlin{Target} for each compilation.create(variantName)
-        assertTrue(
-            result.output.contains("compileFreeKotlinDesktop"),
-            "Expected compileFreeKotlinDesktop task in output:\n${result.output}",
-        )
+        // The active variant (free, isDefault) compiles through the standard
+        // compileKotlinDesktop task. The inactive variant (paid) gets its
+        // own per-variant task via matrix-mode registration.
         assertTrue(
             result.output.contains("compilePaidKotlinDesktop"),
-            "Expected compilePaidKotlinDesktop task in output:\n${result.output}",
+            "Expected compilePaidKotlinDesktop task for inactive variant:\n${result.output}",
+        )
+        // Active variant DOES NOT get a duplicate per-variant task.
+        assertFalse(
+            result.output.contains("compileFreeKotlinDesktop"),
+            "Active variant 'free' must NOT get a duplicate compileFreeKotlinDesktop task:\n${result.output}",
         )
         // Telemetry line from KmpFlavorPlugin (RFC §3 Q13)
         assertTrue(
             result.output.contains("Matrix mode: registered"),
             "Expected matrix-mode lifecycle log in output:\n${result.output}",
+        )
+        assertTrue(
+            result.output.contains("inactive-variant compilations"),
+            "Expected telemetry to mention inactive-variant scope:\n${result.output}",
         )
     }
 
@@ -123,10 +130,6 @@ class MatrixModeJvmRegistrationTest {
             .withPluginClasspath()
             .build()
 
-        assertFalse(
-            result.output.contains("compileFreeKotlinDesktop"),
-            "compileFreeKotlinDesktop must NOT be present when matrix mode is off (v1.x preserved):\n${result.output}",
-        )
         assertFalse(
             result.output.contains("compilePaidKotlinDesktop"),
             "compilePaidKotlinDesktop must NOT be present when matrix mode is off:\n${result.output}",
@@ -147,10 +150,14 @@ class MatrixModeJvmRegistrationTest {
             .withPluginClasspath()
             .build()
 
+        // free is active → uses main compilation; paid is inactive → gets its own task.
         assertTrue(
-            result.output.contains("compileFreeKotlinDesktop"),
-            "gradle property opt-in must register tasks (RFC §3 Q16-C hybrid):\n${result.output}",
+            result.output.contains("compilePaidKotlinDesktop"),
+            "gradle property opt-in must register inactive-variant tasks (RFC §3 Q16-C hybrid):\n${result.output}",
         )
-        assertTrue(result.output.contains("compilePaidKotlinDesktop"))
+        assertFalse(
+            result.output.contains("compileFreeKotlinDesktop"),
+            "Active variant must continue compiling through main compilation:\n${result.output}",
+        )
     }
 }
