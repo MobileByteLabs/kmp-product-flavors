@@ -17,8 +17,10 @@
 package com.mobilebytelabs.kmpflavors
 
 import com.mobilebytelabs.kmpflavors.internal.AgpBridge
+import com.mobilebytelabs.kmpflavors.internal.CompilationRegistrar
 import com.mobilebytelabs.kmpflavors.internal.DependencyConfigurator
 import com.mobilebytelabs.kmpflavors.internal.FlavorVariantResolver
+import com.mobilebytelabs.kmpflavors.internal.MatrixModeResolver
 import com.mobilebytelabs.kmpflavors.internal.PlatformDetector
 import com.mobilebytelabs.kmpflavors.internal.PlatformPropertiesConfigurator
 import com.mobilebytelabs.kmpflavors.internal.SourceSetConfigurator
@@ -164,6 +166,32 @@ class KmpFlavorPlugin : Plugin<Project> {
         // Detect platforms
         val platforms = PlatformDetector.detect(kotlin, logger)
         val createIntermediates = extension.createIntermediateSourceSets.get()
+
+        // v2.0 matrix mode (RFC §3 Q1-Q4): register one KotlinCompilation per
+        // (variant × target) across every non-Android target. Source-set wiring,
+        // per-variant BuildConfig, and per-variant dependencies land in W2 of the
+        // v2.0 impl plan. This W1 hook only stamps the compilations so the task
+        // graph surfaces compileFreeDevKotlinDesktop etc. for downstream wiring.
+        //
+        // RFC §1 non-goal: "Change Android target behaviour (AGP already handles
+        // matrix; we don't touch it)." → skip target name "android".
+        //
+        // The synthetic "metadata" target rejects custom compilations
+        // ("Can't create custom metadata compilations by name") — skip it too.
+        // Both exclusions are name-based following PlatformDetector's convention.
+        if (MatrixModeResolver.isEnabled(project, extension)) {
+            val variantNames = allVariants.map { it.name }
+            val matrixModeTargets = kotlin.targets.filter {
+                it.name != "android" && it.name != "metadata"
+            }
+            matrixModeTargets.forEach { target ->
+                CompilationRegistrar.register(target, variantNames, logger)
+            }
+            logger.lifecycle(
+                "[KMP Flavors] Matrix mode: registered ${variantNames.size} variant " +
+                    "compilations across ${matrixModeTargets.size} non-Android target(s)",
+            )
+        }
 
         // Wire intermediate source sets if needed
         if (createIntermediates) {
