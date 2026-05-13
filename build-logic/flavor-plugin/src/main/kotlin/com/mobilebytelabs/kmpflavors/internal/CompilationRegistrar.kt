@@ -19,12 +19,13 @@ package com.mobilebytelabs.kmpflavors.internal
 import org.gradle.api.NamedDomainObjectContainer
 import org.gradle.api.logging.Logger
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
+import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
 import org.jetbrains.kotlin.gradle.plugin.KotlinTarget
 
 /**
  * Registers one [KotlinCompilation] per variant on a single [KotlinTarget].
  *
- * Load-bearing piece of v2.0 matrix mode (RFC §3 Q1-Q4 + Q12 + Q17 + Q25).
+ * Load-bearing piece of v2.0 matrix mode (RFC §3 Q1-Q4 + Q11 + Q12 + Q17 + Q25).
  *
  * Per RFC §1.1 (Zero-Touch Adoption Tenet), consumer KMP module
  * `build.gradle.kts` files NEVER call this — only the plugin's own
@@ -36,9 +37,21 @@ import org.jetbrains.kotlin.gradle.plugin.KotlinTarget
  * etc. The registrar just supplies the variant name; no manual task
  * registration.
  *
- * Variant compilation `associateWith(main)` (RFC §3 Q12 prerequisite)
- * gives each variant access to `main`'s classpath so the variant's
- * `commonMain` consumers compile.
+ * Source-set wiring (RFC §3 Q2-C hybrid): the registrar adds two kinds
+ * of wiring per variant:
+ *   1. `dependsOn` edges into existing per-flavor source sets that
+ *      v1.x SourceSetConfigurator created (commonFree, commonPaid, etc.).
+ *      This keeps `expect` and `actual` in DIFFERENT Kotlin modules so
+ *      KMP's expect/actual semantics work across variants (Q11).
+ *   2. Optional variant-specific `srcDir` entries for code that is unique
+ *      to a single variant (e.g. `src/freeDev/kotlin`).
+ *
+ * Variant compilations deliberately do NOT `associateWith(main)`:
+ *   - Doing so would pull the active variant's per-flavor source sets
+ *     into every other variant compilation, breaking cross-variant
+ *     isolation (Q12) and producing duplicate `actual` declarations.
+ *   - Per-variant compileClasspath wiring lands in W2 via
+ *     `DependencyConfigurator`'s matrix-mode extension (Q17).
  *
  * W1 scope: handles any [KotlinTarget] via duck-typing through the
  * abstract `compilations` container. JVM is exercised first by W1
@@ -58,24 +71,31 @@ internal object CompilationRegistrar {
      * Skips reserved names. Idempotent: a duplicate call with the same
      * variant name re-uses the existing compilation instead of throwing.
      *
-     * For each created variant, wires `defaultSourceSet.kotlin.srcDir(path)`
-     * for every directory returned by [srcDirsFor]. This is the W2 piece
-     * that unlocks per-variant `expect`/`actual` and cross-variant
-     * isolation (RFC §3 Q11 + Q12). Pass `srcDirsFor = { _ -> emptyList() }`
-     * for the W1 behaviour of registering compilations without source
-     * dirs (the test suite uses this).
+     * For each variant, the registrar wires:
+     *   1. `defaultSourceSet.dependsOn(parent)` for every source set in
+     *      [parentSourceSetsFor]`(variantName)` — the proper Kotlin
+     *      source-set hierarchy (RFC §3 Q2-C) so expect/actual works
+     *      across variants (Q11) and isolation holds (Q12).
+     *   2. `defaultSourceSet.kotlin.srcDir(path)` for every directory in
+     *      [variantSpecificSrcDirsFor]`(variantName)` — used for code
+     *      unique to a single variant (rare; most code lives in
+     *      per-flavor source sets handled by clause 1).
      *
      * @param target the KMP target (JVM / iOS / JS / etc.) to extend
      * @param variantNames variant names to register, e.g. `["freeDev", "paidProd"]`
-     * @param srcDirsFor for each variant name, returns the list of source
-     *   roots to wire into the variant compilation's defaultSourceSet
-     *   (Kotlin source dirs only; resources land in W4)
+     * @param parentSourceSetsFor for each variant name, returns the
+     *   already-resolved per-flavor [KotlinSourceSet]s the variant
+     *   compilation's defaultSourceSet should depend on
+     * @param variantSpecificSrcDirsFor for each variant name, returns
+     *   any variant-specific source directories to wire directly into
+     *   the variant compilation's defaultSourceSet
      * @param logger optional info logger for telemetry (RFC §3 Q13)
      */
     fun register(
         target: KotlinTarget,
         variantNames: List<String>,
-        srcDirsFor: (variantName: String) -> List<String> = { emptyList() },
+        parentSourceSetsFor: (variantName: String) -> List<KotlinSourceSet> = { emptyList() },
+        variantSpecificSrcDirsFor: (variantName: String) -> List<String> = { emptyList() },
         logger: Logger? = null,
     ) {
         if (variantNames.isEmpty()) return
@@ -93,28 +113,27 @@ internal object CompilationRegistrar {
             }
             val existing = container.findByName(variantName)
             val variant = existing ?: container.create(variantName)
-            // Deliberately NOT associateWith(main): variant compilations are
-            // independent of `main`. associating would (a) pull the active
-            // variant's per-flavor source sets into every other variant
-            // (creating duplicate `actual` declarations for the same `expect`),
-            // and (b) make cross-variant isolation (RFC §3 Q12) impossible.
-            // Per-variant dependency wiring lands in W2 of the v2.0 impl plan
-            // (Q17), where each variant gets its own `compileClasspath` via
-            // DependencyConfigurator's matrix-mode extension.
-            // Wire per-variant source dirs into the variant's defaultSourceSet.
-            // RFC §3 Q2-C hybrid: explicit srcDir for variant-specific roots
-            // (commonFree, commonDev, commonFreeDev, …) + Hierarchy Template
-            // for the common edges. The default source set's `kotlin.srcDir(...)`
-            // call is the same shape the D1 spike used.
-            val srcDirs = srcDirsFor(variantName)
-            srcDirs.forEach { dir ->
-                variant.defaultSourceSet.kotlin.srcDir(dir)
-            }
+
+            // Wire dependsOn edges into the per-flavor source sets created by
+            // v1.x SourceSetConfigurator. This is the Q2-C hybrid: the variant's
+            // defaultSourceSet hangs off commonFree / commonPaid / etc. via
+            // standard KMP source-set dependsOn, so `expect` in commonMain and
+            // `actual` in commonFlavor live in separate compilation modules
+            // exactly the way KMP expects.
+            val parents = parentSourceSetsFor(variantName)
+            parents.forEach { parent -> variant.defaultSourceSet.dependsOn(parent) }
+
+            // Wire variant-specific source dirs directly into the variant
+            // defaultSourceSet (rare path — used for code that only exists
+            // for one specific variant, not per-flavor).
+            val srcDirs = variantSpecificSrcDirsFor(variantName)
+            srcDirs.forEach { dir -> variant.defaultSourceSet.kotlin.srcDir(dir) }
+
             if (existing == null) {
                 logger?.info(
                     "[KMP Flavors] Registered variant compilation: " +
                         "${variantName}Kotlin${target.name.replaceFirstChar { it.uppercase() }} " +
-                        "(srcDirs=${srcDirs.size})",
+                        "(parents=${parents.size}, srcDirs=${srcDirs.size})",
                 )
             }
         }

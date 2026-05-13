@@ -140,37 +140,53 @@ class CompilationRegistrarTest {
     }
 
     @Test
-    fun `register wires variant-supplied source dirs into defaultSourceSet (W2 per-variant source-set wiring)`() {
+    fun `register wires dependsOn into the supplied parent source sets (W2_2 hierarchy)`() {
+        val commonFree = mockk<org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet>(relaxed = true) {
+            every { name } returns "commonFree"
+        }
+        val commonDev = mockk<org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet>(relaxed = true) {
+            every { name } returns "commonDev"
+        }
         CompilationRegistrar.register(
             target = target,
             variantNames = listOf("freeDev"),
-            srcDirsFor = { name ->
-                if (name == "freeDev") {
-                    listOf("src/commonMain/kotlin", "src/commonFree/kotlin", "src/commonDev/kotlin")
-                } else {
-                    emptyList()
-                }
+            parentSourceSetsFor = { name ->
+                if (name == "freeDev") listOf(commonFree, commonDev) else emptyList()
+            },
+            logger = logger,
+        )
+
+        val freeDevDefault = createdByName.getValue("freeDev").defaultSourceSet
+        verify { freeDevDefault.dependsOn(commonFree) }
+        verify { freeDevDefault.dependsOn(commonDev) }
+    }
+
+    @Test
+    fun `register wires variant-specific srcDir entries directly into defaultSourceSet`() {
+        CompilationRegistrar.register(
+            target = target,
+            variantNames = listOf("freeDev"),
+            variantSpecificSrcDirsFor = { name ->
+                if (name == "freeDev") listOf("src/freeDev/kotlin") else emptyList()
             },
             logger = logger,
         )
 
         val freeDev = createdByName.getValue("freeDev")
         val kotlinSet = freeDev.defaultSourceSet.kotlin
-        verify(exactly = 1) { kotlinSet.srcDir("src/commonMain/kotlin") }
-        verify(exactly = 1) { kotlinSet.srcDir("src/commonFree/kotlin") }
-        verify(exactly = 1) { kotlinSet.srcDir("src/commonDev/kotlin") }
+        verify(exactly = 1) { kotlinSet.srcDir("src/freeDev/kotlin") }
     }
 
     @Test
-    fun `register with empty srcDirs supplied does not call srcDir at all`() {
+    fun `register with no parent source sets and no srcDirs only creates the compilation`() {
         CompilationRegistrar.register(
             target = target,
             variantNames = listOf("freeDev"),
-            srcDirsFor = { emptyList() },
             logger = logger,
         )
 
         val freeDev = createdByName.getValue("freeDev")
+        verify(exactly = 0) { freeDev.defaultSourceSet.dependsOn(any<org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet>()) }
         verify(exactly = 0) { freeDev.defaultSourceSet.kotlin.srcDir(any<String>()) }
     }
 }

@@ -213,62 +213,6 @@ class KmpFlavorPlugin : Plugin<Project> {
             )
         }
 
-        // v2.0 matrix mode (RFC §3 Q1-Q4): register one KotlinCompilation per
-        // (variant × target) across every non-Android target. Source-set wiring,
-        // per-variant BuildConfig, and per-variant dependencies land in W2 of the
-        // v2.0 impl plan. This W1 hook only stamps the compilations so the task
-        // graph surfaces compileFreeDevKotlinDesktop etc. for downstream wiring.
-        //
-        // RFC §1 non-goal: "Change Android target behaviour (AGP already handles
-        // matrix; we don't touch it)." → skip target name "android".
-        //
-        // The synthetic "metadata" target rejects custom compilations
-        // ("Can't create custom metadata compilations by name") — skip it too.
-        // Both exclusions are name-based following PlatformDetector's convention.
-        if (matrixModeEnabled) {
-            // Matrix mode adds compilations for INACTIVE variants only — the
-            // active variant continues to compile through the standard `main`
-            // compilation wired by v1.x SourceSetConfigurator above. This
-            // preserves v1.x semantics for the active variant and avoids the
-            // `compile{Active}Kotlin{Target}` naming collision with the
-            // existing source-set wiring (KGP rejects sources being in two
-            // compilations and dependsOn into a default source set).
-            val activeVariantName = activeVariant.name
-            val variantNames = allVariants
-                .map { it.name }
-                .filter { it != activeVariantName }
-            // Index variants by name so the per-variant srcDirs lookup is O(1).
-            val variantByName = allVariants.associateBy { it.name }
-            // RFC §3 Q2-C hybrid source-set strategy. Every variant gets:
-            //   src/commonMain/kotlin
-            //   src/common{Flavor1Capitalized}/kotlin   (one per flavor in the variant)
-            //   src/common{VariantNameCapitalized}/kotlin   (variant-specific overrides)
-            // The full hierarchy template + dependsOn graph lands in W3 once
-            // KmpFlavorVariant (Q19) ships and we can model the source-set DAG
-            // through that API instead of synthesising it inline here.
-            val srcDirsFor: (String) -> List<String> = { name ->
-                val variant = variantByName[name]
-                if (variant == null) {
-                    emptyList()
-                } else {
-                    buildList {
-                        add("src/commonMain/kotlin")
-                        variant.flavors.forEach { flavor ->
-                            add("src/common${flavor.name.replaceFirstChar { it.uppercase() }}/kotlin")
-                        }
-                        add("src/common${name.replaceFirstChar { it.uppercase() }}/kotlin")
-                    }
-                }
-            }
-            nonAndroidTargets.forEach { target ->
-                CompilationRegistrar.register(target, variantNames, srcDirsFor, logger)
-            }
-            logger.lifecycle(
-                "[KMP Flavors] Matrix mode: registered ${variantNames.size} inactive-variant " +
-                    "compilations across ${nonAndroidTargets.size} non-Android target(s) " +
-                    "(active variant '$activeVariantName' continues to compile through `main`)",
-            )
-        }
 
         // Wire intermediate source sets if needed
         if (createIntermediates) {
@@ -294,6 +238,82 @@ class KmpFlavorPlugin : Plugin<Project> {
             platformSourceSets = platformSourceSets,
             createIntermediates = createIntermediates,
         )
+
+        // v2.0 matrix mode (RFC §3 Q1-Q4): register one KotlinCompilation per
+        // (variant × target) across every non-Android target. Source-set wiring,
+        // per-variant BuildConfig, and per-variant dependencies land in W2 of the
+        // v2.0 impl plan. This W1 hook only stamps the compilations so the task
+        // graph surfaces compileFreeDevKotlinDesktop etc. for downstream wiring.
+        //
+        // RFC §1 non-goal: "Change Android target behaviour (AGP already handles
+        // matrix; we don't touch it)." → skip target name "android".
+        //
+        // The synthetic "metadata" target rejects custom compilations
+        // ("Can't create custom metadata compilations by name") — skip it too.
+        // Both exclusions are name-based following PlatformDetector's convention.
+        if (matrixModeEnabled) {
+            // Matrix mode adds compilations for INACTIVE variants only — the
+            // active variant continues to compile through the standard `main`
+            // compilation wired by v1.x SourceSetConfigurator above. This
+            // preserves v1.x semantics for the active variant and avoids the
+            // `compile{Active}Kotlin{Target}` naming collision with the
+            // existing source-set wiring (KGP rejects sources being in two
+            // compilations and dependsOn into a default source set).
+            val activeVariantName = activeVariant.name
+            val variantNames = allVariants
+                .map { it.name }
+                .filter { it != activeVariantName }
+            // Index variants by name so the per-variant lookup is O(1).
+            val variantByName = allVariants.associateBy { it.name }
+            // RFC §3 Q2-C hybrid: dependsOn into per-flavor source sets that
+            // v1.x SourceSetConfigurator created (commonFree, commonPaid, etc.),
+            // plus optional variant-specific srcDir for code unique to one
+            // variant. The per-flavor source sets already dependsOn(commonMain),
+            // so the variant's defaultSourceSet transitively sees commonMain via
+            // the KotlinSourceSet hierarchy — `expect` in commonMain and
+            // `actual` in commonFlavor live in SEPARATE compilation modules,
+            // which is exactly what KMP's expect/actual semantics require.
+            // v1.x SourceSetConfigurator only wires `commonFlavor.dependsOn(commonMain)`
+            // for the active flavor (see SourceSetConfigurator.kt line 81). For inactive
+            // flavors in matrix mode, we wire that edge ourselves so the variant
+            // compilation can see commonMain's `expect` declarations through the
+            // commonFlavor -> commonMain dependsOn chain.
+            val commonMainSourceSet = kotlin.sourceSets.getByName("commonMain")
+            val parentSourceSetsFor: (String) -> List<org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet> = { name ->
+                val variant = variantByName[name]
+                if (variant == null) {
+                    emptyList()
+                } else {
+                    variant.flavors.mapNotNull { flavor ->
+                        val ssName = "common${flavor.name.replaceFirstChar { it.uppercase() }}"
+                        kotlin.sourceSets.findByName(ssName)?.also { commonFlavor ->
+                            commonFlavor.dependsOn(commonMainSourceSet)
+                        }
+                    }
+                }
+            }
+            // Variant-specific srcDir (e.g., `src/freeDev/kotlin`) — only used
+            // for code that lives in a single variant and isn't expressible
+            // as a per-flavor common source set. Most projects won't need this.
+            val variantSpecificSrcDirsFor: (String) -> List<String> = { name ->
+                listOf("src/${name}/kotlin")
+            }
+            nonAndroidTargets.forEach { target ->
+                CompilationRegistrar.register(
+                    target = target,
+                    variantNames = variantNames,
+                    parentSourceSetsFor = parentSourceSetsFor,
+                    variantSpecificSrcDirsFor = variantSpecificSrcDirsFor,
+                    logger = logger,
+                )
+            }
+            logger.lifecycle(
+                "[KMP Flavors] Matrix mode: registered ${variantNames.size} inactive-variant " +
+                    "compilations across ${nonAndroidTargets.size} non-Android target(s) " +
+                    "(active variant '$activeVariantName' continues to compile through `main`)",
+            )
+        }
+
 
         // Configure dependencies
         val dependencyConfigurator = DependencyConfigurator(logger)

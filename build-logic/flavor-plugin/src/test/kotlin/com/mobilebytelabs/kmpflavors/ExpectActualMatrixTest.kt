@@ -102,14 +102,6 @@ class ExpectActualMatrixTest {
     }
 
     @Test
-    @Disabled(
-        "Re-deferred to v2.0 W3 — needs proper KotlinSourceSet hierarchy " +
-            "(commonPaid `dependsOn(commonMain)`) so the actual lives in a " +
-            "separate Kotlin module from the expect. W2.1's flat srcDir " +
-            "wiring puts expect+actual in the same compilation module, " +
-            "which Kotlin rejects with 'expect and corresponding actual are " +
-            "declared in the same module'.",
-    )
     fun `active variant compiles through main — inactive variant compiles through its own per-variant task`() {
         // free is the active variant (isDefault) → compileKotlinDesktop carries its actual via v1.x wiring.
         // paid is inactive → matrix mode adds compilePaidKotlinDesktop with the paid actual.
