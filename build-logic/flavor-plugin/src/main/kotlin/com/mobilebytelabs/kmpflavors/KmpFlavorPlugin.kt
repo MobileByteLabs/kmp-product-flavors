@@ -20,6 +20,8 @@ import com.mobilebytelabs.kmpflavors.internal.AgpBridge
 import com.mobilebytelabs.kmpflavors.internal.CompilationRegistrar
 import com.mobilebytelabs.kmpflavors.internal.DependencyConfigurator
 import com.mobilebytelabs.kmpflavors.internal.FlavorVariantResolver
+import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator
+import com.mobilebytelabs.kmpflavors.internal.KmpFlavorValidationSeverity
 import com.mobilebytelabs.kmpflavors.internal.MatrixModeResolver
 import com.mobilebytelabs.kmpflavors.internal.PlatformDetector
 import com.mobilebytelabs.kmpflavors.internal.PlatformPropertiesConfigurator
@@ -121,8 +123,22 @@ class KmpFlavorPlugin : Plugin<Project> {
         val flavors = extension.flavors.toList()
         val dimensions = extension.flavorDimensions.toList()
 
-        // Skip if no flavors configured
+        // Skip if no flavors configured (v1.x behaviour preserved unless matrix
+        // mode is explicitly opted in, in which case KMPF-V08 must fire).
         if (flavors.isEmpty()) {
+            if (MatrixModeResolver.isEnabled(project, extension)) {
+                throw GradleException(
+                    "kmpFlavors plugin configuration is invalid (1 error(s)):\n\n" +
+                        "  ${KmpFlavorPluginValidator.CODE_MATRIX_MODE_WITHOUT_FLAVORS}: " +
+                        "kmpFlavors.buildMatrix is enabled but no flavors are registered. " +
+                        "Matrix mode requires at least one flavor to generate compilations from.\n" +
+                        "  Fix: Either register flavors via " +
+                        "`kmpFlavors { flavors { register(\"…\") } }` in the convention " +
+                        "plugin, or remove the `buildMatrix.set(true)` / `gradle.properties: " +
+                        "kmpFlavors.buildMatrix=true` opt-in.\n\n" +
+                        "See docs/ERROR_CODES.md for the full catalog.",
+                )
+            }
             logger.info("[KMP Flavors] No flavors configured. Skipping.")
             return
         }
@@ -167,6 +183,36 @@ class KmpFlavorPlugin : Plugin<Project> {
         val platforms = PlatformDetector.detect(kotlin, logger)
         val createIntermediates = extension.createIntermediateSourceSets.get()
 
+        // v2.0 fail-fast validation (RFC §3 Q23). Run before the matrix-mode
+        // registrar so structured errors are surfaced with stable KMPF-Vxx codes
+        // instead of opaque downstream stack traces.
+        val matrixModeEnabled = MatrixModeResolver.isEnabled(project, extension)
+        val nonAndroidTargets = kotlin.targets.filter {
+            it.name != "android" && it.name != "metadata"
+        }
+        val validationFindings = KmpFlavorPluginValidator.validate(
+            flavors = flavors,
+            buildTypes = buildTypesList,
+            resolvedVariants = allVariants,
+            matrixModeEnabled = matrixModeEnabled,
+            detectedTargetCount = nonAndroidTargets.size,
+        )
+        val errors = validationFindings.filter { it.severity == KmpFlavorValidationSeverity.ERROR }
+        val warnings = validationFindings.filter { it.severity == KmpFlavorValidationSeverity.WARNING }
+        warnings.forEach { warning ->
+            logger.warn("[KMP Flavors] ${warning.code} — ${warning.message} Fix: ${warning.fix}")
+        }
+        if (errors.isNotEmpty()) {
+            val formatted = errors.joinToString("\n\n") { error ->
+                "  ${error.code}: ${error.message}\n  Fix: ${error.fix}"
+            }
+            throw GradleException(
+                "kmpFlavors plugin configuration is invalid (${errors.size} error(s)):\n\n" +
+                    "$formatted\n\n" +
+                    "See docs/ERROR_CODES.md for the full catalog.",
+            )
+        }
+
         // v2.0 matrix mode (RFC §3 Q1-Q4): register one KotlinCompilation per
         // (variant × target) across every non-Android target. Source-set wiring,
         // per-variant BuildConfig, and per-variant dependencies land in W2 of the
@@ -179,17 +225,14 @@ class KmpFlavorPlugin : Plugin<Project> {
         // The synthetic "metadata" target rejects custom compilations
         // ("Can't create custom metadata compilations by name") — skip it too.
         // Both exclusions are name-based following PlatformDetector's convention.
-        if (MatrixModeResolver.isEnabled(project, extension)) {
+        if (matrixModeEnabled) {
             val variantNames = allVariants.map { it.name }
-            val matrixModeTargets = kotlin.targets.filter {
-                it.name != "android" && it.name != "metadata"
-            }
-            matrixModeTargets.forEach { target ->
+            nonAndroidTargets.forEach { target ->
                 CompilationRegistrar.register(target, variantNames, logger)
             }
             logger.lifecycle(
                 "[KMP Flavors] Matrix mode: registered ${variantNames.size} variant " +
-                    "compilations across ${matrixModeTargets.size} non-Android target(s)",
+                    "compilations across ${nonAndroidTargets.size} non-Android target(s)",
             )
         }
 
