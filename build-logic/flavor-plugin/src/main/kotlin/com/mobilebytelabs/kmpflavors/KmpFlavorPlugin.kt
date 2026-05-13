@@ -464,7 +464,12 @@ class KmpFlavorPlugin : Plugin<Project> {
         // class. Subsequent applications skip silently to prevent DEX-merge
         // duplicate-class collisions. See shouldGenerateCodegen() below.
         if (shouldGenerateCodegen(project, extension)) {
-            wireGenerateBuildConfigToCompilation(project, kotlin)
+            wireGenerateBuildConfigToCompilation(
+                project = project,
+                kotlin = kotlin,
+                matrixModeEnabled = matrixModeEnabled,
+                nonAndroidTargets = nonAndroidTargets,
+            )
         }
     }
 
@@ -701,16 +706,34 @@ class KmpFlavorPlugin : Plugin<Project> {
         }
     }
 
-    private fun wireGenerateBuildConfigToCompilation(project: Project, kotlin: KotlinMultiplatformExtension) {
+    private fun wireGenerateBuildConfigToCompilation(
+        project: Project,
+        kotlin: KotlinMultiplatformExtension,
+        matrixModeEnabled: Boolean,
+        nonAndroidTargets: List<org.jetbrains.kotlin.gradle.plugin.KotlinTarget>,
+    ) {
         val generateTask = project.tasks.named(
             "generateFlavorBuildConfig",
             GenerateBuildConfigTask::class.java,
         )
+        val outputDirProvider = generateTask.flatMap { it.outputDirectory }
 
-        // Add generated source directory to commonMain
-        kotlin.sourceSets.getByName("commonMain").kotlin.srcDir(
-            generateTask.flatMap { it.outputDirectory },
-        )
+        if (matrixModeEnabled) {
+            // Matrix mode: wire the active-variant BuildKonfig into each
+            // non-Android target's `main` compilation's defaultSourceSet
+            // (e.g., `desktopMain`). Wiring into commonMain would cause
+            // inactive-variant compilations to inherit the active-variant
+            // BuildKonfig via the source-set hierarchy AND have their own
+            // per-variant BuildKonfig — Kotlin rejects this with
+            // "Redeclaration" at the variant compile.
+            for (target in nonAndroidTargets) {
+                val mainCompilation = target.compilations.findByName("main") ?: continue
+                mainCompilation.defaultSourceSet.kotlin.srcDir(outputDirProvider)
+            }
+        } else {
+            // v1.x active-only mode: wire into commonMain (existing behaviour).
+            kotlin.sourceSets.getByName("commonMain").kotlin.srcDir(outputDirProvider)
+        }
 
         // Make Kotlin compilation depend on generation
         project.tasks.matching { it.name.startsWith("compileKotlin") }.configureEach {

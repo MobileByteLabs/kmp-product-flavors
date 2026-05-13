@@ -36,25 +36,32 @@ kmpFlavors {
     buildMatrix.set(true)
     publishMatrix.set(true)
 
-    // Known limitation (tracked for a W5 plugin fix): when matrix mode is on
-    // and `generateBuildConfig=true`, the active-variant BuildKonfig.kt is
-    // emitted to `commonMain/kotlin` and inactive-variant compilations
-    // inherit it via the source-set hierarchy AND their own per-variant
-    // BuildKonfig.kt — resulting in `Redeclaration` at the variant compile.
-    // The W5 fix lands the active-variant BuildKonfig in the JVM target's
-    // main source set instead of commonMain so it's scoped correctly.
-    // For now this sample disables codegen — the per-variant BuildKonfig
-    // generator is independently exercised by PerVariantBuildConfigTest in
-    // the plugin's unit suite.
-    generateBuildConfig.set(false)
+    // W5.1 fix: when matrix mode is on, the active-variant BuildKonfig is
+    // wired into each non-Android target's `main` defaultSourceSet (e.g.
+    // `desktopMain`) instead of commonMain. That scopes it to only the
+    // active-variant compilation, so inactive-variant compilations see
+    // ONLY their own per-variant BuildKonfig.
+    generateBuildConfig.set(true)
+    buildConfigPackage.set("com.example.matrixmode")
+    buildConfigClassName.set("BuildKonfig")
 
     enableBuildTypes.set(true)
 
     flavors {
-        register("free") { isDefault.set(true) }
-        register("paid")
+        register("free") {
+            isDefault.set(true)
+            buildConfigField("Boolean", "IS_PREMIUM", "false")
+            buildConfigField("Int", "MAX_ITEMS", "10")
+        }
+        register("paid") {
+            buildConfigField("Boolean", "IS_PREMIUM", "true")
+            buildConfigField("Int", "MAX_ITEMS", "1000")
+        }
     }
     buildTypes {
+        // Don't declare explicit `IS_DEBUG` here — the generator
+        // auto-derives `IS_<BUILDTYPE>` constants, so an explicit field
+        // with the same name would collide.
         register("debug") { isDefault.set(true) }
         register("release")
     }
