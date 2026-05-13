@@ -25,6 +25,7 @@ import com.mobilebytelabs.kmpflavors.internal.GenerateBuildConfigTasksRegistrar
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorValidationSeverity
 import com.mobilebytelabs.kmpflavors.internal.MatrixModeResolver
+import com.mobilebytelabs.kmpflavors.internal.PerVariantPublishConfigurator
 import com.mobilebytelabs.kmpflavors.internal.PlatformDetector
 import com.mobilebytelabs.kmpflavors.internal.PlatformPropertiesConfigurator
 import com.mobilebytelabs.kmpflavors.internal.SourceSetConfigurator
@@ -411,6 +412,18 @@ class KmpFlavorPlugin : Plugin<Project> {
                 nonAndroidTargets = nonAndroidTargets,
                 activeVariant = activeVariant,
                 inactiveVariants = inactiveVariants,
+            )
+        }
+
+        // Q21-D — per-variant Maven publishing mechanism. No-op when
+        // publishMatrix isn't opted in or when maven-publish isn't applied.
+        if (matrixModeEnabled) {
+            val inactiveVariants = allVariants.filter { it.name != activeVariant.name }
+            PerVariantPublishConfigurator.configure(
+                project = project,
+                extension = extension,
+                inactiveVariants = inactiveVariants,
+                nonAndroidTargets = nonAndroidTargets,
             )
         }
 

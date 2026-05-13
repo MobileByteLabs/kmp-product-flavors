@@ -214,6 +214,27 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
     abstract val buildMatrix: Property<Boolean>
 
     /**
+     * v2.0 per-variant Maven publishing opt-in (RFC §3 Q21-D).
+     *
+     * When `true` AND the consumer's project applies `maven-publish` (or
+     * `com.vanniktech.maven.publish`), the plugin registers one
+     * [org.gradle.api.publish.maven.MavenPublication] per inactive variant
+     * × non-Android target, with a Maven classifier equal to the variant
+     * name. Consumer libraries can then ship classifier-tagged variant
+     * artifacts (e.g. `coordinate:1.0.0:paid`) without touching their
+     * per-module DSL.
+     *
+     * The plugin itself stays single-published (Q21-A behaviour for
+     * kmp-product-flavors's own artifacts). Q21-D ships the *mechanism*
+     * so consumer libraries opt in.
+     *
+     * Convention: not set (so `isPresent == false`). The plugin treats
+     * unset extension + missing property as `false` — no per-variant
+     * publications are registered.
+     */
+    abstract val publishMatrix: Property<Boolean>
+
+    /**
      * Whether to propagate KMP flavor dimensions and product flavors into the
      * Android Gradle Plugin (AGP) extension on modules that apply
      * `com.android.application`.
