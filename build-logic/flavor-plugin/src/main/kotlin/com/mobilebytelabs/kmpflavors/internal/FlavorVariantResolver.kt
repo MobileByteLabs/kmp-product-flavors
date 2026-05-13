@@ -113,6 +113,7 @@ object FlavorVariantResolver {
                 variantName = variant.name,
                 flavorNames = variant.flavorNames,
                 flavors = variant.flavors,
+                buildType = variant.buildType?.name,
             )
 
             // Apply all filter actions
