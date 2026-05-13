@@ -353,6 +353,24 @@ See the full [Convention Plugin Integration Guide](integration/convention-plugin
 - **JDK** 17+
 - See compatibility matrix below
 
+## Roadmap
+
+### v2.0 — Matrix Mode (per-variant `KotlinCompilation` on every target)
+
+Today, v1.x active-variant-only mode compiles exactly one variant's source set at a time. **v2.0 will bring AGP-style matrix mode to KMP**: build every variant × every target in one Gradle invocation, opt-in, with **zero per-module DSL changes** for consumers.
+
+The D1 spike (`spike/d1-per-variant-compilation` @ `58ee241`) proved feasibility on Desktop. Three follow-up probes on 2026-05-13 closed the iOS / config-cache / build-time open questions:
+
+| Question | Result |
+|---|---|
+| Q4 — iOS per-variant tasks | ✅ `compileFreeDevKotlinIosSimulatorArm64`, `iosSimulatorArm64FreeDevKlibrary`, `iosSimulatorArm64FreeDevBinaries` register correctly. iOS in scope for v2.0 GA. |
+| Q7 — configuration cache | ✅ cold 34s → warm 6s, "Configuration cache entry reused" |
+| Q8 — build time on 2-compilation matrix | ✅ 1.01× ratio (≤2× SLO) |
+
+The full design is in **[`docs/RFC-v2.0-per-variant-compilation.md`](docs/RFC-v2.0-per-variant-compilation.md)** (open for review at [#44](https://github.com/MobileByteLabs/kmp-product-flavors/pull/44)). Stakeholder feedback wanted on Q5 default (opt-in vs opt-out), iOS scope, per-variant publishing, and the 6-month v1.x adoption window. Reply on PR #44.
+
+> **Consumer-facing promise**: every consumer KMP module's `build.gradle.kts` will be byte-identical between v1.x and v2.0. Matrix mode is opted in via a single property (`kmpFlavors.buildMatrix=true` in `gradle.properties` OR `buildMatrix.set(true)` in the convention plugin). The plugin's internals register all per-variant compilations programmatically — never via consumer DSL.
+
 ## Compatibility Matrix
 
 | `kmp-product-flavors` version | Kotlin | AGP (if Android consumer) | Gradle | JDK | Compose Multiplatform |
