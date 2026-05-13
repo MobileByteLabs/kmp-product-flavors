@@ -164,6 +164,24 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
         objects.domainObjectContainer(BuildTypeConfig::class.java)
 
     /**
+     * v2.0 public variant API (RFC §3 Q19-B). One [KmpFlavorVariant]
+     * element is populated per matrix-mode variant after
+     * `CompilationRegistrar` runs. Consumers customise variants via
+     * standard Gradle container mechanics:
+     *
+     * ```kotlin
+     * kmpFlavors.variants.matching { it.flavors.contains("paid") }
+     *     .configureEach { /* per-variant customisation */ }
+     * ```
+     *
+     * Only populated when `buildMatrix.set(true)` AND the project has at
+     * least one flavor. Reads in `configureEach { }` are safe; eager
+     * `forEach` before `afterEvaluate` returns an empty collection.
+     */
+    val variants: NamedDomainObjectContainer<KmpFlavorVariant> =
+        objects.domainObjectContainer(KmpFlavorVariant::class.java)
+
+    /**
      * Whether to enable build types support.
      * When true, variants will include the build type suffix (e.g., freeDebug, paidRelease).
      *

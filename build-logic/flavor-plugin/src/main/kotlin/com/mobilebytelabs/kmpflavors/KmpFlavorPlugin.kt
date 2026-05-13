@@ -360,6 +360,47 @@ class KmpFlavorPlugin : Plugin<Project> {
             )
         }
 
+        // Q19-B — populate the public `kmpFlavors.variants` container with one
+        // KmpFlavorVariant per resolved variant. Consumers can then use
+        // `kmpFlavors.variants.matching { ... }.configureEach { ... }` to
+        // customise variants. Lazy fields (`targets`, `compilations`) are
+        // populated below after the variant compilations are resolvable.
+        if (matrixModeEnabled) {
+            allVariants.forEach { v ->
+                // Pre-configure the variant instance outside the container, then
+                // add it. This guarantees `flavors`/`buildType` are populated
+                // BEFORE any consumer-registered configureEach callback fires.
+                // (Empirically, NamedDomainObjectContainer.create(name, action)
+                // fires configureEach BEFORE the action runs for this container
+                // — surfaced by VariantApiTest in W3.2.)
+                if (extension.variants.findByName(v.name) == null) {
+                    val pv = project.objects.newInstance(KmpFlavorVariant::class.java, v.name)
+                    pv.flavors = v.flavors.map { it.name }
+                    pv.buildType = v.buildType?.name
+                    extension.variants.add(pv)
+                }
+            }
+            // Resolve target + compilation references for the inactive variants
+            // (the active variant compiles through `main`, so its `compilations`
+            // map is intentionally empty — consumers asking about the active
+            // variant's compilation should query `target.compilations.main`).
+            val inactiveVariantNames = allVariants.map { it.name }.toSet() - activeVariant.name
+            val resolvedTargets = nonAndroidTargets.toSet()
+            // configureEach { } SAM-converts to KmpFlavorVariant.() -> Unit (receiver-style),
+            // not (KmpFlavorVariant) -> Unit. So use `this` rather than a named param.
+            extension.variants.configureEach {
+                if (name in inactiveVariantNames) {
+                    targets = resolvedTargets
+                    compilations = resolvedTargets.associateWith { target ->
+                        @Suppress("UNCHECKED_CAST")
+                        (target.compilations as org.gradle.api.NamedDomainObjectContainer<org.jetbrains.kotlin.gradle.plugin.KotlinCompilation<*>>)
+                            .findByName(name)
+                            ?: target.compilations.getByName("main")
+                    }
+                }
+            }
+        }
+
 
         // Configure dependencies
         val dependencyConfigurator = DependencyConfigurator(logger)
