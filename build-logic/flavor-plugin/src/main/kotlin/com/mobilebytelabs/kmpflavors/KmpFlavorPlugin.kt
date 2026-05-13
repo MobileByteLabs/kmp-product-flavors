@@ -33,6 +33,7 @@ import com.mobilebytelabs.kmpflavors.tasks.InitFlavorSourceSetsTask
 import com.mobilebytelabs.kmpflavors.tasks.ListFlavorsTask
 import com.mobilebytelabs.kmpflavors.tasks.PrintFlavorPropertiesTask
 import com.mobilebytelabs.kmpflavors.tasks.ValidateFlavorsTask
+import org.gradle.api.Action
 import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -103,6 +104,33 @@ class KmpFlavorPlugin : Plugin<Project> {
             "kmpFlavors",
             KmpFlavorExtension::class.java,
         )
+
+        // RFC §3 Q17 — pre-create per-flavor `commonFlavor` source sets eagerly
+        // as flavors are registered, so consumers can reference them in the
+        // standard KMP DSL (`kotlin { sourceSets { val commonPaid by getting
+        // { dependencies { ... } } } }`) without having to wrap in
+        // `maybeCreate` or wait for `afterEvaluate`. The callback fires
+        // synchronously when each flavor is added to `extension.flavors`.
+        //
+        // Order constraint for consumers: the `kmpFlavors { flavors {
+        // register(...) } }` block must come BEFORE any `kotlin { sourceSets
+        // { val commonFlavor by getting } }` block in the same build file.
+        // This is documented in docs/MATRIX_MODE.md.
+        project.plugins.withId("org.jetbrains.kotlin.multiplatform") {
+            val kotlin = project.extensions.getByType(KotlinMultiplatformExtension::class.java)
+            // `whenObjectAdded` fires synchronously and eagerly whenever a
+            // flavor is registered. Avoid `.all` here — Kotlin's stdlib
+            // `Iterable.all(predicate)` shadows Gradle's
+            // `NamedDomainObjectContainer.all(Action)` and produces a
+            // confusing "Return type mismatch: expected 'Boolean'" error.
+            val createPerFlavorSourceSet = object : Action<FlavorConfig> {
+                override fun execute(flavor: FlavorConfig) {
+                    val ssName = "common${flavor.name.replaceFirstChar { it.uppercase() }}"
+                    kotlin.sourceSets.maybeCreate(ssName)
+                }
+            }
+            extension.flavors.whenObjectAdded(createPerFlavorSourceSet)
+        }
 
         // Defer configuration until after project evaluation
         project.afterEvaluate {
