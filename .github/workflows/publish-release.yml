@@ -30,31 +30,44 @@ permissions:
 
 jobs:
   preflight:
-    # Block publishing of any commit that has not passed PR Check on the same SHA.
-    # Scheduled runs operate on the default branch tip; workflow_dispatch operates
-    # on the ref the user picked. Either way, we check the same head_sha.
-    name: Preflight — require PR Check green on head_sha
+    # Block publishing of any commit that has not been validated on the same SHA.
+    # Two workflows can satisfy this:
+    #   - "PR Check" runs on pull_request — green when a contributor's PR was tested.
+    #   - "CI"       runs on push to development — green when post-merge validation
+    #                finished on the merged commit.
+    # Either workflow being SUCCESS proves the commit was tested. PR Check does NOT
+    # auto-run on push to development, so requiring PR Check alone would block
+    # every post-merge publish — accept CI as an equivalent gate.
+    name: Preflight — require PR Check or CI green on head_sha
     runs-on: ubuntu-latest
     steps:
-      - name: Verify PR Check succeeded on this commit
+      - name: Verify validation workflow succeeded on this commit
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HEAD_SHA: ${{ github.sha }}
         run: |
-          echo "Looking for a successful 'PR Check' run on $HEAD_SHA"
-          COUNT=$(gh run list \
+          echo "Looking for a successful 'PR Check' or 'CI' run on $HEAD_SHA"
+          PR_CHECK_COUNT=$(gh run list \
             --repo "$GITHUB_REPOSITORY" \
             --workflow "PR Check" \
             --commit "$HEAD_SHA" \
             --status success \
             --json conclusion \
             --jq 'length')
-          if [ "$COUNT" -eq 0 ]; then
-            echo "::error::No successful PR Check run found for $HEAD_SHA."
-            echo "::error::This commit has not been validated. Re-run PR Check on this commit first, then re-trigger publish."
+          CI_COUNT=$(gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow "CI" \
+            --commit "$HEAD_SHA" \
+            --status success \
+            --json conclusion \
+            --jq 'length')
+          TOTAL=$((PR_CHECK_COUNT + CI_COUNT))
+          if [ "$TOTAL" -eq 0 ]; then
+            echo "::error::No successful validation run (PR Check or CI) found for $HEAD_SHA."
+            echo "::error::This commit has not been validated. Wait for PR Check / CI to complete, or re-run them on this commit, then re-trigger publish."
             exit 1
           fi
-          echo "✓ Found $COUNT successful PR Check run(s) on $HEAD_SHA — proceeding."
+          echo "✓ Found $PR_CHECK_COUNT PR Check + $CI_COUNT CI successful run(s) on $HEAD_SHA — proceeding."
 
   publish:
     needs: preflight
