@@ -17,12 +17,12 @@ plugins {
     alias(libs.plugins.kmp.flavors.convention)
 }
 
-// Designate :cmp-shared as the FlavorConfig codegen host (v1.1.5+).
+// Designate :cmp-shared as the BuildKonfig codegen host (v1.1.5+).
 // Without this, claim resolution is non-deterministic across configuration
 // order — any module applying kmp.flavors could win the first-come-first-served
 // claim. Setting codegenHost = true guarantees this module always wins, so
 // downstream code and CI can reliably reference :cmp-shared's generated
-// FlavorConfig.kt.
+// BuildKonfig.kt.
 extensions.configure<KmpFlavorExtension> {
     codegenHost.set(true)
 }

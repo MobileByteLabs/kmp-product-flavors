@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.6] - 2026-05-13
+
+Docs + tooling release. No plugin-source behaviour change vs. 1.1.5 — adopters can bump the pin without code changes.
+
+### Added
+
+- **`docs/ROLLBACK.md`** — rollback strategy if a downstream app hits a v1.1.5/v1.1.6 regression. Documents recovery target (v1.1.0), "what's NOT a regression" matrix (KLIB warnings, Compose 1.10 Preview deprecation noise), and a catastrophic-rollback composite-include fallback. Notes that v1.1.1–v1.1.4 were mavenLocal-only iteration markers.
+- **`scripts/plugin-ci-prepush.sh`** — local CI-parity script mirroring `.github/workflows/pr-check.yml`. Runs `spotlessCheck`, flavor-plugin compile + test, `basic-flavors` matrix (free/paid × dev/staging), and the `kmp-project-template` sample BuildKonfig assertions. Surfaces every CI failure in 2-4 min locally instead of waiting on the runner queue.
+- **Plugin test coverage for `codegenHost`** — `ConventionPluginIntegrationTest.codegenHost set false opts module out of codegen entirely` verifies the opt-out path.
+
+### Fixed
+
+- **Sample `kmp-project-template/cmp-shared` source code references `BuildKonfig` (not `FlavorConfig`)** — `samples/kmp-project-template/cmp-shared/src/commonMain/kotlin/cmp/shared/flavor/AppVariant.kt` was the last remaining file in the sample still importing `org.openmf.kmptemplate.FlavorConfig`. Renamed to `BuildKonfig` to match the v1.1.5 default class name. `pr-check.yml`'s "kmp-project-template sample build" job now passes.
+
+### CI / Operations
+
+- **`.github/workflows/publish-release.yml`** — added a `preflight` job that runs before `publish` and verifies, via `gh run list --workflow "PR Check" --commit $HEAD_SHA --status success`, that at least one successful PR Check run exists on the head SHA. Fails fast with a clear error if not, blocking publish of un-validated commits. Requires `actions: read` permission (added).
+
 ## [1.1.5] - 2026-05-12
 
 Zero-config release. Downstream KMP consumers can adopt with **no workaround toggles** — the API is now the extension config + flavor/buildType DSL only.
