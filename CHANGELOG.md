@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Docs
+
+- **`docs/RFC-v2.0-per-variant-compilation.md`** — open RFC for v2.0 "matrix mode" (per-variant `KotlinCompilation` on every KMP target). Locks the design across 26 questions (Q1-Q26); includes live D1-spike-branch measurements for iOS feasibility, configuration-cache compatibility, and build-time SLO; mandates that all per-variant compilation logic lives **inside the plugin** so consumer KMP module `build.gradle.kts` files are byte-identical between v1.x and v2.0. Open for feedback at [#44](https://github.com/MobileByteLabs/kmp-product-flavors/pull/44). v2.0 implementation work (W1) is gated on RFC sign-off.
+
 ## [1.1.6] - 2026-05-13
 
 Docs + tooling release. No plugin-source behaviour change vs. 1.1.5 — adopters can bump the pin without code changes.
