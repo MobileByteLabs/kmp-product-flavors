@@ -15,10 +15,10 @@
 
 package cmp.shared.flavor
 
-import org.openmf.kmptemplate.FlavorConfig
+import org.openmf.kmptemplate.BuildKonfig
 
 /**
- * Typed wrapper around the generated `FlavorConfig` object.
+ * Typed wrapper around the generated `BuildKonfig` object.
  *
  * Exposes only the BASE contract (demo/prod tier + debug/staging/release).
  * Consumer apps that add their own flavor dimensions via
@@ -29,23 +29,23 @@ import org.openmf.kmptemplate.FlavorConfig
 object AppVariant {
 
     // ---- Base flavor (tier) ---------------------------------------------------
-    val isDemo: Boolean get() = FlavorConfig.IS_DEMO
-    val isProd: Boolean get() = FlavorConfig.IS_PROD
+    val isDemo: Boolean get() = BuildKonfig.IS_DEMO
+    val isProd: Boolean get() = BuildKonfig.IS_PROD
 
-    val baseUrl: String        get() = FlavorConfig.BASE_URL
-    val demoUsername: String   get() = FlavorConfig.DEMO_USERNAME
-    val demoPassword: String   get() = FlavorConfig.DEMO_PASSWORD
+    val baseUrl: String        get() = BuildKonfig.BASE_URL
+    val demoUsername: String   get() = BuildKonfig.DEMO_USERNAME
+    val demoPassword: String   get() = BuildKonfig.DEMO_PASSWORD
 
     // ---- Build type -----------------------------------------------------------
-    val buildType: String      get() = FlavorConfig.BUILD_TYPE
-    val isDebug: Boolean       get() = FlavorConfig.IS_DEBUG
-    val isStaging: Boolean     get() = FlavorConfig.IS_STAGING
-    val isRelease: Boolean     get() = FlavorConfig.IS_RELEASE
+    val buildType: String      get() = BuildKonfig.BUILD_TYPE
+    val isDebug: Boolean       get() = BuildKonfig.IS_DEBUG
+    val isStaging: Boolean     get() = BuildKonfig.IS_STAGING
+    val isRelease: Boolean     get() = BuildKonfig.IS_RELEASE
 
-    val enableLogging: Boolean    get() = FlavorConfig.ENABLE_LOGGING
-    val showDebugOverlay: Boolean get() = FlavorConfig.SHOW_DEBUG_OVERLAY
-    val logTag: String            get() = FlavorConfig.LOG_TAG
+    val enableLogging: Boolean    get() = BuildKonfig.ENABLE_LOGGING
+    val showDebugOverlay: Boolean get() = BuildKonfig.SHOW_DEBUG_OVERLAY
+    val logTag: String            get() = BuildKonfig.LOG_TAG
 
     // ---- Variant identity -----------------------------------------------------
-    val variantName: String   get() = FlavorConfig.VARIANT_NAME
+    val variantName: String   get() = BuildKonfig.VARIANT_NAME
 }

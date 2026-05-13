@@ -18,7 +18,7 @@
 
 **Variant matrix:** `demoDebug, demoStaging, demoRelease, prodDebug, prodStaging, prodRelease` (6 variants).
 
-The generated `FlavorConfig.kt` exposes:
+The generated `BuildKonfig.kt` exposes:
 
 - `VARIANT_NAME`, `BUILD_TYPE`
 - `IS_DEMO`, `IS_PROD`, `IS_DEBUG`, `IS_STAGING`, `IS_RELEASE`

@@ -26,9 +26,38 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: read
 
 jobs:
+  preflight:
+    # Block publishing of any commit that has not passed PR Check on the same SHA.
+    # Scheduled runs operate on the default branch tip; workflow_dispatch operates
+    # on the ref the user picked. Either way, we check the same head_sha.
+    name: Preflight — require PR Check green on head_sha
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify PR Check succeeded on this commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          echo "Looking for a successful 'PR Check' run on $HEAD_SHA"
+          COUNT=$(gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow "PR Check" \
+            --commit "$HEAD_SHA" \
+            --status success \
+            --json conclusion \
+            --jq 'length')
+          if [ "$COUNT" -eq 0 ]; then
+            echo "::error::No successful PR Check run found for $HEAD_SHA."
+            echo "::error::This commit has not been validated. Re-run PR Check on this commit first, then re-trigger publish."
+            exit 1
+          fi
+          echo "✓ Found $COUNT successful PR Check run(s) on $HEAD_SHA — proceeding."
+
   publish:
+    needs: preflight
     uses: MobileByteLabs/mbl-actionhub/.github/workflows/publish-kmp-library.yml@v1.5.4
     with:
       module-path: 'build-logic/flavor-plugin'

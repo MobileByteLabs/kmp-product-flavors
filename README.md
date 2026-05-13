@@ -26,9 +26,9 @@ A Gradle plugin that brings Android-style product flavor support to **all Kotlin
 
 ## Supported Platforms
 
-This plugin supports the following Kotlin Multiplatform targets in the current published version (`v1.1.0`). The status column reflects what `PlatformDetector.kt` actually recognises today — see roadmap below for planned additions.
+This plugin supports the following Kotlin Multiplatform targets in the current published version (`v1.1.5`). The status column reflects what `PlatformDetector.kt` actually recognises today — see roadmap below for planned additions.
 
-| Platform | Targets | Status (v1.1.0) |
+| Platform | Targets | Status (v1.1.5) |
 |----------|---------|-----------------|
 | **Android** | `androidTarget()` | ✅ Detected |
 | **iOS** | `iosArm64()`, `iosX64()`, `iosSimulatorArm64()` | ✅ Detected |
@@ -115,8 +115,9 @@ kotlin {
 }
 
 kmpFlavors {
-    generateBuildConfig.set(true)
     buildConfigPackage.set("com.example.app")
+    // buildConfigClassName defaults to "BuildKonfig" (v1.1.5+)
+    // generateBuildConfig + createIntermediateSourceSets + bridgeAgp* defaults are safe — zero-config.
 
     // Define dimensions
     flavorDimensions {
@@ -202,13 +203,32 @@ Output:
 ╰──────────────────────────────────────────────────────────────╯
 ```
 
-## Generated BuildConfig
+## Multi-module setup (v1.1.5+)
+
+When `org.convention.kmp.flavors` (or any convention plugin applying `KmpFlavorPlugin`) is auto-applied across every module in a multi-module build, only **one** module should generate `BuildKonfig.kt` — otherwise the same class lands in every module's classpath and you hit DEX merge duplicate-class errors on Android.
+
+The plugin handles this automatically via a rootProject-extras claim: the first subproject configured wins, the rest log info-level "skipping codegen" messages. For deterministic results across builds, designate a specific module as the codegen host:
 
 ```kotlin
-// build/generated/kmpFlavors/commonMain/kotlin/com/example/app/FlavorConfig.kt
+// In :cmp-shared/build.gradle.kts (or whichever module you choose):
+extensions.configure<KmpFlavorExtension> {
+    codegenHost.set(true)
+}
+```
+
+`codegenHost.set(true)` always wins the claim regardless of configuration order. `codegenHost.set(false)` opts a module out entirely. Default (`null`) is first-come-first-served auto-claim.
+
+See [CHANGELOG.md](CHANGELOG.md) for the full v1.1.5 release notes.
+
+## Generated BuildKonfig
+
+Default class name is `BuildKonfig` since v1.1.5 (was `FlavorConfig`). Override via `buildConfigClassName.set("MyName")` if you prefer a different identifier.
+
+```kotlin
+// build/generated/kmpFlavors/commonMain/kotlin/com/example/app/BuildKonfig.kt
 package com.example.app
 
-object FlavorConfig {
+object BuildKonfig {
     const val VARIANT_NAME: String = "freeDev"
 
     // Auto-generated flavor flags

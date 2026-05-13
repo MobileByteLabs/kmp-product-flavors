@@ -51,7 +51,10 @@ class KMPFlavorsConventionPlugin : Plugin<Project> {
 
             extensions.configure<KmpFlavorExtension> {
                 buildConfigPackage.set("org.openmf.kmptemplate")
-                buildConfigClassName.set("FlavorConfig")
+                // v1.1.5+ — uses default buildConfigClassName = "BuildKonfig"; remove
+                // override only if you want a custom name. Bridge defaults
+                // (bridgeAgpProductFlavors / bridgeAgpBuildTypes = true) are safe —
+                // the bridge is idempotent on already-registered AGP flavors.
                 enableBuildTypes.set(true)
 
                 // Single base dimension — consumer apps may add more.

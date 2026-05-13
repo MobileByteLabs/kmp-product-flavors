@@ -7,6 +7,89 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.6] - 2026-05-13
+
+Docs + tooling release. No plugin-source behaviour change vs. 1.1.5 — adopters can bump the pin without code changes.
+
+### Added
+
+- **`docs/ROLLBACK.md`** — rollback strategy if a downstream app hits a v1.1.5/v1.1.6 regression. Documents recovery target (v1.1.0), "what's NOT a regression" matrix (KLIB warnings, Compose 1.10 Preview deprecation noise), and a catastrophic-rollback composite-include fallback. Notes that v1.1.1–v1.1.4 were mavenLocal-only iteration markers.
+- **`scripts/plugin-ci-prepush.sh`** — local CI-parity script mirroring `.github/workflows/pr-check.yml`. Runs `spotlessCheck`, flavor-plugin compile + test, `basic-flavors` matrix (free/paid × dev/staging), and the `kmp-project-template` sample BuildKonfig assertions. Surfaces every CI failure in 2-4 min locally instead of waiting on the runner queue.
+- **Plugin test coverage for `codegenHost`** — `ConventionPluginIntegrationTest.codegenHost set false opts module out of codegen entirely` verifies the opt-out path.
+
+### Fixed
+
+- **Sample `kmp-project-template/cmp-shared` source code references `BuildKonfig` (not `FlavorConfig`)** — `samples/kmp-project-template/cmp-shared/src/commonMain/kotlin/cmp/shared/flavor/AppVariant.kt` was the last remaining file in the sample still importing `org.openmf.kmptemplate.FlavorConfig`. Renamed to `BuildKonfig` to match the v1.1.5 default class name. `pr-check.yml`'s "kmp-project-template sample build" job now passes.
+
+### CI / Operations
+
+- **`.github/workflows/publish-release.yml`** — added a `preflight` job that runs before `publish` and verifies, via `gh run list --workflow "PR Check" --commit $HEAD_SHA --status success`, that at least one successful PR Check run exists on the head SHA. Fails fast with a clear error if not, blocking publish of un-validated commits. Requires `actions: read` permission (added).
+
+## [1.1.5] - 2026-05-12
+
+Zero-config release. Downstream KMP consumers can adopt with **no workaround toggles** — the API is now the extension config + flavor/buildType DSL only.
+
+### Added
+
+- **`codegenHost: Property<Boolean>`** on `KmpFlavorExtension` — explicit deterministic codegen-host designation for multi-module builds. `null` (default) keeps the auto-claim behaviour; `set(true)` forces this module to win the claim regardless of configuration order; `set(false)` opts the module out of codegen even if it would have claimed.
+- **Idempotent AGP bridge** — `AgpBridge.apply()` now detects when AGP `productFlavors` / `buildTypes` are already populated (e.g. via a consumer convention plugin\'s synchronous `pluginManager.withPlugin(...)` registration). If the existing set is a superset of the KMP flavor/buildType names, the bridge logs an info-level "no-op" and returns silently. Real conflicts still warn.
+- **Default `buildConfigClassName` is now `"BuildKonfig"`** (was `"FlavorConfig"`). Aligns with Kotlin Multiplatform ecosystem naming.
+- **Default `bridgeAgpProductFlavors.convention(true)` + `bridgeAgpBuildTypes.convention(true)`** — now safe because of the idempotency fix above. Consumers no longer need to set these to `false` to avoid duplicate-flavor warnings.
+
+### Fixed
+
+- **Multi-module `BuildKonfig` codegen** (resolves DEX merge duplicate-class error). Convention plugins that auto-apply `kmp.flavors` across every module previously caused each module to generate its own `<package>.BuildKonfig.kt`. New rootProject-extras claim ensures only one subproject generates the class; subsequent applications log info and skip via `KmpFlavorPlugin.shouldGenerateCodegen()`.
+- **Lazy per-flavor source-set creation** in `SourceSetConfigurator`. Previously created `commonProd`, `iosDemoTest`, `androidProdTest`, etc. eagerly even when inactive and empty. KMP reported them as "Unused Kotlin Source Sets" — 19 warnings per module in a typical 2-dimension setup. Now `maybeCreateLazy()` only creates source sets when (a) the flavor is active, OR (b) the on-disk `src/<name>/{kotlin,resources}` directory contains files. Test source sets always require on-disk content even for the active flavor.
+- **Web intermediate source-set wiring** in `PlatformDetector.wireIntermediateSourceSets()`. The previous `wireIfMissing` probe for `webMain → commonMain` and `js/wasmJs/wasmWasi → webMain` ran before Kotlin 2.1+\'s default hierarchy template installed its edges, producing spurious "Redundant dependsOn Kotlin Source Sets" warnings. The explicit web wiring is now removed — the hierarchy template owns those edges. The plugin only registers `src/webMain/{kotlin,resources}` directories.
+
+### Build
+
+- **Kotlin 2.0 metadata compatibility** for the plugin main source set (`languageVersion` + `apiVersion` capped to `KOTLIN_2_0`). The plugin can now be consumed by builds whose `kotlin-dsl` is on the embedded Kotlin 2.0.x compiler (Gradle <9.5). Source-level features don\'t depend on Kotlin 2.1+; the cap is metadata-only.
+
+### Adoption API (after v1.1.5)
+
+```kotlin
+extensions.configure<KmpFlavorExtension> {
+    buildConfigPackage.set("com.your.app")
+    enableBuildTypes.set(true)
+    flavorDimensions { register("contentType") { priority.set(0) } }
+    flavors { ... }
+    buildTypes { ... }
+}
+```
+
+No `generateBuildConfig.set(false)`. No `createIntermediateSourceSets.set(false)`. No `bridgeAgp*.set(false)`. No `buildConfigClassName.set(...)`.
+
+For deterministic codegen-host designation in multi-module projects, the designated host module (e.g. `:cmp-shared`) adds:
+
+```kotlin
+extensions.configure<KmpFlavorExtension> {
+    codegenHost.set(true)
+}
+```
+
+### Reference adoption
+
+`openMF/kmp-project-template#141` (merged 2026-05-12) — full end-to-end adoption with the v1.1.5 API. Canonical example for downstream consumers (mifos-mobile, mifos-pay, mifos-x-field-officer-app, mifos-x-group-banking, mifos-x-open-banking, reels-downloader-new).
+
+### Migration from earlier versions
+
+Delete the following lines from your consumer\'s `KMPFlavorsConventionPlugin` if present:
+
+```kotlin
+generateBuildConfig.set(false)          // multi-module is now auto-handled
+createIntermediateSourceSets.set(false) // web wiring delegated to Kotlin hierarchy template
+bridgeAgpProductFlavors.set(false)      // bridge is idempotent now
+bridgeAgpBuildTypes.set(false)
+buildConfigClassName.set("FlavorConfig") // default is now "BuildKonfig"
+```
+
+And from `gradle.properties`:
+
+```properties
+kotlin.suppressGradlePluginWarnings=UnusedSourceSetsWarning  # plugin no longer creates unused source sets
+```
+
 ## [1.1.2] - 2026-05-11
 
 ### Fixed
