@@ -16,6 +16,7 @@
 
 package com.mobilebytelabs.kmpflavors
 
+import com.mobilebytelabs.kmpflavors.internal.AggregateTasksRegistrar
 import com.mobilebytelabs.kmpflavors.internal.AgpBridge
 import com.mobilebytelabs.kmpflavors.internal.CompilationRegistrar
 import com.mobilebytelabs.kmpflavors.internal.DependencyConfigurator
@@ -399,6 +400,18 @@ class KmpFlavorPlugin : Plugin<Project> {
                     }
                 }
             }
+        }
+
+        // Q18-C — register aggregate `assembleAll{Target}Variants` per target +
+        // super-aggregate `assembleAllVariants` walking every target × variant.
+        if (matrixModeEnabled) {
+            val inactiveVariants = allVariants.filter { it.name != activeVariant.name }
+            AggregateTasksRegistrar.register(
+                project = project,
+                nonAndroidTargets = nonAndroidTargets,
+                activeVariant = activeVariant,
+                inactiveVariants = inactiveVariants,
+            )
         }
 
 
