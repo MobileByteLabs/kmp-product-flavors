@@ -20,6 +20,7 @@ import com.mobilebytelabs.kmpflavors.internal.AgpBridge
 import com.mobilebytelabs.kmpflavors.internal.CompilationRegistrar
 import com.mobilebytelabs.kmpflavors.internal.DependencyConfigurator
 import com.mobilebytelabs.kmpflavors.internal.FlavorVariantResolver
+import com.mobilebytelabs.kmpflavors.internal.GenerateBuildConfigTasksRegistrar
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorValidationSeverity
 import com.mobilebytelabs.kmpflavors.internal.MatrixModeResolver
@@ -339,6 +340,23 @@ class KmpFlavorPlugin : Plugin<Project> {
                 "[KMP Flavors] Matrix mode: registered ${variantNames.size} inactive-variant " +
                     "compilations across ${nonAndroidTargets.size} non-Android target(s) " +
                     "(active variant '$activeVariantName' continues to compile through `main`)",
+            )
+        }
+
+        // Q3-A — register one GenerateBuildConfigTask per INACTIVE variant in matrix
+        // mode and wire each task's output directory into the corresponding
+        // variant compilation's defaultSourceSet. Active variant's BuildConfig
+        // is registered by registerTasks() below as `generateFlavorBuildConfig`
+        // (v1.x behaviour preserved).
+        if (matrixModeEnabled) {
+            val inactiveVariants = allVariants.filter { it.name != activeVariant.name }
+            GenerateBuildConfigTasksRegistrar.register(
+                project = project,
+                extension = extension,
+                inactiveVariants = inactiveVariants,
+                flavors = flavors,
+                kotlin = kotlin,
+                shouldGenerate = shouldGenerateCodegen(project, extension),
             )
         }
 
