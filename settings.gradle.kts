@@ -34,6 +34,7 @@ rootProject.name = "kmp-product-flavors"
 
 // Samples demonstrating the KMP Product Flavors plugin
 include(":samples:basic-flavors")
+include(":samples:matrix-mode")
 
 // Note: samples/kmp-project-template is a standalone project with its own build
 // Build it separately: cd samples/kmp-project-template && ./gradlew build
