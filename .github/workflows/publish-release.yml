@@ -71,7 +71,7 @@ jobs:
 
   publish:
     needs: preflight
-    uses: MobileByteLabs/mbl-actionhub/.github/workflows/publish-kmp-library.yml@v1.5.5
+    uses: MobileByteLabs/mbl-actionhub/.github/workflows/publish-kmp-library.yml@v1.5.6
     with:
       module-path: 'build-logic/flavor-plugin'
       group-id: 'io.github.mobilebytelabs.kmpflavors'
