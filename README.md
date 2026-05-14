@@ -386,11 +386,9 @@ That's it. No per-module `build.gradle.kts` edit. The Zero-Touch Adoption tenet 
 ### Reference
 
 - **Full reference** — [`docs/MATRIX_MODE.md`](docs/MATRIX_MODE.md) (consumer guide, Q24 adjacent-plugin compat table, KMPF-Vxx error quickref)
-- **Migration from v1.x** — [`docs/MIGRATION_v1_to_v2.md`](docs/MIGRATION_v1_to_v2.md)
 - **Error codes** — [`docs/ERROR_CODES.md`](docs/ERROR_CODES.md)
 - **End-to-end sample** — [`samples/matrix-mode/`](samples/matrix-mode/README.md) — exercises every consumer surface in one project
 - **Design RFC** — [`docs/RFC-v2.0-per-variant-compilation.md`](docs/RFC-v2.0-per-variant-compilation.md) (sealed 2026-05-13)
-- **Migration assistant** — `./gradlew kmpFlavorsMigrateToV2` prints a per-project Markdown report (add `--json` for CI)
 
 > **Consumer-facing promise**: every consumer KMP module's `build.gradle.kts` is byte-identical between v1.x and v2.0. Matrix mode is opted in via a single property (`kmpFlavors.buildMatrix=true` in `gradle.properties` OR `buildMatrix.set(true)` in the convention plugin). The plugin's internals register all per-variant compilations programmatically — never via consumer DSL.
 
