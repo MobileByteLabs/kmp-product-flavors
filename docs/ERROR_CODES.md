@@ -111,6 +111,39 @@ Each entry: `code`, `severity`, `message` (rendered to consumers), `fix` (concre
 
 ---
 
+## KMPF-V15 — Apple Silicon host targeting iosX64 simulator (Rosetta workaround)
+
+| | |
+|---|---|
+| **Severity** | WARNING |
+| **Since** | v2.2.0 (Phase 0I) |
+| **Message** | Apple Silicon host (`aarch64` / `arm64`) is declaring an `iosX64` target. Some Kotlin/Native toolchain versions need Rosetta to assemble the iosX64 simulator framework on M-series hardware. |
+| **Fix** | Either drop `iosX64()` (M-series simulators use `iosSimulatorArm64()`), OR run Gradle under Rosetta: `arch -x86_64 ./gradlew :module:assembleAllVariants`. |
+
+---
+
+## KMPF-V16 — CMP × KGP version combination known-incompatible
+
+| | |
+|---|---|
+| **Severity** | WARNING |
+| **Since** | v2.2.0 (Phase 0L) |
+| **Message** | Known-incompatible combination: Compose Multiplatform `<x.y.z>` + Kotlin Gradle Plugin `<a.b.c>`. Per-variant `composeResources/` auto-discovery on custom source sets silently no-ops on this pairing. |
+| **Fix** | Upgrade `org.jetbrains.compose` to `>= 1.7.0`, OR downgrade KGP to `< 2.2.0`, OR add per-flavor resource directories manually via `kotlin.sourceSets.commonFlavor.resources.srcDir(...)`. |
+
+---
+
+## KMPF-V17 — KGP × Gradle version combination known-incompatible
+
+| | |
+|---|---|
+| **Severity** | WARNING |
+| **Since** | v2.2.0 (Phase 0L) |
+| **Message** | Known-incompatible combination: KGP `<a.b.c>` + Gradle `<x.y>`. The Hierarchy Template surface is unstable on this pairing; matrix-mode source-set wiring may emit spurious `Invalid Source Set Dependency Across Trees` warnings. |
+| **Fix** | Upgrade Gradle to `>= 8.5` (recommended) OR upgrade KGP to `>= 2.1.0`. |
+
+---
+
 ## How to suppress / triage in CI
 
 Findings are surfaced through Gradle's standard logger:

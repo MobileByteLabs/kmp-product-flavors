@@ -72,6 +72,9 @@ internal object KmpFlavorPluginValidator {
     const val CODE_INVALID_BUILD_CONFIG_FIELD_TYPE: String = "KMPF-V07"
     const val CODE_MATRIX_MODE_WITHOUT_FLAVORS: String = "KMPF-V08"
     const val CODE_CMP_COMPOSE_RESOURCES_VERSION_INCOMPATIBLE: String = "KMPF-V14"
+    const val CODE_IOS_ROSETTA_REQUIRED: String = "KMPF-V15"
+    const val CODE_CMP_KGP_VERSION_INCOMPATIBLE: String = "KMPF-V16"
+    const val CODE_KGP_GRADLE_VERSION_INCOMPATIBLE: String = "KMPF-V17"
 
     /**
      * Supported Kotlin literal types for `buildConfigField`. Other types
@@ -239,5 +242,104 @@ internal object KmpFlavorPluginValidator {
         }
 
         return findings
+    }
+
+    /**
+     * v2.2 Phase 0I + 0L — platform + version compatibility checks.
+     *
+     * Runs alongside the main [validate] call but with broader inputs (host OS arch,
+     * KGP version, Gradle version, CMP version). Emits structured findings instead of
+     * letting consumers debug raw `xcodebuild`/`compileKotlin` errors.
+     *
+     * Codes:
+     *   - V15: Apple Silicon host (`aarch64`/`arm64`) + iOS targets that historically
+     *     need Rosetta for the `iosX64` simulator (notably under Kotlin/Native pre-2.0
+     *     toolchains). Emits the recommended `arch -x86_64 ./gradlew` workaround.
+     *   - V16: known-bad combinations of Compose Multiplatform + KGP versions.
+     *     Currently: CMP < 1.7.0 with KGP 2.2+ silently no-ops `composeResources/`
+     *     auto-discovery on custom source sets.
+     *   - V17: known-bad combinations of KGP + Gradle versions. Currently: KGP 2.0.x
+     *     with Gradle 8.0–8.4 has unstable Hierarchy Template.
+     */
+    fun validatePlatformAndVersionCompatibility(
+        hostOsArch: String,
+        gradleVersion: String,
+        kgpVersion: String?,
+        cmpVersion: String?,
+        declaredIosTargetNames: Set<String>,
+    ): List<KmpFlavorValidationFinding> {
+        val findings = mutableListOf<KmpFlavorValidationFinding>()
+
+        // V15: Apple Silicon + iosX64 simulator → may need Rosetta on older Kotlin/Native.
+        if ((hostOsArch == "aarch64" || hostOsArch == "arm64") &&
+            "iosX64" in declaredIosTargetNames
+        ) {
+            findings += KmpFlavorValidationFinding(
+                code = CODE_IOS_ROSETTA_REQUIRED,
+                severity = KmpFlavorValidationSeverity.WARNING,
+                message = "Apple Silicon host (`$hostOsArch`) is declaring an iosX64 target. " +
+                    "Some Kotlin/Native toolchain versions need Rosetta to assemble the " +
+                    "iosX64 simulator framework on M-series hardware. If `xcodebuild` " +
+                    "fails with arch-mismatch errors, retry the Gradle build under Rosetta.",
+                fix = "Either drop the `iosX64()` target (M-series simulators use " +
+                    "`iosSimulatorArm64()`), OR run the Gradle build under Rosetta: " +
+                    "`arch -x86_64 ./gradlew :module:assembleAllVariants`. " +
+                    "Document the toolchain matrix in docs/PUBLISHING.md for your project.",
+            )
+        }
+
+        // V16: CMP × KGP compatibility. Currently a single known-bad combo:
+        // CMP < 1.7.0 + KGP >= 2.2 silently breaks composeResources auto-discovery on
+        // custom source sets.
+        if (cmpVersion != null && kgpVersion != null) {
+            if (versionLessThan(cmpVersion, "1.7.0") && !versionLessThan(kgpVersion, "2.2.0")) {
+                findings += KmpFlavorValidationFinding(
+                    code = CODE_CMP_KGP_VERSION_INCOMPATIBLE,
+                    severity = KmpFlavorValidationSeverity.WARNING,
+                    message = "Known-incompatible combination: Compose Multiplatform " +
+                        "`$cmpVersion` + Kotlin Gradle Plugin `$kgpVersion`. Per-variant " +
+                        "`composeResources/` auto-discovery on custom source sets " +
+                        "(commonFree, commonPaid, etc.) silently no-ops on this pairing.",
+                    fix = "Upgrade `org.jetbrains.compose` to `>= 1.7.0`, OR downgrade KGP " +
+                        "to `< 2.2.0`, OR add per-flavor resource directories manually via " +
+                        "`kotlin.sourceSets.commonFlavor.resources.srcDir(...)`.",
+                )
+            }
+        }
+
+        // V17: KGP × Gradle compatibility. Currently: KGP 2.0.x + Gradle 8.0-8.4 has
+        // unstable Hierarchy Template.
+        if (kgpVersion != null) {
+            val kgpMajor = kgpVersion.substringBefore(".").toIntOrNull() ?: 0
+            val kgpMinor = kgpVersion.substringAfter(".").substringBefore(".").toIntOrNull() ?: 0
+            val gradleMajor = gradleVersion.substringBefore(".").toIntOrNull() ?: 0
+            val gradleMinor = gradleVersion.substringAfter(".").substringBefore(".").toIntOrNull() ?: 0
+            if (kgpMajor == 2 && kgpMinor == 0 && gradleMajor == 8 && gradleMinor < 5) {
+                findings += KmpFlavorValidationFinding(
+                    code = CODE_KGP_GRADLE_VERSION_INCOMPATIBLE,
+                    severity = KmpFlavorValidationSeverity.WARNING,
+                    message = "Known-incompatible combination: KGP `$kgpVersion` + Gradle " +
+                        "`$gradleVersion`. The Hierarchy Template surface is unstable on this " +
+                        "pairing; matrix-mode source-set wiring may emit spurious " +
+                        "`Invalid Source Set Dependency Across Trees` warnings.",
+                    fix = "Upgrade Gradle to `>= 8.5` (recommended) OR upgrade KGP to `>= 2.1.0`.",
+                )
+            }
+        }
+
+        return findings
+    }
+
+    /**
+     * Naïve semver comparison sufficient for major.minor.patch strings used by
+     * Kotlin / Compose / Gradle. Returns true iff [a] < [b].
+     */
+    private fun versionLessThan(a: String, b: String): Boolean {
+        val aParts = a.split(".").mapNotNull { it.toIntOrNull() }
+        val bParts = b.split(".").mapNotNull { it.toIntOrNull() }
+        for (i in 0 until minOf(aParts.size, bParts.size)) {
+            if (aParts[i] != bParts[i]) return aParts[i] < bParts[i]
+        }
+        return aParts.size < bParts.size
     }
 }
