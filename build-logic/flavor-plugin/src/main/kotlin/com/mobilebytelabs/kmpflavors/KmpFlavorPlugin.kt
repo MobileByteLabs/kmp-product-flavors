@@ -33,6 +33,7 @@ import com.mobilebytelabs.kmpflavors.tasks.GenerateBuildConfigTask
 import com.mobilebytelabs.kmpflavors.tasks.GenerateRunConfigurationsTask
 import com.mobilebytelabs.kmpflavors.tasks.GenerateSpmManifestTask
 import com.mobilebytelabs.kmpflavors.tasks.InitFlavorSourceSetsTask
+import com.mobilebytelabs.kmpflavors.tasks.KmpFlavorsMigrateToV2Task
 import com.mobilebytelabs.kmpflavors.tasks.ListFlavorsTask
 import com.mobilebytelabs.kmpflavors.tasks.PrintFlavorPropertiesTask
 import com.mobilebytelabs.kmpflavors.tasks.ValidateFlavorsTask
@@ -674,6 +675,31 @@ class KmpFlavorPlugin : Plugin<Project> {
             webTitleSuffix.set(
                 activeVariant.combinedWebTitleSuffix.ifEmpty { null },
             )
+        }
+
+        // Q26 — kmpFlavorsMigrateToV2 read-only migration assistant.
+        val pluginVersion = "2.0.0-alpha.1"
+        val matrixModeEnabledNow = MatrixModeResolver.isEnabled(project, extension)
+        val publishMatrixEnabledNow = extension.publishMatrix.getOrElse(false)
+        val targetsCountNow = project.extensions.findByType(KotlinMultiplatformExtension::class.java)
+            ?.targets?.count { it.name != "android" && it.name != "metadata" } ?: 0
+        project.tasks.register(
+            "kmpFlavorsMigrateToV2",
+            KmpFlavorsMigrateToV2Task::class.java,
+        ).configure {
+            group = "kmpFlavors variants"
+            description =
+                "Read-only migration assistant — prints what (if anything) needs to change " +
+                    "to land on v2.0 matrix mode. Never modifies the project."
+            this.projectName.set(project.name)
+            this.pluginVersion.set(pluginVersion)
+            this.flavorCount.set(flavors.size)
+            this.buildTypeCount.set(extension.buildTypes.size)
+            this.matrixModeEnabled.set(matrixModeEnabledNow)
+            this.publishMatrixEnabled.set(publishMatrixEnabledNow)
+            this.activeVariantName.set(activeVariant.name)
+            this.targetCount.set(targetsCountNow)
+            this.jsonOutput.convention(false)
         }
     }
 
