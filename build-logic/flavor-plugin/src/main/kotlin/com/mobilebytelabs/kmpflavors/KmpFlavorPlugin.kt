@@ -28,6 +28,8 @@ import com.mobilebytelabs.kmpflavors.internal.GenerateBuildConfigTasksRegistrar
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorValidationSeverity
 import com.mobilebytelabs.kmpflavors.internal.MatrixModeResolver
+import com.mobilebytelabs.kmpflavors.internal.PerVariantIosPublishConfigurator
+import com.mobilebytelabs.kmpflavors.internal.PerVariantJsPublishConfigurator
 import com.mobilebytelabs.kmpflavors.internal.PerVariantPublishConfigurator
 import com.mobilebytelabs.kmpflavors.internal.PlatformDetector
 import com.mobilebytelabs.kmpflavors.internal.PlatformPropertiesConfigurator
@@ -521,9 +523,28 @@ class KmpFlavorPlugin : Plugin<Project> {
 
         // Q21-D — per-variant Maven publishing mechanism. No-op when
         // publishMatrix isn't opted in or when maven-publish isn't applied.
+        // v2.0 ships JVM; v2.1 Phase 5 extends to iOS + JS/WasmJs.
         if (matrixModeEnabled) {
             val inactiveVariants = allVariants.filter { it.name != activeVariantResolved.name }
             PerVariantPublishConfigurator.configure(
+                project = project,
+                extension = extension,
+                inactiveVariants = inactiveVariants,
+                nonAndroidTargets = nonAndroidTargets,
+            )
+            // v2.1 Phase 5A — iOS per-variant publishing (classifier-tagged MavenPublication
+            // per (inactive variant × iOS target); per-variant XCFramework aggregation
+            // deferred to v2.2 — see docs/PUBLISHING.md).
+            PerVariantIosPublishConfigurator.configure(
+                project = project,
+                extension = extension,
+                inactiveVariants = inactiveVariants,
+                nonAndroidTargets = nonAndroidTargets,
+            )
+            // v2.1 Phase 5B+5C — JS/WasmJs per-variant publishing (classifier-tagged
+            // MavenPublication per (inactive variant × JS-family target); npm registry
+            // publishing is consumer-side — see docs/PUBLISHING.md).
+            PerVariantJsPublishConfigurator.configure(
                 project = project,
                 extension = extension,
                 inactiveVariants = inactiveVariants,

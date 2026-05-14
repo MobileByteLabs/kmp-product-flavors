@@ -53,7 +53,7 @@ Two equivalent forms — pick whichever fits your convention plugin / CI ergonom
 | `generate{Variant}BuildConfig` task per inactive variant | Outputs `build/generated/kmpFlavors/{variantName}/kotlin/...` | RFC §3 Q3-A |
 | `kmpFlavors.variants` public API | `NamedDomainObjectContainer<KmpFlavorVariant>` for `matching { … }.configureEach { … }` | RFC §3 Q19-B |
 | `variantFilter { setIgnore(true) }` DSL | AGP-shaped filter; `buildType == "staging"` works | RFC §3 Q20-A |
-| `publishMatrix` opt-in | Classifier-tagged Maven publications per variant (JVM) | RFC §3 Q21-D |
+| `publishMatrix` opt-in | Classifier-tagged Maven publications per (variant × target): JVM (v2.0), iOS klib (v2.1), JS / WasmJs (v2.1). See [PUBLISHING.md](PUBLISHING.md) for the full catalog. | RFC §3 Q21-D / v2.1 Phase 5 |
 | `dependencyGuardPerVariant` opt-in (v2.1) | Auto-registers per-(variant × target) `dependencyGuard.configuration(...)` baselines | Q24 / v2.1 Phase 4 |
 | `excludeGeneratedFromFormatters` opt-in (v2.1) | Auto-excludes generated `BuildKonfig` paths from Spotless + Detekt | Q24 / v2.1 Phase 4 |
 | `detektPerVariant` opt-in (v2.1) | Registers `detekt{Variant}` task per variant with per-variant baselines | Q24 / v2.1 Phase 4 |
