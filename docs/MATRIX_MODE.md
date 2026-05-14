@@ -151,6 +151,24 @@ Setting `buildMatrix.set(false)` (or removing the opt-in entirely) restores v1.x
 
 ---
 
+## AGP-native capabilities (handled by AGP, not by this plugin)
+
+The following AGP product-flavor features are **already supported** on Android consumers via this plugin's AGP bridge (`bridgeAgpProductFlavors` / `bridgeAgpBuildTypes`) in v1.x+. They are NOT gaps in v2.0 / v2.1 — AGP handles them natively once KMP flavors propagate into the AGP `productFlavors { }` block.
+
+| AGP capability | How it works on Android consumers |
+|---|---|
+| `manifestPlaceholders` per variant | Declare `productFlavors { free { manifestPlaceholders["x"] = "y" } }` (or via the KMP→AGP bridge) — AGP injects the placeholder into the manifest per variant. |
+| Per-variant signing | `signingConfigs { } / productFlavors { free { signingConfig signingConfigs.x } }` — AGP signs the per-variant APK with the matching config. |
+| Per-variant ProGuard / R8 | `productFlavors { free { proguardFiles 'proguard-free.pro' } }` — AGP applies the per-variant rule file at minification time. |
+| `applicationIdSuffix` / `versionNameSuffix` per variant | Already wired: this plugin's AGP bridge maps `kmpFlavors.flavors { register("free") { applicationIdSuffix.set(".free") } }` into AGP `productFlavors.free.applicationIdSuffix`. |
+| Per-variant lint (`lintOptions { }`) | AGP's lint plugin per-variant config flows through unchanged when the bridge propagates KMP flavors. |
+
+These items are documented for transparency — if you see them on an AGP feature matrix, the answer is "already supported on Android consumers via the bridge; no `kmpFlavors` DSL needed beyond declaring the flavor".
+
+For Detekt-per-variant (non-Android) and other non-Android lint paths, see [`v2.1 plan`](https://github.com/MobileByteLabs/kmp-product-flavors/blob/development/plans/v2.0-RFC-tracker.md) Phase 4.
+
+---
+
 ## Troubleshooting (KMPF-Vxx error codes)
 
 See `docs/ERROR_CODES.md` (W5 deliverable). Quick reference:
