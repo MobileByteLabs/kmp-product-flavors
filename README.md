@@ -55,6 +55,21 @@ This plugin supports the following Kotlin Multiplatform targets in the current p
 - 🛠️ **IDE Run Configurations** - Auto-generated configs for each build variant
 - 💾 **Build cache support** - Cacheable tasks for efficient builds
 
+## What's new in v2.1
+
+**AGP-parity-complete** on the Kotlin side. Closes v2.0's deliberate deferrals:
+
+- **Per-variant resources** — drop `strings.xml` into `src/commonFree/composeResources/` and the free variant gets a different `Res.string.app_name` than commonMain. Works the same way for `src/{flavor}/res/` on Android via the AGP bridge. See [`docs/MATRIX_MODE.md`](docs/MATRIX_MODE.md#per-variant-resources-v21).
+- **Per-variant test compilations** — `compile{Variant}TestKotlin{Target}` per inactive variant × target. Variant tests can call variant main's `internal` declarations; cross-variant test isolation holds.
+- **Native per-variant publishing** — `iosX64` / `iosArm64` / `iosSimulatorArm64` + `js(IR)` + `wasmJs()` classifier-tagged Maven publications. Consumers resolve via `coordinate:1.0.0:paid-iosArm64`. See [`docs/PUBLISHING.md`](docs/PUBLISHING.md).
+- **Detekt-per-variant** — `kmpFlavors { detektPerVariant.set(true) }` registers one `detekt{Variant}` task per variant with per-variant baselines at `config/detekt/{variant}/baseline.xml`. Equivalent UX to AGP's "Lint per variant" for non-Android targets.
+- **IDE Run Configurations × target** — `./gradlew generateVariantRunConfigurations` emits one `.run.xml` per (variant × target).
+- **Adjacent-plugin helpers** — opt-in `dependencyGuardPerVariant` + `excludeGeneratedFromFormatters` close the documented Q24 ⚠ caveats around dependency-guard / Spotless / Detekt scoping.
+- **Diagnostic tasks** — `./gradlew :module:diagnoseVariant --variant freeDev` (with `--json` for CI) + `./gradlew :module:listVariantCompilations` for matrix-mode introspection.
+- **Validator codes V02 / V03 / V06 / V07** — `FLAVOR_MISSING_DIMENSION`, `DIMENSION_HAS_NO_FLAVORS`, `UNKNOWN_ACTIVE_VARIANT` (WARNING), `INVALID_BUILD_CONFIG_FIELD_TYPE`. Full catalog in [`docs/ERROR_CODES.md`](docs/ERROR_CODES.md).
+
+Drop-in v2.0 → v2.1 upgrade: bump the plugin pin. No per-module DSL change required. See [`CHANGELOG.md`](CHANGELOG.md) `[2.1.0]` for the full diff + compatibility notes.
+
 ## Installation
 
 > **Latest Version:** Check the badges above or [Maven Central](https://central.sonatype.com/artifact/io.github.mobilebytelabs.kmpflavors/flavor-plugin) / [Gradle Plugin Portal](https://plugins.gradle.org/plugin/io.github.mobilebytelabs.kmp-product-flavors)
