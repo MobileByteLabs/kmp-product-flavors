@@ -333,6 +333,23 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
     abstract val detektPerVariant: Property<Boolean>
 
     /**
+     * v2.2 Phase 1A — opt-in for cross-variant intermediate `common{BuildType}` source sets.
+     *
+     * When `true` (AND `enableBuildTypes = true` AND matrix mode is on), the plugin
+     * creates `common{BuildType}` source sets (e.g. `commonStaging`) that
+     * `dependsOn(commonMain)`. Every variant whose `buildType` matches
+     * (e.g. `freeStaging` + `paidStaging`) gains a `dependsOn(commonStaging)` edge
+     * on its compilation's defaultSourceSet — so symbols declared in `commonStaging`
+     * are visible to ALL staging-flavored variants but not to `freeProd` / `paidProd`.
+     *
+     * Closes RFC §10 deferral (cross-variant intermediate source sets). Disabled by
+     * default because the source-set DAG change is opinionated; consumers opt in.
+     *
+     * Convention: `false` (opt-in).
+     */
+    abstract val createIntermediateBuildTypeSourceSets: Property<Boolean>
+
+    /**
      * Internal list of variant filter actions.
      */
     internal val variantFilterActions = mutableListOf<Action<VariantFilter>>()
@@ -440,5 +457,7 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
         // v2.2 Phase 0G — master opt-out. Default `true` for fully-automatic-plugin
         // ergonomics; consumers wanting strict v2.0 / v2.1 semantics set to `false`.
         autoEnable.convention(true)
+        // v2.2 Phase 1A — cross-variant intermediate source sets, opt-in.
+        createIntermediateBuildTypeSourceSets.convention(false)
     }
 }

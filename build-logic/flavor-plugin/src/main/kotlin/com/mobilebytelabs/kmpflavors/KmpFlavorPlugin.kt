@@ -25,6 +25,7 @@ import com.mobilebytelabs.kmpflavors.internal.DependencyGuardHelper
 import com.mobilebytelabs.kmpflavors.internal.DetektPerVariantHelper
 import com.mobilebytelabs.kmpflavors.internal.FlavorVariantResolver
 import com.mobilebytelabs.kmpflavors.internal.GenerateBuildConfigTasksRegistrar
+import com.mobilebytelabs.kmpflavors.internal.IntermediateSourceSetConfigurator
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorValidationSeverity
 import com.mobilebytelabs.kmpflavors.internal.MatrixModeResolver
@@ -383,6 +384,11 @@ class KmpFlavorPlugin : Plugin<Project> {
             createIntermediates = createIntermediates,
         )
 
+        // v2.2 Phase 1A — intermediate source-set map; populated inside the matrix-mode
+        // CompilationRegistrar block and read inside the matrix-mode variant API block.
+        // Declared at function scope so both blocks can see it.
+        var intermediateSourceSetsByVariant: Map<String, List<org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet>> = emptyMap()
+
         // v2.0 matrix mode (RFC §3 Q1-Q4): register one KotlinCompilation per
         // (variant × target) across every non-Android target. Source-set wiring,
         // per-variant BuildConfig, and per-variant dependencies land in W2 of the
@@ -455,6 +461,17 @@ class KmpFlavorPlugin : Plugin<Project> {
                 "[KMP Flavors] Matrix mode: registered ${variantNames.size} inactive-variant " +
                     "compilations across ${nonAndroidTargets.size} non-Android target(s) " +
                     "(active variant '$activeVariantName' continues to compile through `main`)",
+            )
+
+            // v2.2 Phase 1A — wire cross-variant intermediate source sets when opted in.
+            // No-op when createIntermediateBuildTypeSourceSets=false OR no buildTypes registered.
+            intermediateSourceSetsByVariant = IntermediateSourceSetConfigurator.configure(
+                kotlin = kotlin,
+                buildTypes = buildTypesList,
+                allVariants = allVariants,
+                nonAndroidTargets = nonAndroidTargets,
+                enabled = extension.createIntermediateBuildTypeSourceSets.get(),
+                logger = logger,
             )
 
             // v2.1 Phase 2 (Q10) — register `compile{Variant}TestKotlin{Target}` per inactive
@@ -597,6 +614,8 @@ class KmpFlavorPlugin : Plugin<Project> {
                             .findByName(name)
                             ?: target.compilations.getByName("main")
                     }
+                    // v2.2 Phase 1A — expose intermediate source sets per variant.
+                    intermediateSourceSets = intermediateSourceSetsByVariant[name].orEmpty()
                 }
             }
         }
