@@ -353,23 +353,46 @@ See the full [Convention Plugin Integration Guide](integration/convention-plugin
 - **JDK** 17+
 - See compatibility matrix below
 
-## Roadmap
+## Matrix mode (v2.0)
 
-### v2.0 — Matrix Mode (per-variant `KotlinCompilation` on every target)
+> Build every variant × every non-Android target in one Gradle invocation, AGP-style. Opt-in, zero per-module DSL change. Available in v2.0.0+; v1.x active-variant-only behaviour is preserved when matrix mode is off (the default).
 
-Today, v1.x active-variant-only mode compiles exactly one variant's source set at a time. **v2.0 will bring AGP-style matrix mode to KMP**: build every variant × every target in one Gradle invocation, opt-in, with **zero per-module DSL changes** for consumers.
+### Two-line opt-in
 
-The D1 spike (`spike/d1-per-variant-compilation` @ `58ee241`) proved feasibility on Desktop. Three follow-up probes on 2026-05-13 closed the iOS / config-cache / build-time open questions:
+```kotlin
+// In your convention plugin OR gradle.properties — single touch-point per project.
+kmpFlavors {
+    buildMatrix.set(true)        // OR `gradle.properties: kmpFlavors.buildMatrix=true`
+    flavors {
+        register("free") { isDefault.set(true) }
+        register("paid")
+    }
+}
+```
 
-| Question | Result |
+That's it. No per-module `build.gradle.kts` edit. The Zero-Touch Adoption tenet is verified by tests that diff sample-app module files between v1.x and v2.0 with matrix mode enabled and assert byte-equality.
+
+### What you get
+
+| Task | Purpose |
 |---|---|
-| Q4 — iOS per-variant tasks | ✅ `compileFreeDevKotlinIosSimulatorArm64`, `iosSimulatorArm64FreeDevKlibrary`, `iosSimulatorArm64FreeDevBinaries` register correctly. iOS in scope for v2.0 GA. |
-| Q7 — configuration cache | ✅ cold 34s → warm 6s, "Configuration cache entry reused" |
-| Q8 — build time on 2-compilation matrix | ✅ 1.01× ratio (≤2× SLO) |
+| `compile{Variant}Kotlin{Target}` per inactive variant × target | KGP-auto-generated |
+| `generate{Variant}BuildConfig` per inactive variant | Per-variant `BuildKonfig.kt` |
+| `assembleAll{Target}Variants` per target + `assembleAllVariants` super-aggregate | CI matrix sharding + dev convenience |
+| `kmpFlavors.variants` (`NamedDomainObjectCollection<KmpFlavorVariant>`) | `matching { … }.configureEach { … }` consumer hook |
+| `variantFilter { … setIgnore(true) }` | AGP-style filter; `buildType == "staging"` works |
+| `publishMatrix.set(true)` | Per-variant classifier-tagged Maven publications (JVM) |
 
-The full design is in **[`docs/RFC-v2.0-per-variant-compilation.md`](docs/RFC-v2.0-per-variant-compilation.md)** (open for review at [#44](https://github.com/MobileByteLabs/kmp-product-flavors/pull/44)). Stakeholder feedback wanted on Q5 default (opt-in vs opt-out), iOS scope, per-variant publishing, and the 6-month v1.x adoption window. Reply on PR #44.
+### Reference
 
-> **Consumer-facing promise**: every consumer KMP module's `build.gradle.kts` will be byte-identical between v1.x and v2.0. Matrix mode is opted in via a single property (`kmpFlavors.buildMatrix=true` in `gradle.properties` OR `buildMatrix.set(true)` in the convention plugin). The plugin's internals register all per-variant compilations programmatically — never via consumer DSL.
+- **Full reference** — [`docs/MATRIX_MODE.md`](docs/MATRIX_MODE.md) (consumer guide, Q24 adjacent-plugin compat table, KMPF-Vxx error quickref)
+- **Migration from v1.x** — [`docs/MIGRATION_v1_to_v2.md`](docs/MIGRATION_v1_to_v2.md)
+- **Error codes** — [`docs/ERROR_CODES.md`](docs/ERROR_CODES.md)
+- **End-to-end sample** — [`samples/matrix-mode/`](samples/matrix-mode/README.md) — exercises every consumer surface in one project
+- **Design RFC** — [`docs/RFC-v2.0-per-variant-compilation.md`](docs/RFC-v2.0-per-variant-compilation.md) (sealed 2026-05-13)
+- **Migration assistant** — `./gradlew kmpFlavorsMigrateToV2` prints a per-project Markdown report (add `--json` for CI)
+
+> **Consumer-facing promise**: every consumer KMP module's `build.gradle.kts` is byte-identical between v1.x and v2.0. Matrix mode is opted in via a single property (`kmpFlavors.buildMatrix=true` in `gradle.properties` OR `buildMatrix.set(true)` in the convention plugin). The plugin's internals register all per-variant compilations programmatically — never via consumer DSL.
 
 ## Compatibility Matrix
 

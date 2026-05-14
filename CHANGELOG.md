@@ -7,9 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Docs
+## [2.0.0-alpha.1] - 2026-05-14
 
-- **`docs/RFC-v2.0-per-variant-compilation.md`** — open RFC for v2.0 "matrix mode" (per-variant `KotlinCompilation` on every KMP target). Locks the design across 26 questions (Q1-Q26); includes live D1-spike-branch measurements for iOS feasibility, configuration-cache compatibility, and build-time SLO; mandates that all per-variant compilation logic lives **inside the plugin** so consumer KMP module `build.gradle.kts` files are byte-identical between v1.x and v2.0. Open for feedback at [#44](https://github.com/MobileByteLabs/kmp-product-flavors/pull/44). v2.0 implementation work (W1) is gated on RFC sign-off.
+> **Matrix mode** ships. Build every variant × every non-Android KMP target in one Gradle invocation, AGP-style. Opt-in (`kmpFlavors.buildMatrix=true`), with **zero per-module `build.gradle.kts` change** required from consumers (Zero-Touch Adoption tenet, RFC §1.1).
+>
+> v1.x active-variant-only behaviour is preserved when matrix mode is off (the default). No breaking changes for v1.x consumers — `2.0.0-alpha.1` should be a drop-in version bump if `buildMatrix` is left untouched.
+
+### Added
+
+- **`kmpFlavors.buildMatrix: Property<Boolean>`** — single-point opt-in for matrix mode (RFC §3 Q5-A, Q16-C). Hybrid resolution: extension > `gradle.properties: kmpFlavors.buildMatrix=true` > `false`.
+- **Per-variant `compile{Variant}Kotlin{Target}` tasks** — KGP-auto-generated from `compilations.create("{variantName}")` for every inactive variant × non-Android target (JVM, iOS Native, JS IR, WasmJs all exercised end-to-end). Active variant continues to compile through the standard `compileKotlin{Target}` task (RFC §3 Q1-B, Q4).
+- **Per-variant `KotlinSourceSet` hierarchy wiring** — variant compilations `dependsOn` the existing per-flavor source sets (commonFree, commonPaid, etc.) via the standard KMP source-set DAG, so `expect`/`actual` (Q11) works across variants and cross-variant isolation (Q12) holds.
+- **Per-variant dependencies** — declaring `commonPaid { dependencies { implementation("...") } }` propagates to the paid variant's compileClasspath only; active and other-flavor compilations don't see it (RFC §3 Q17).
+- **`generate{Variant}BuildConfig` tasks** — one per inactive variant. Output at `build/generated/kmpFlavors/{variantName}/kotlin/…`. Per-variant `IS_<FLAVOR>` / `IS_<BUILDTYPE>` constants + per-variant `buildConfigField` values (RFC §3 Q3-A).
+- **`assembleAll{Target}Variants` per target + `assembleAllVariants` super-aggregate** — CI matrix-sharding and dev-convenience entry points. Both in the `kmpFlavors variants` task group (RFC §3 Q18-C, Q9).
+- **`kmpFlavors.variants: NamedDomainObjectCollection<KmpFlavorVariant>`** — public variant API. `name / flavors / buildType / targets / compilations` per element. Consumers use standard `matching { … }.configureEach { … }` mechanics for per-variant customisation (RFC §3 Q19-B).
+- **`variantFilter { setIgnore(true) }`** — AGP-style synonym for the existing `exclude()`. `VariantFilter` gained `buildType: String?` so the canonical example `if (flavors.any { it.name == "paid" } && buildType == "staging") setIgnore(true)` works (RFC §3 Q20-A).
+- **`kmpFlavors.publishMatrix: Property<Boolean>`** — opt-in for per-variant Maven publishing. When `true` and `maven-publish` (or `com.vanniktech.maven.publish`) is applied, registers a `MavenPublication("variant{X}")` per inactive variant × JVM target with a classifier-tagged Jar. Standard `publishVariant{X}PublicationTo{Repo}` tasks derived by Gradle (RFC §3 Q21-D).
+- **`KmpFlavorPluginValidator`** — fail-fast configuration validation with stable error codes `KMPF-V01` (flavor/buildType collision), `KMPF-V04` (variantFilter excluded all), `KMPF-V05` (matrix-on with zero targets, WARNING), `KMPF-V08` (matrix-on with zero flavors). Each finding carries code + severity + message + concrete fix. ERRORs throw `GradleException`; WARNINGs go to `logger.warn`. Full catalog: `docs/ERROR_CODES.md`. (RFC §3 Q23)
+- **`./gradlew kmpFlavorsMigrateToV2`** — read-only migration assistant. Prints per-project Markdown report or single-line JSON (`--json`) with what (if anything) needs to change to land on v2.0. Never modifies the project. (RFC §3 Q26)
+- **`samples/matrix-mode/`** — end-to-end reference sample exercising every consumer surface: 4-variant matrix (2 flavors × 2 buildTypes), per-flavor `expect`/`actual`, per-variant deps (kotlinx-coroutines-core on commonPaid), variant API, variantFilter excluding `paidRelease`, per-variant publishing, per-variant `BuildKonfig.kt`. Run `./gradlew :samples:matrix-mode:assembleAllVariants` to exercise.
+- **`docs/MATRIX_MODE.md`** — consumer reference for matrix mode (TL;DR opt-in, what gets added, Q24 adjacent-plugin compatibility table, exclusion rules, KMPF-Vxx quick reference).
+- **`docs/MIGRATION_v1_to_v2.md`** — upgrade guide. TL;DR: bump the plugin pin; optionally add one line to `gradle.properties`.
+- **`docs/ERROR_CODES.md`** — KMPF-Vxx catalogue (V01/V04/V05/V08 shipped; V02/V03/V06/V07 marked pending).
+- **`docs/RFC-v2.0-per-variant-compilation.md`** — design RFC (sealed 2026-05-13 via [#44](https://github.com/MobileByteLabs/kmp-product-flavors/pull/44); merged squash `ea486d1`). 26 design questions answered with provisional defaults; 24 dispositioned gaps in §3.5; live spike measurements inline for Q4/Q7/Q8.
+
+### Tests
+
+- 22 new tests landed across W1-W5: `MatrixModeResolverTest`, `CompilationRegistrarTest`, `KmpFlavorPluginValidatorTest`, `MatrixModeJvmRegistrationTest`, `EdgeCaseMatrixTest`, `MultiTargetMatrixRegistrationTest`, `VariantApiTest`, `AggregateVariantTasksTest`, `VariantFilterDslTest`, `BuildTimeBenchmarkTest`, `ExpectActualMatrixTest` (Q11), `CrossVariantIsolationTest` (Q12), `PerVariantDependencyClasspathTest` (Q17), `PerVariantBuildConfigTest` (Q3-A), `PerVariantPublishingTest` (Q21-D), `ConfigCacheCompatibilityTest` (Q7 ≥95% hit-rate SLO), `MigrateToV2TaskTest` (Q26), `AdjacentPluginCompatTest` (Q24 — vanniktech case `@Disabled` due to TestKit classpath isolation; real verification in the `samples/matrix-mode/` sample). Total: 146 tests / 1 skipped / 0 failures.
+
+### Known limitations
+
+- **Per-variant publishing is JVM-only at alpha.1.** iOS/JS/WasmJs per-variant publishing has KMP-specific complications (per-target XCFramework bundling on iOS) and is deferred to a v2.0 post-GA follow-up if survey demand justifies the work.
+- **Compose Multiplatform hot-reload is active-variant only** at alpha.1. Per-variant hot-reload is v2.1 scope (RFC §3 Q24).
+- **vanniktech.maven-publish + TestKit**: TestKit classpath isolation can't satisfy vanniktech's `KotlinBasePlugin` import, so the smoke test is `@Disabled`. The compat is real — vanniktech delegates to `maven-publish`, and our `withId("maven-publish")` hook fires transitively. Verified in the `samples/matrix-mode/` sample.
+
+### Compatibility
+
+- **No breaking changes for v1.x consumers**: v2.0.0-alpha.1 with `buildMatrix` left untouched is behaviourally identical to v1.1.7.
+- Minimum KGP: 2.1+ (alpha tested against 2.2.21).
+- Minimum Gradle: 8.5+ (alpha tested against Gradle 9.5).
+- Minimum JDK: 17+.
+- Per RFC §3 Q15, v1.x continues to receive critical-fix releases for 6 months after v2.0 GA.
 
 ## [1.1.6] - 2026-05-13
 
