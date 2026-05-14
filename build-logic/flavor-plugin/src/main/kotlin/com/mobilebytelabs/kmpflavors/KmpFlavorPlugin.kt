@@ -16,9 +16,16 @@
 
 package com.mobilebytelabs.kmpflavors
 
+import com.mobilebytelabs.kmpflavors.internal.AggregateTasksRegistrar
 import com.mobilebytelabs.kmpflavors.internal.AgpBridge
+import com.mobilebytelabs.kmpflavors.internal.CompilationRegistrar
 import com.mobilebytelabs.kmpflavors.internal.DependencyConfigurator
 import com.mobilebytelabs.kmpflavors.internal.FlavorVariantResolver
+import com.mobilebytelabs.kmpflavors.internal.GenerateBuildConfigTasksRegistrar
+import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator
+import com.mobilebytelabs.kmpflavors.internal.KmpFlavorValidationSeverity
+import com.mobilebytelabs.kmpflavors.internal.MatrixModeResolver
+import com.mobilebytelabs.kmpflavors.internal.PerVariantPublishConfigurator
 import com.mobilebytelabs.kmpflavors.internal.PlatformDetector
 import com.mobilebytelabs.kmpflavors.internal.PlatformPropertiesConfigurator
 import com.mobilebytelabs.kmpflavors.internal.SourceSetConfigurator
@@ -29,6 +36,7 @@ import com.mobilebytelabs.kmpflavors.tasks.InitFlavorSourceSetsTask
 import com.mobilebytelabs.kmpflavors.tasks.ListFlavorsTask
 import com.mobilebytelabs.kmpflavors.tasks.PrintFlavorPropertiesTask
 import com.mobilebytelabs.kmpflavors.tasks.ValidateFlavorsTask
+import org.gradle.api.Action
 import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -100,6 +108,33 @@ class KmpFlavorPlugin : Plugin<Project> {
             KmpFlavorExtension::class.java,
         )
 
+        // RFC §3 Q17 — pre-create per-flavor `commonFlavor` source sets eagerly
+        // as flavors are registered, so consumers can reference them in the
+        // standard KMP DSL (`kotlin { sourceSets { val commonPaid by getting
+        // { dependencies { ... } } } }`) without having to wrap in
+        // `maybeCreate` or wait for `afterEvaluate`. The callback fires
+        // synchronously when each flavor is added to `extension.flavors`.
+        //
+        // Order constraint for consumers: the `kmpFlavors { flavors {
+        // register(...) } }` block must come BEFORE any `kotlin { sourceSets
+        // { val commonFlavor by getting } }` block in the same build file.
+        // This is documented in docs/MATRIX_MODE.md.
+        project.plugins.withId("org.jetbrains.kotlin.multiplatform") {
+            val kotlin = project.extensions.getByType(KotlinMultiplatformExtension::class.java)
+            // `whenObjectAdded` fires synchronously and eagerly whenever a
+            // flavor is registered. Avoid `.all` here — Kotlin's stdlib
+            // `Iterable.all(predicate)` shadows Gradle's
+            // `NamedDomainObjectContainer.all(Action)` and produces a
+            // confusing "Return type mismatch: expected 'Boolean'" error.
+            val createPerFlavorSourceSet = object : Action<FlavorConfig> {
+                override fun execute(flavor: FlavorConfig) {
+                    val ssName = "common${flavor.name.replaceFirstChar { it.uppercase() }}"
+                    kotlin.sourceSets.maybeCreate(ssName)
+                }
+            }
+            extension.flavors.whenObjectAdded(createPerFlavorSourceSet)
+        }
+
         // Defer configuration until after project evaluation
         project.afterEvaluate {
             configurePlugin(project, extension)
@@ -119,8 +154,22 @@ class KmpFlavorPlugin : Plugin<Project> {
         val flavors = extension.flavors.toList()
         val dimensions = extension.flavorDimensions.toList()
 
-        // Skip if no flavors configured
+        // Skip if no flavors configured (v1.x behaviour preserved unless matrix
+        // mode is explicitly opted in, in which case KMPF-V08 must fire).
         if (flavors.isEmpty()) {
+            if (MatrixModeResolver.isEnabled(project, extension)) {
+                throw GradleException(
+                    "kmpFlavors plugin configuration is invalid (1 error(s)):\n\n" +
+                        "  ${KmpFlavorPluginValidator.CODE_MATRIX_MODE_WITHOUT_FLAVORS}: " +
+                        "kmpFlavors.buildMatrix is enabled but no flavors are registered. " +
+                        "Matrix mode requires at least one flavor to generate compilations from.\n" +
+                        "  Fix: Either register flavors via " +
+                        "`kmpFlavors { flavors { register(\"…\") } }` in the convention " +
+                        "plugin, or remove the `buildMatrix.set(true)` / `gradle.properties: " +
+                        "kmpFlavors.buildMatrix=true` opt-in.\n\n" +
+                        "See docs/ERROR_CODES.md for the full catalog.",
+                )
+            }
             logger.info("[KMP Flavors] No flavors configured. Skipping.")
             return
         }
@@ -165,6 +214,36 @@ class KmpFlavorPlugin : Plugin<Project> {
         val platforms = PlatformDetector.detect(kotlin, logger)
         val createIntermediates = extension.createIntermediateSourceSets.get()
 
+        // v2.0 fail-fast validation (RFC §3 Q23). Run before the matrix-mode
+        // registrar so structured errors are surfaced with stable KMPF-Vxx codes
+        // instead of opaque downstream stack traces.
+        val matrixModeEnabled = MatrixModeResolver.isEnabled(project, extension)
+        val nonAndroidTargets = kotlin.targets.filter {
+            it.name != "android" && it.name != "metadata"
+        }
+        val validationFindings = KmpFlavorPluginValidator.validate(
+            flavors = flavors,
+            buildTypes = buildTypesList,
+            resolvedVariants = allVariants,
+            matrixModeEnabled = matrixModeEnabled,
+            detectedTargetCount = nonAndroidTargets.size,
+        )
+        val errors = validationFindings.filter { it.severity == KmpFlavorValidationSeverity.ERROR }
+        val warnings = validationFindings.filter { it.severity == KmpFlavorValidationSeverity.WARNING }
+        warnings.forEach { warning ->
+            logger.warn("[KMP Flavors] ${warning.code} — ${warning.message} Fix: ${warning.fix}")
+        }
+        if (errors.isNotEmpty()) {
+            val formatted = errors.joinToString("\n\n") { error ->
+                "  ${error.code}: ${error.message}\n  Fix: ${error.fix}"
+            }
+            throw GradleException(
+                "kmpFlavors plugin configuration is invalid (${errors.size} error(s)):\n\n" +
+                    "$formatted\n\n" +
+                    "See docs/ERROR_CODES.md for the full catalog.",
+            )
+        }
+
         // Wire intermediate source sets if needed
         if (createIntermediates) {
             PlatformDetector.wireIntermediateSourceSets(kotlin, platforms)
@@ -173,7 +252,12 @@ class KmpFlavorPlugin : Plugin<Project> {
         // Resolve platform source sets
         val platformSourceSets = PlatformDetector.resolveSourceSets(kotlin, platforms)
 
-        // Configure flavor source sets
+        // Configure flavor source sets (v1.x active-variant model). Runs in
+        // BOTH v1.x and v2.0 matrix mode: the active variant always compiles
+        // through the standard `main` compilation. Matrix mode adds
+        // compilations for the INACTIVE variants on top — the active
+        // variant doesn't get a duplicate `compile{Active}Kotlin{Target}`
+        // task because that would collide with v1.x's source-set wiring.
         val sourceSetConfigurator = SourceSetConfigurator(logger)
         sourceSetConfigurator.configure(
             project = project,
@@ -184,6 +268,163 @@ class KmpFlavorPlugin : Plugin<Project> {
             platformSourceSets = platformSourceSets,
             createIntermediates = createIntermediates,
         )
+
+        // v2.0 matrix mode (RFC §3 Q1-Q4): register one KotlinCompilation per
+        // (variant × target) across every non-Android target. Source-set wiring,
+        // per-variant BuildConfig, and per-variant dependencies land in W2 of the
+        // v2.0 impl plan. This W1 hook only stamps the compilations so the task
+        // graph surfaces compileFreeDevKotlinDesktop etc. for downstream wiring.
+        //
+        // RFC §1 non-goal: "Change Android target behaviour (AGP already handles
+        // matrix; we don't touch it)." → skip target name "android".
+        //
+        // The synthetic "metadata" target rejects custom compilations
+        // ("Can't create custom metadata compilations by name") — skip it too.
+        // Both exclusions are name-based following PlatformDetector's convention.
+        if (matrixModeEnabled) {
+            // Matrix mode adds compilations for INACTIVE variants only — the
+            // active variant continues to compile through the standard `main`
+            // compilation wired by v1.x SourceSetConfigurator above. This
+            // preserves v1.x semantics for the active variant and avoids the
+            // `compile{Active}Kotlin{Target}` naming collision with the
+            // existing source-set wiring (KGP rejects sources being in two
+            // compilations and dependsOn into a default source set).
+            val activeVariantName = activeVariant.name
+            val variantNames = allVariants
+                .map { it.name }
+                .filter { it != activeVariantName }
+            // Index variants by name so the per-variant lookup is O(1).
+            val variantByName = allVariants.associateBy { it.name }
+            // RFC §3 Q2-C hybrid: dependsOn into per-flavor source sets that
+            // v1.x SourceSetConfigurator created (commonFree, commonPaid, etc.),
+            // plus optional variant-specific srcDir for code unique to one
+            // variant. The per-flavor source sets already dependsOn(commonMain),
+            // so the variant's defaultSourceSet transitively sees commonMain via
+            // the KotlinSourceSet hierarchy — `expect` in commonMain and
+            // `actual` in commonFlavor live in SEPARATE compilation modules,
+            // which is exactly what KMP's expect/actual semantics require.
+            // v1.x SourceSetConfigurator only wires `commonFlavor.dependsOn(commonMain)`
+            // for the active flavor (see SourceSetConfigurator.kt line 81). For inactive
+            // flavors in matrix mode, we wire that edge ourselves so the variant
+            // compilation can see commonMain's `expect` declarations through the
+            // commonFlavor -> commonMain dependsOn chain.
+            val commonMainSourceSet = kotlin.sourceSets.getByName("commonMain")
+            val parentSourceSetsFor: (String) -> List<org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet> = { name ->
+                val variant = variantByName[name]
+                if (variant == null) {
+                    emptyList()
+                } else {
+                    variant.flavors.mapNotNull { flavor ->
+                        val ssName = "common${flavor.name.replaceFirstChar { it.uppercase() }}"
+                        kotlin.sourceSets.findByName(ssName)?.also { commonFlavor ->
+                            commonFlavor.dependsOn(commonMainSourceSet)
+                        }
+                    }
+                }
+            }
+            // Variant-specific srcDir (e.g., `src/freeDev/kotlin`) — only used
+            // for code that lives in a single variant and isn't expressible
+            // as a per-flavor common source set. Most projects won't need this.
+            val variantSpecificSrcDirsFor: (String) -> List<String> = { name ->
+                listOf("src/$name/kotlin")
+            }
+            nonAndroidTargets.forEach { target ->
+                CompilationRegistrar.register(
+                    target = target,
+                    variantNames = variantNames,
+                    parentSourceSetsFor = parentSourceSetsFor,
+                    variantSpecificSrcDirsFor = variantSpecificSrcDirsFor,
+                    logger = logger,
+                )
+            }
+            logger.lifecycle(
+                "[KMP Flavors] Matrix mode: registered ${variantNames.size} inactive-variant " +
+                    "compilations across ${nonAndroidTargets.size} non-Android target(s) " +
+                    "(active variant '$activeVariantName' continues to compile through `main`)",
+            )
+        }
+
+        // Q3-A — register one GenerateBuildConfigTask per INACTIVE variant in matrix
+        // mode and wire each task's output directory into the corresponding
+        // variant compilation's defaultSourceSet. Active variant's BuildConfig
+        // is registered by registerTasks() below as `generateFlavorBuildConfig`
+        // (v1.x behaviour preserved).
+        if (matrixModeEnabled) {
+            val inactiveVariants = allVariants.filter { it.name != activeVariant.name }
+            GenerateBuildConfigTasksRegistrar.register(
+                project = project,
+                extension = extension,
+                inactiveVariants = inactiveVariants,
+                flavors = flavors,
+                kotlin = kotlin,
+                shouldGenerate = shouldGenerateCodegen(project, extension),
+            )
+        }
+
+        // Q19-B — populate the public `kmpFlavors.variants` container with one
+        // KmpFlavorVariant per resolved variant. Consumers can then use
+        // `kmpFlavors.variants.matching { ... }.configureEach { ... }` to
+        // customise variants. Lazy fields (`targets`, `compilations`) are
+        // populated below after the variant compilations are resolvable.
+        if (matrixModeEnabled) {
+            allVariants.forEach { v ->
+                // Pre-configure the variant instance outside the container, then
+                // add it. This guarantees `flavors`/`buildType` are populated
+                // BEFORE any consumer-registered configureEach callback fires.
+                // (Empirically, NamedDomainObjectContainer.create(name, action)
+                // fires configureEach BEFORE the action runs for this container
+                // — surfaced by VariantApiTest in W3.2.)
+                if (extension.variants.findByName(v.name) == null) {
+                    val pv = project.objects.newInstance(KmpFlavorVariant::class.java, v.name)
+                    pv.flavors = v.flavors.map { it.name }
+                    pv.buildType = v.buildType?.name
+                    extension.variants.add(pv)
+                }
+            }
+            // Resolve target + compilation references for the inactive variants
+            // (the active variant compiles through `main`, so its `compilations`
+            // map is intentionally empty — consumers asking about the active
+            // variant's compilation should query `target.compilations.main`).
+            val inactiveVariantNames = allVariants.map { it.name }.toSet() - activeVariant.name
+            val resolvedTargets = nonAndroidTargets.toSet()
+            // configureEach { } SAM-converts to KmpFlavorVariant.() -> Unit (receiver-style),
+            // not (KmpFlavorVariant) -> Unit. So use `this` rather than a named param.
+            extension.variants.configureEach {
+                if (name in inactiveVariantNames) {
+                    targets = resolvedTargets
+                    compilations = resolvedTargets.associateWith { target ->
+                        @Suppress("UNCHECKED_CAST")
+                        (target.compilations as org.gradle.api.NamedDomainObjectContainer<org.jetbrains.kotlin.gradle.plugin.KotlinCompilation<*>>)
+                            .findByName(name)
+                            ?: target.compilations.getByName("main")
+                    }
+                }
+            }
+        }
+
+        // Q18-C — register aggregate `assembleAll{Target}Variants` per target +
+        // super-aggregate `assembleAllVariants` walking every target × variant.
+        if (matrixModeEnabled) {
+            val inactiveVariants = allVariants.filter { it.name != activeVariant.name }
+            AggregateTasksRegistrar.register(
+                project = project,
+                nonAndroidTargets = nonAndroidTargets,
+                activeVariant = activeVariant,
+                inactiveVariants = inactiveVariants,
+            )
+        }
+
+        // Q21-D — per-variant Maven publishing mechanism. No-op when
+        // publishMatrix isn't opted in or when maven-publish isn't applied.
+        if (matrixModeEnabled) {
+            val inactiveVariants = allVariants.filter { it.name != activeVariant.name }
+            PerVariantPublishConfigurator.configure(
+                project = project,
+                extension = extension,
+                inactiveVariants = inactiveVariants,
+                nonAndroidTargets = nonAndroidTargets,
+            )
+        }
 
         // Configure dependencies
         val dependencyConfigurator = DependencyConfigurator(logger)
@@ -221,7 +462,12 @@ class KmpFlavorPlugin : Plugin<Project> {
         // class. Subsequent applications skip silently to prevent DEX-merge
         // duplicate-class collisions. See shouldGenerateCodegen() below.
         if (shouldGenerateCodegen(project, extension)) {
-            wireGenerateBuildConfigToCompilation(project, kotlin)
+            wireGenerateBuildConfigToCompilation(
+                project = project,
+                kotlin = kotlin,
+                matrixModeEnabled = matrixModeEnabled,
+                nonAndroidTargets = nonAndroidTargets,
+            )
         }
     }
 
@@ -308,11 +554,25 @@ class KmpFlavorPlugin : Plugin<Project> {
         val activeName = gradleProperty ?: extensionProperty
 
         return if (activeName != null) {
-            FlavorVariantResolver.resolveVariantByName(activeName, allVariants)
-                ?: throw GradleException(
-                    "[KMP Flavors] Unknown variant '$activeName'. " +
-                        "Available variants: ${allVariants.joinToString(", ") { it.name }}",
+            val resolved = FlavorVariantResolver.resolveVariantByName(activeName, allVariants)
+            if (resolved != null) {
+                resolved
+            } else {
+                // Soft-fall to default variant when `-PkmpFlavor` doesn't match this
+                // project's variants. The property is project-wide (set with -P at the
+                // CLI), so in a multi-project build it's normal for sibling projects
+                // not to recognise the value (CI passes -PkmpFlavor=freeDev for one
+                // sample, every other plugin-applied module sees the property too).
+                // KMPF-V06 in docs/ERROR_CODES.md: WARNING-level fall-back, not ERROR.
+                project.logger.warn(
+                    "[KMP Flavors] KMPF-V06: Unknown variant '$activeName' for project " +
+                        "':${project.name}'. Available variants: " +
+                        "${allVariants.joinToString(", ") { it.name }}. " +
+                        "Falling back to default variant.",
                 )
+                FlavorVariantResolver.resolveDefaultVariant(dimensions, flavors, buildTypes, enableBuildTypes)
+                    ?: allVariants.first()
+            }
         } else {
             FlavorVariantResolver.resolveDefaultVariant(dimensions, flavors, buildTypes, enableBuildTypes)
                 ?: allVariants.first()
@@ -458,16 +718,34 @@ class KmpFlavorPlugin : Plugin<Project> {
         }
     }
 
-    private fun wireGenerateBuildConfigToCompilation(project: Project, kotlin: KotlinMultiplatformExtension) {
+    private fun wireGenerateBuildConfigToCompilation(
+        project: Project,
+        kotlin: KotlinMultiplatformExtension,
+        matrixModeEnabled: Boolean,
+        nonAndroidTargets: List<org.jetbrains.kotlin.gradle.plugin.KotlinTarget>,
+    ) {
         val generateTask = project.tasks.named(
             "generateFlavorBuildConfig",
             GenerateBuildConfigTask::class.java,
         )
+        val outputDirProvider = generateTask.flatMap { it.outputDirectory }
 
-        // Add generated source directory to commonMain
-        kotlin.sourceSets.getByName("commonMain").kotlin.srcDir(
-            generateTask.flatMap { it.outputDirectory },
-        )
+        if (matrixModeEnabled) {
+            // Matrix mode: wire the active-variant BuildKonfig into each
+            // non-Android target's `main` compilation's defaultSourceSet
+            // (e.g., `desktopMain`). Wiring into commonMain would cause
+            // inactive-variant compilations to inherit the active-variant
+            // BuildKonfig via the source-set hierarchy AND have their own
+            // per-variant BuildKonfig — Kotlin rejects this with
+            // "Redeclaration" at the variant compile.
+            for (target in nonAndroidTargets) {
+                val mainCompilation = target.compilations.findByName("main") ?: continue
+                mainCompilation.defaultSourceSet.kotlin.srcDir(outputDirProvider)
+            }
+        } else {
+            // v1.x active-only mode: wire into commonMain (existing behaviour).
+            kotlin.sourceSets.getByName("commonMain").kotlin.srcDir(outputDirProvider)
+        }
 
         // Make Kotlin compilation depend on generation
         project.tasks.matching { it.name.startsWith("compileKotlin") }.configureEach {

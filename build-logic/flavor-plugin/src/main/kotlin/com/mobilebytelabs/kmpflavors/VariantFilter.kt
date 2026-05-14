@@ -43,7 +43,22 @@ package com.mobilebytelabs.kmpflavors
  * @property flavorNames The list of flavor names in this variant
  * @property flavors The list of FlavorConfig objects in this variant
  */
-class VariantFilter(val variantName: String, val flavorNames: List<String>, val flavors: List<FlavorConfig>) {
+class VariantFilter(
+    val variantName: String,
+    val flavorNames: List<String>,
+    val flavors: List<FlavorConfig>,
+    /**
+     * The build type name for this variant, or `null` when build types
+     * are not enabled. Added in v2.0 for RFC §3 Q20-A AGP-parity:
+     *
+     * ```kotlin
+     * variantFilter {
+     *     if (flavors.contains("paid") && buildType == "staging") setIgnore(true)
+     * }
+     * ```
+     */
+    val buildType: String? = null,
+) {
     private var excluded = false
 
     /**
@@ -53,6 +68,22 @@ class VariantFilter(val variantName: String, val flavorNames: List<String>, val 
     fun exclude() {
         excluded = true
     }
+
+    /**
+     * AGP-style synonym for [exclude] (RFC §3 Q20-A). Lowers the friction
+     * for Android developers migrating to KMP. Passing `false` resets the
+     * exclusion flag — matches AGP semantics where later filter actions can
+     * override earlier ones.
+     */
+    fun setIgnore(ignore: Boolean) {
+        excluded = ignore
+    }
+
+    /**
+     * Checks if this variant's build type matches [name].
+     * Returns `false` when build types are disabled and [buildType] is `null`.
+     */
+    fun hasBuildType(name: String): Boolean = buildType == name
 
     /**
      * Returns whether this variant has been marked for exclusion.

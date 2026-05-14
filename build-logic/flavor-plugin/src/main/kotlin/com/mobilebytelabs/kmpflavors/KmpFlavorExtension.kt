@@ -164,12 +164,75 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
         objects.domainObjectContainer(BuildTypeConfig::class.java)
 
     /**
+     * v2.0 public variant API (RFC §3 Q19-B). One [KmpFlavorVariant]
+     * element is populated per matrix-mode variant after
+     * `CompilationRegistrar` runs. Consumers customise variants via
+     * standard Gradle container mechanics:
+     *
+     * ```kotlin
+     * kmpFlavors.variants.matching { it.flavors.contains("paid") }
+     *     .configureEach { /* per-variant customisation */ }
+     * ```
+     *
+     * Only populated when `buildMatrix.set(true)` AND the project has at
+     * least one flavor. Reads in `configureEach { }` are safe; eager
+     * `forEach` before `afterEvaluate` returns an empty collection.
+     */
+    val variants: NamedDomainObjectContainer<KmpFlavorVariant> =
+        objects.domainObjectContainer(KmpFlavorVariant::class.java)
+
+    /**
      * Whether to enable build types support.
      * When true, variants will include the build type suffix (e.g., freeDebug, paidRelease).
      *
      * Convention: false (build types are disabled by default for simplicity)
      */
     abstract val enableBuildTypes: Property<Boolean>
+
+    /**
+     * v2.0 matrix mode opt-in. When `true`, the plugin registers one
+     * `KotlinCompilation` per (variant × target) across every detected
+     * KMP non-Android target, so the full variant matrix builds in one
+     * Gradle invocation (AGP-style). When `false` (default), the plugin
+     * preserves v1.x behaviour: only the active variant's source set is
+     * wired into the existing `main` compilation per target.
+     *
+     * Single-point opt-in (RFC §3 Q16-C hybrid):
+     * - `gradle.properties: kmpFlavors.buildMatrix=true` — project-wide default.
+     * - `kmpFlavors { buildMatrix.set(true) }` in the convention plugin —
+     *   per-project override of the property. Extension wins on conflict.
+     *
+     * Per the Zero-Touch Adoption Design Tenet (RFC §1.1), no per-module
+     * `build.gradle.kts` ever sets this. The convention plugin or the
+     * root `gradle.properties` is the only consumer touch-point.
+     *
+     * Convention: not set (so `isPresent == false`). The plugin's
+     * `MatrixModeResolver` treats unset extension + missing property as
+     * `false` (v1.x behaviour). Explicit `set(false)` opts a project out
+     * of an enabling gradle.properties override.
+     */
+    abstract val buildMatrix: Property<Boolean>
+
+    /**
+     * v2.0 per-variant Maven publishing opt-in (RFC §3 Q21-D).
+     *
+     * When `true` AND the consumer's project applies `maven-publish` (or
+     * `com.vanniktech.maven.publish`), the plugin registers one
+     * [org.gradle.api.publish.maven.MavenPublication] per inactive variant
+     * × non-Android target, with a Maven classifier equal to the variant
+     * name. Consumer libraries can then ship classifier-tagged variant
+     * artifacts (e.g. `coordinate:1.0.0:paid`) without touching their
+     * per-module DSL.
+     *
+     * The plugin itself stays single-published (Q21-A behaviour for
+     * kmp-product-flavors's own artifacts). Q21-D ships the *mechanism*
+     * so consumer libraries opt in.
+     *
+     * Convention: not set (so `isPresent == false`). The plugin treats
+     * unset extension + missing property as `false` — no per-variant
+     * publications are registered.
+     */
+    abstract val publishMatrix: Property<Boolean>
 
     /**
      * Whether to propagate KMP flavor dimensions and product flavors into the
@@ -293,6 +356,11 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
         buildConfigClassName.convention("BuildKonfig")
         createIntermediateSourceSets.convention(true)
         enableBuildTypes.convention(false)
+        // NOTE: deliberately NO `buildMatrix.convention(false)` — the resolver
+        // relies on `extension.buildMatrix.isPresent` returning `false` when the
+        // consumer didn't explicitly opt in, so it can fall back to the Gradle
+        // property `kmpFlavors.buildMatrix`. Setting a convention here would
+        // short-circuit that fallback. See `MatrixModeResolver` for details.
         // Safe defaults: the AGP bridge is idempotent in v1.1.5+. It detects already-
         // registered product flavors / build types (e.g. consumer convention plugins that
         // call configureFlavors() synchronously inside a withPlugin callback) and skips
