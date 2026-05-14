@@ -69,7 +69,7 @@ class AggregateVariantTasksTest {
         )
     }
 
-    private val NON_FAILED_OUTCOMES = setOf(
+    private val nonFailedOutcomes = setOf(
         TaskOutcome.SUCCESS,
         TaskOutcome.UP_TO_DATE,
         TaskOutcome.NO_SOURCE,
@@ -87,7 +87,7 @@ class AggregateVariantTasksTest {
         // Aggregate is a no-input/output DefaultTask, so UP_TO_DATE is the
         // expected outcome — anything except FAILED / SKIPPED counts as success.
         assertTrue(
-            result.task(":assembleAllDesktopVariants")?.outcome in NON_FAILED_OUTCOMES,
+            result.task(":assembleAllDesktopVariants")?.outcome in nonFailedOutcomes,
             "Aggregate must complete without failure:\n${result.output}",
         )
         val active = result.task(":compileKotlinDesktop")
@@ -110,8 +110,8 @@ class AggregateVariantTasksTest {
             .withPluginClasspath()
             .build()
 
-        assertTrue(result.task(":assembleAllVariants")?.outcome in NON_FAILED_OUTCOMES)
-        assertTrue(result.task(":assembleAllDesktopVariants")?.outcome in NON_FAILED_OUTCOMES)
+        assertTrue(result.task(":assembleAllVariants")?.outcome in nonFailedOutcomes)
+        assertTrue(result.task(":assembleAllDesktopVariants")?.outcome in nonFailedOutcomes)
     }
 
     @Test

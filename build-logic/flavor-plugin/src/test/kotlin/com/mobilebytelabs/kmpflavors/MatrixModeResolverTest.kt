@@ -29,8 +29,7 @@ class MatrixModeResolverTest {
         return project
     }
 
-    private fun ext(project: org.gradle.api.Project): KmpFlavorExtension =
-        project.extensions.create("kmpFlavors", KmpFlavorExtension::class.java)
+    private fun ext(project: org.gradle.api.Project): KmpFlavorExtension = project.extensions.create("kmpFlavors", KmpFlavorExtension::class.java)
 
     @Test
     fun `default off — neither extension nor property set, resolver returns false`() {

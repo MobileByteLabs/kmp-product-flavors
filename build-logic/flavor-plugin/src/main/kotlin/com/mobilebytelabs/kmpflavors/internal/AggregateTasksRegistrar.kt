@@ -46,12 +46,7 @@ internal object AggregateTasksRegistrar {
 
     private const val TASK_GROUP = "kmpFlavors variants"
 
-    fun register(
-        project: Project,
-        nonAndroidTargets: List<KotlinTarget>,
-        activeVariant: FlavorVariant,
-        inactiveVariants: List<FlavorVariant>,
-    ) {
+    fun register(project: Project, nonAndroidTargets: List<KotlinTarget>, activeVariant: FlavorVariant, inactiveVariants: List<FlavorVariant>) {
         if (nonAndroidTargets.isEmpty()) return
 
         val perTargetAggregateNames = mutableListOf<String>()
@@ -74,7 +69,7 @@ internal object AggregateTasksRegistrar {
                 this.group = TASK_GROUP
                 this.description =
                     "Compile every kmpFlavors variant on target '${target.name}' " +
-                        "(${1 + inactiveVariants.size} variant(s))."
+                    "(${1 + inactiveVariants.size} variant(s))."
                 compileTaskNames.forEach { taskName ->
                     dependsOn(project.tasks.named(taskName))
                 }
@@ -86,7 +81,7 @@ internal object AggregateTasksRegistrar {
             this.group = TASK_GROUP
             this.description =
                 "Compile every kmpFlavors variant on every non-Android target " +
-                    "(${nonAndroidTargets.size} target(s) × ${1 + inactiveVariants.size} variant(s))."
+                "(${nonAndroidTargets.size} target(s) × ${1 + inactiveVariants.size} variant(s))."
             perTargetAggregateNames.forEach { name ->
                 dependsOn(project.tasks.named(name))
             }

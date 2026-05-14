@@ -142,8 +142,7 @@ class PerVariantDependencyClasspathTest {
             .buildAndFail()
 
         assertTrue(
-            result.output.contains("Unresolved reference") &&
-                result.output.contains("kotlinx") ||
+            (result.output.contains("Unresolved reference") && result.output.contains("kotlinx")) ||
                 result.output.contains("delay"),
             "Expected commonFree → unresolved kotlinx.coroutines.delay because the dep was declared only on commonPaid:\n${result.output}",
         )

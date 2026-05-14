@@ -38,12 +38,7 @@ internal enum class KmpFlavorValidationSeverity { ERROR, WARNING }
  * tooling (CI grep, IDE quick-fix integrations, error-aggregation
  * dashboards) doesn't break across minor versions.
  */
-internal data class KmpFlavorValidationFinding(
-    val code: String,
-    val severity: KmpFlavorValidationSeverity,
-    val message: String,
-    val fix: String,
-)
+internal data class KmpFlavorValidationFinding(val code: String, val severity: KmpFlavorValidationSeverity, val message: String, val fix: String)
 
 /**
  * v2.0 fail-fast configuration validator (RFC §3 Q23).

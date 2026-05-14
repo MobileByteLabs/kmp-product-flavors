@@ -244,7 +244,6 @@ class KmpFlavorPlugin : Plugin<Project> {
             )
         }
 
-
         // Wire intermediate source sets if needed
         if (createIntermediates) {
             PlatformDetector.wireIntermediateSourceSets(kotlin, platforms)
@@ -327,7 +326,7 @@ class KmpFlavorPlugin : Plugin<Project> {
             // for code that lives in a single variant and isn't expressible
             // as a per-flavor common source set. Most projects won't need this.
             val variantSpecificSrcDirsFor: (String) -> List<String> = { name ->
-                listOf("src/${name}/kotlin")
+                listOf("src/$name/kotlin")
             }
             nonAndroidTargets.forEach { target ->
                 CompilationRegistrar.register(
@@ -426,7 +425,6 @@ class KmpFlavorPlugin : Plugin<Project> {
                 nonAndroidTargets = nonAndroidTargets,
             )
         }
-
 
         // Configure dependencies
         val dependencyConfigurator = DependencyConfigurator(logger)
@@ -556,11 +554,25 @@ class KmpFlavorPlugin : Plugin<Project> {
         val activeName = gradleProperty ?: extensionProperty
 
         return if (activeName != null) {
-            FlavorVariantResolver.resolveVariantByName(activeName, allVariants)
-                ?: throw GradleException(
-                    "[KMP Flavors] Unknown variant '$activeName'. " +
-                        "Available variants: ${allVariants.joinToString(", ") { it.name }}",
+            val resolved = FlavorVariantResolver.resolveVariantByName(activeName, allVariants)
+            if (resolved != null) {
+                resolved
+            } else {
+                // Soft-fall to default variant when `-PkmpFlavor` doesn't match this
+                // project's variants. The property is project-wide (set with -P at the
+                // CLI), so in a multi-project build it's normal for sibling projects
+                // not to recognise the value (CI passes -PkmpFlavor=freeDev for one
+                // sample, every other plugin-applied module sees the property too).
+                // KMPF-V06 in docs/ERROR_CODES.md: WARNING-level fall-back, not ERROR.
+                project.logger.warn(
+                    "[KMP Flavors] KMPF-V06: Unknown variant '$activeName' for project " +
+                        "':${project.name}'. Available variants: " +
+                        "${allVariants.joinToString(", ") { it.name }}. " +
+                        "Falling back to default variant.",
                 )
+                FlavorVariantResolver.resolveDefaultVariant(dimensions, flavors, buildTypes, enableBuildTypes)
+                    ?: allVariants.first()
+            }
         } else {
             FlavorVariantResolver.resolveDefaultVariant(dimensions, flavors, buildTypes, enableBuildTypes)
                 ?: allVariants.first()

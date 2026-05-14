@@ -57,12 +57,7 @@ import org.jetbrains.kotlin.gradle.plugin.KotlinTarget
  */
 internal object PerVariantPublishConfigurator {
 
-    fun configure(
-        project: Project,
-        extension: KmpFlavorExtension,
-        inactiveVariants: List<FlavorVariant>,
-        nonAndroidTargets: List<KotlinTarget>,
-    ) {
+    fun configure(project: Project, extension: KmpFlavorExtension, inactiveVariants: List<FlavorVariant>, nonAndroidTargets: List<KotlinTarget>) {
         if (!extension.publishMatrix.getOrElse(false)) return
         if (inactiveVariants.isEmpty()) return
 
@@ -74,11 +69,7 @@ internal object PerVariantPublishConfigurator {
         }
     }
 
-    private fun configureWithMavenPublish(
-        project: Project,
-        inactiveVariants: List<FlavorVariant>,
-        nonAndroidTargets: List<KotlinTarget>,
-    ) {
+    private fun configureWithMavenPublish(project: Project, inactiveVariants: List<FlavorVariant>, nonAndroidTargets: List<KotlinTarget>) {
         val publishing = project.extensions.findByType(PublishingExtension::class.java) ?: return
         val publications = publishing.publications
 
@@ -105,12 +96,12 @@ internal object PerVariantPublishConfigurator {
 
                 // Per-variant Jar task. Names it `jar{Variant}Kotlin{Target}` so
                 // it's visible alongside KGP's other `jar*` tasks.
-                val jarTaskName = "jar${variantCap}Kotlin${targetCap}"
+                val jarTaskName = "jar${variantCap}Kotlin$targetCap"
                 val jarTask = project.tasks.register(jarTaskName, Jar::class.java) {
                     this.group = "kmpFlavors variants"
                     this.description =
                         "Packages compilation output of variant '${variant.name}' " +
-                            "on target '${target.name}' as a classifier-tagged JAR."
+                        "on target '${target.name}' as a classifier-tagged JAR."
                     this.archiveBaseName.set(project.name)
                     this.archiveClassifier.set(variant.name)
                     from(compilation.output.allOutputs)
@@ -118,7 +109,7 @@ internal object PerVariantPublishConfigurator {
 
                 // Per-variant MavenPublication. Gradle's maven-publish plugin
                 // derives all the standard publish tasks from this.
-                val publicationName = "variant${variantCap}"
+                val publicationName = "variant$variantCap"
                 publications.register(publicationName, MavenPublication::class.java) {
                     artifactId = project.name
                     artifact(jarTask)

@@ -42,14 +42,11 @@ class KmpFlavorPluginValidatorTest {
 
     private val project = ProjectBuilder.builder().build()
 
-    private fun flavor(name: String): FlavorConfig =
-        project.objects.newInstance(FlavorConfig::class.java, name)
+    private fun flavor(name: String): FlavorConfig = project.objects.newInstance(FlavorConfig::class.java, name)
 
-    private fun buildType(name: String): BuildTypeConfig =
-        project.objects.newInstance(BuildTypeConfig::class.java, name)
+    private fun buildType(name: String): BuildTypeConfig = project.objects.newInstance(BuildTypeConfig::class.java, name)
 
-    private fun variant(name: String, flavorNames: List<String> = emptyList()): FlavorVariant =
-        FlavorVariant(name = name, flavors = flavorNames.map { flavor(it) })
+    private fun variant(name: String, flavorNames: List<String> = emptyList()): FlavorVariant = FlavorVariant(name = name, flavors = flavorNames.map { flavor(it) })
 
     private fun KmpFlavorValidationFinding.matches(code: String): Boolean = this.code == code
 
