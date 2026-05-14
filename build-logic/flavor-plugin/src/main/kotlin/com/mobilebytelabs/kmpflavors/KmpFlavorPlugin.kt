@@ -19,6 +19,7 @@ package com.mobilebytelabs.kmpflavors
 import com.mobilebytelabs.kmpflavors.internal.AggregateTasksRegistrar
 import com.mobilebytelabs.kmpflavors.internal.AgpBridge
 import com.mobilebytelabs.kmpflavors.internal.CompilationRegistrar
+import com.mobilebytelabs.kmpflavors.internal.ComposeResourcesConfigurator
 import com.mobilebytelabs.kmpflavors.internal.DependencyConfigurator
 import com.mobilebytelabs.kmpflavors.internal.FlavorVariantResolver
 import com.mobilebytelabs.kmpflavors.internal.GenerateBuildConfigTasksRegistrar
@@ -409,6 +410,17 @@ class KmpFlavorPlugin : Plugin<Project> {
                 )
             }
         }
+
+        // v2.1 Phase 3A (per-variant Compose resources) — auto-discovery via CMP convention.
+        // Only logs a lifecycle line when CMP is applied; no source-set wiring needed because
+        // CMP iterates kotlin.sourceSets to apply its composeResources/ convention.
+        ComposeResourcesConfigurator.configure(
+            project = project,
+            kotlin = kotlin,
+            allFlavors = flavors,
+            matrixModeEnabled = matrixModeEnabled,
+            logger = logger,
+        )
 
         // Q3-A — register one GenerateBuildConfigTask per INACTIVE variant in matrix
         // mode and wire each task's output directory into the corresponding
