@@ -61,18 +61,18 @@ object FlavorVariantResolver {
             }
         } else {
             val sortedDimensions = dimensions.sortedBy { it.priority.getOrElse(0) }
+            // KMPF-V03 (validator-caught): if a dimension has no flavors the matrix can't
+            // produce variants. Return an empty list here so the validator surfaces the
+            // structured finding instead of an opaque IllegalStateException at resolution time.
             val flavorsByDimension = sortedDimensions.map { dimension ->
-                val dimensionFlavors = flavors.filter { it.dimension.orNull == dimension.name }
-                if (dimensionFlavors.isEmpty()) {
-                    throw IllegalStateException(
-                        "Dimension '${dimension.name}' has no flavors assigned to it. " +
-                            "Make sure each flavor has dimension.set(\"${dimension.name}\").",
-                    )
-                }
-                dimensionFlavors
+                flavors.filter { it.dimension.orNull == dimension.name }
             }
-            cartesianProduct(flavorsByDimension).map { flavorList ->
-                FlavorVariant(name = buildVariantName(flavorList), flavors = flavorList)
+            if (flavorsByDimension.any { it.isEmpty() }) {
+                emptyList()
+            } else {
+                cartesianProduct(flavorsByDimension).map { flavorList ->
+                    FlavorVariant(name = buildVariantName(flavorList), flavors = flavorList)
+                }
             }
         }
 

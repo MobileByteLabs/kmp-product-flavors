@@ -92,7 +92,10 @@ class FlavorVariantResolverTest {
     }
 
     @Test
-    fun `resolveAllVariants throws when dimension has no flavors`() {
+    fun `resolveAllVariants returns empty list when a dimension has no flavors (V03 routed to validator)`() {
+        // v2.1: the resolver no longer throws for "dimension has no flavors" — that condition is
+        // surfaced as a structured KMPF-V03 finding by KmpFlavorPluginValidator. The resolver
+        // returns an empty matrix so the validator can see the state and report it.
         val dimensions = listOf(
             createMockDimension("tier", 0),
             createMockDimension("environment", 1),
@@ -102,9 +105,8 @@ class FlavorVariantResolverTest {
             // Missing "environment" flavors
         )
 
-        assertThrows<IllegalStateException> {
-            FlavorVariantResolver.resolveAllVariants(dimensions, flavors)
-        }
+        val result = FlavorVariantResolver.resolveAllVariants(dimensions, flavors)
+        assertTrue(result.isEmpty(), "Expected an empty matrix when a dimension has no flavors; got: $result")
     }
 
     @Test
