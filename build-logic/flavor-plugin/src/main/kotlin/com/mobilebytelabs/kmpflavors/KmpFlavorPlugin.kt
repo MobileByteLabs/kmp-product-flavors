@@ -29,6 +29,7 @@ import com.mobilebytelabs.kmpflavors.internal.PerVariantPublishConfigurator
 import com.mobilebytelabs.kmpflavors.internal.PlatformDetector
 import com.mobilebytelabs.kmpflavors.internal.PlatformPropertiesConfigurator
 import com.mobilebytelabs.kmpflavors.internal.SourceSetConfigurator
+import com.mobilebytelabs.kmpflavors.internal.TestCompilationRegistrar
 import com.mobilebytelabs.kmpflavors.tasks.DiagnoseVariantTask
 import com.mobilebytelabs.kmpflavors.tasks.GenerateBuildConfigTask
 import com.mobilebytelabs.kmpflavors.tasks.GenerateRunConfigurationsTask
@@ -356,6 +357,57 @@ class KmpFlavorPlugin : Plugin<Project> {
                     "compilations across ${nonAndroidTargets.size} non-Android target(s) " +
                     "(active variant '$activeVariantName' continues to compile through `main`)",
             )
+
+            // v2.1 Phase 2 (Q10) — register `compile{Variant}TestKotlin{Target}` per inactive
+            // variant × target. The active variant uses KGP's standard `test` compilation.
+            //
+            // Per-variant test source-set wiring: for each flavor in the variant, ensure
+            // `common{Flavor}Test` exists and `dependsOn(commonTest)`. The registrar then
+            // wires the variant test compilation's defaultSourceSet to dependsOn each
+            // per-flavor test source set, so per-flavor test helpers + `internal` symbols
+            // from the variant main are visible exactly the way KMP expects.
+            //
+            // Skipped silently when the module declares no `commonTest` (test-less modules).
+            val commonTestSourceSet = kotlin.sourceSets.findByName("commonTest")
+            if (commonTestSourceSet != null) {
+                val parentTestSourceSetsFor: (String) -> List<org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet> = { name ->
+                    val variant = variantByName[name]
+                    if (variant == null) {
+                        emptyList()
+                    } else {
+                        variant.flavors.map { flavor ->
+                            val ssName = "common${flavor.name.replaceFirstChar { it.uppercase() }}Test"
+                            kotlin.sourceSets.maybeCreate(ssName).also { commonFlavorTest ->
+                                commonFlavorTest.dependsOn(commonTestSourceSet)
+                                commonFlavorTest.kotlin.srcDir("src/$ssName/kotlin")
+                                commonFlavorTest.resources.srcDir("src/$ssName/resources")
+                            }
+                        }
+                    }
+                }
+                val variantSpecificTestSrcDirsFor: (String) -> List<String> = { name ->
+                    listOf("src/${name}Test/kotlin")
+                }
+                nonAndroidTargets.forEach { target ->
+                    TestCompilationRegistrar.register(
+                        target = target,
+                        variantNames = variantNames,
+                        parentTestSourceSetsFor = parentTestSourceSetsFor,
+                        variantSpecificTestSrcDirsFor = variantSpecificTestSrcDirsFor,
+                        logger = logger,
+                    )
+                }
+                logger.lifecycle(
+                    "[KMP Flavors] Matrix mode: registered ${variantNames.size} inactive-variant " +
+                        "TEST compilations across ${nonAndroidTargets.size} non-Android target(s) " +
+                        "(active variant '$activeVariantName' continues to use the standard `test` compilation)",
+                )
+            } else {
+                logger.info(
+                    "[KMP Flavors] No `commonTest` source set on this module — skipping per-variant " +
+                        "test compilation registration (Q10 no-op for test-less modules).",
+                )
+            }
         }
 
         // Q3-A — register one GenerateBuildConfigTask per INACTIVE variant in matrix
