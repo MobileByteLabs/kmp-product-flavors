@@ -298,6 +298,26 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
     abstract val excludeGeneratedFromFormatters: Property<Boolean>
 
     /**
+     * v2.2 Phase 0 — master opt-out for every auto-detection in Phase 0.
+     *
+     * When `true` (default in v2.2+), the plugin auto-enables several
+     * features based on detected conditions:
+     *   - `buildMatrix` auto-fires when >=2 non-Android targets + >=2 flavors.
+     *   - `publishMatrix` auto-fires when `maven-publish` is applied + matrix on.
+     *   - `dependencyGuardPerVariant` / `excludeGeneratedFromFormatters` /
+     *     `detektPerVariant` auto-fire when their adjacent plugins are detected.
+     *   - `enableBuildTypes` auto-flips to `true` on first `buildTypes { register(...) }`.
+     *
+     * Consumers who want strict v2.0 / v2.1 explicit-opt-in semantics flip this
+     * to `false`. Individual auto-detections can also be overridden via the
+     * corresponding explicit `set(false)` on their property — but the master
+     * switch is the simplest path.
+     *
+     * Convention: true (in v2.2+).
+     */
+    abstract val autoEnable: Property<Boolean>
+
+    /**
      * v2.1 Phase 4 — per-variant Detekt analysis.
      *
      * When `true` AND the consumer applies `io.gitlab.arturbosch.detekt`,
@@ -412,8 +432,13 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
         //   kmpFlavors { dependencyGuardPerVariant.set(true) }
         //   kmpFlavors { excludeGeneratedFromFormatters.set(true) }
         //   kmpFlavors { detektPerVariant.set(true) }
+        // Phase 4 helpers default to off (opt-in). v2.2 Phase 0C auto-flips them to
+        // true via withPlugin callbacks when their adjacent plugin is detected.
         dependencyGuardPerVariant.convention(false)
         excludeGeneratedFromFormatters.convention(false)
         detektPerVariant.convention(false)
+        // v2.2 Phase 0G — master opt-out. Default `true` for fully-automatic-plugin
+        // ergonomics; consumers wanting strict v2.0 / v2.1 semantics set to `false`.
+        autoEnable.convention(true)
     }
 }

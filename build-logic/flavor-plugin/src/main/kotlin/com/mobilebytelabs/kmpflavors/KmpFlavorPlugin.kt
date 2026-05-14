@@ -145,6 +145,64 @@ class KmpFlavorPlugin : Plugin<Project> {
             extension.flavors.whenObjectAdded(createPerFlavorSourceSet)
         }
 
+        // v2.2 Phase 0D — auto-flip `enableBuildTypes` when the consumer registers any
+        // `buildTypes { register(...) }`. Most consumers forget to flip the flag after
+        // declaring buildTypes; the auto-flip is the obvious DWIM.
+        //
+        // Explicit `enableBuildTypes.set(false)` still wins (consumer wants flavor-only
+        // matrix despite declaring build types) — the hook only fires when the flag is
+        // still false at the time the first buildType is registered.
+        val enableBuildTypesAutoFlip = object : Action<BuildTypeConfig> {
+            override fun execute(buildType: BuildTypeConfig) {
+                if (extension.autoEnable.get() && !extension.enableBuildTypes.get()) {
+                    extension.enableBuildTypes.set(true)
+                    project.logger.info(
+                        "[KMP Flavors] Phase 0D — auto-flipping enableBuildTypes to true " +
+                            "because consumer registered buildType '${buildType.name}'. " +
+                            "Set `kmpFlavors.enableBuildTypes.set(false)` to keep a flavor-only matrix.",
+                    )
+                }
+            }
+        }
+        extension.buildTypes.whenObjectAdded(enableBuildTypesAutoFlip)
+
+        // v2.2 Phase 0B + 0C — auto-enable publishMatrix + adjacent-plugin helpers when
+        // their plugins are detected. Each withPlugin callback latches a flag that we
+        // read inside afterEvaluate so the autoEnable check sees the consumer's
+        // `kmpFlavors { autoEnable.set(false) }` value rather than the convention default.
+        var mavenPublishApplied = false
+        var dependencyGuardApplied = false
+        var spotlessApplied = false
+        var detektApplied = false
+        project.pluginManager.withPlugin("maven-publish") { mavenPublishApplied = true }
+        project.pluginManager.withPlugin("com.dropbox.dependency-guard") { dependencyGuardApplied = true }
+        project.pluginManager.withPlugin("com.diffplug.spotless") { spotlessApplied = true }
+        project.pluginManager.withPlugin("io.gitlab.arturbosch.detekt") { detektApplied = true }
+        project.afterEvaluate {
+            // Phase 0 auto-enables run inside afterEvaluate so the consumer's `kmpFlavors
+            // { autoEnable.set(false) }` has been evaluated by now.
+            if (!extension.autoEnable.get()) return@afterEvaluate
+            if (mavenPublishApplied && !extension.publishMatrix.isPresent) {
+                extension.publishMatrix.set(true)
+                project.logger.info(
+                    "[KMP Flavors] Phase 0B — auto-enabling publishMatrix because " +
+                        "`maven-publish` is applied. Set `kmpFlavors.publishMatrix.set(false)` to opt out.",
+                )
+            }
+            if (dependencyGuardApplied && !extension.dependencyGuardPerVariant.get()) {
+                extension.dependencyGuardPerVariant.set(true)
+                project.logger.info("[KMP Flavors] Phase 0C — auto-enabling dependencyGuardPerVariant.")
+            }
+            if ((spotlessApplied || detektApplied) && !extension.excludeGeneratedFromFormatters.get()) {
+                extension.excludeGeneratedFromFormatters.set(true)
+                project.logger.info("[KMP Flavors] Phase 0C — auto-enabling excludeGeneratedFromFormatters.")
+            }
+            if (detektApplied && !extension.detektPerVariant.get()) {
+                extension.detektPerVariant.set(true)
+                project.logger.info("[KMP Flavors] Phase 0C — auto-enabling detektPerVariant.")
+            }
+        }
+
         // Defer configuration until after project evaluation
         project.afterEvaluate {
             configurePlugin(project, extension)
@@ -230,9 +288,27 @@ class KmpFlavorPlugin : Plugin<Project> {
         // v2.0 fail-fast validation (RFC §3 Q23). Run before the matrix-mode
         // registrar so structured errors are surfaced with stable KMPF-Vxx codes
         // instead of opaque downstream stack traces.
-        val matrixModeEnabled = MatrixModeResolver.isEnabled(project, extension)
+        // v2.2 Phase 0A — compute nonAndroidTargets BEFORE the resolver so the auto-
+        // heuristic has access to target + flavor counts.
         val nonAndroidTargets = kotlin.targets.filter {
             it.name != "android" && it.name != "metadata"
+        }
+        val matrixModeEnabled = MatrixModeResolver.isEnabled(
+            project = project,
+            extension = extension,
+            nonAndroidTargetCount = nonAndroidTargets.size,
+            flavorCount = flavors.size,
+        )
+        if (matrixModeEnabled &&
+            !extension.buildMatrix.isPresent &&
+            project.findProperty(MatrixModeResolver.GRADLE_PROPERTY) == null
+        ) {
+            logger.lifecycle(
+                "[KMP Flavors] Phase 0A — auto-enabling matrix mode because " +
+                    "${nonAndroidTargets.size} non-Android target(s) + ${flavors.size} flavor(s) " +
+                    "satisfy the heuristic. Set `kmpFlavors.buildMatrix.set(false)` or " +
+                    "`kmpFlavors.autoEnable.set(false)` to opt out.",
+            )
         }
         val validationFindings = KmpFlavorPluginValidator.validate(
             flavors = flavors,

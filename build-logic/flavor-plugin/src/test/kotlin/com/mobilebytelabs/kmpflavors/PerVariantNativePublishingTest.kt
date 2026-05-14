@@ -208,8 +208,10 @@ class PerVariantNativePublishingTest {
                 js(IR) { nodejs() }
             }
             kmpFlavors {
+                autoEnable.set(false)
                 buildMatrix.set(true)
-                // publishMatrix is intentionally unset (defaults to off)
+                // publishMatrix unset; autoEnable=false suppresses Phase 0B auto-enable so
+                // the test exercises strict v2.0/v2.1 opt-in semantics.
                 generateBuildConfig.set(false)
                 flavors {
                     register("free") { isDefault.set(true) }

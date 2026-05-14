@@ -88,6 +88,81 @@ internal object ComposeResourcesConfigurator {
                     "Drop files under: $flavorPaths to override commonMain resources " +
                     "per variant. Leaf source set wins on duplicate keys.",
             )
+            // v2.2 Phase 0E — version detection. CMP < 1.7 doesn't auto-discover
+            // composeResources/ on custom source sets; emit KMPF-V14 WARNING so consumers
+            // know per-variant resource overrides may silently no-op on the older line.
+            checkCmpVersion(project, logger)
         }
+    }
+
+    /**
+     * v2.2 Phase 0E — reflective Compose Multiplatform version read.
+     *
+     * Resolves the CMP plugin classpath's `org.jetbrains.compose:org.jetbrains.compose.gradle.plugin`
+     * (or the legacy `compose-gradle-plugin`) module version. If the version is
+     * older than 1.7.0, emits a `KMPF-V14` WARNING — composeResources/ auto-discovery
+     * on custom source sets first lands in 1.7.
+     *
+     * Reflective + best-effort: a missing-version scenario logs `info` and proceeds.
+     */
+    private fun checkCmpVersion(project: org.gradle.api.Project, logger: Logger) {
+        val detectedVersion = resolveCmpVersion(project)
+        if (detectedVersion == null) {
+            logger.info(
+                "[KMP Flavors] KMPF-V14 — could not detect Compose Multiplatform plugin version; " +
+                    "skipping per-variant composeResources/ compatibility check.",
+            )
+            return
+        }
+        if (versionIsOlderThan(detectedVersion, MIN_CMP_VERSION)) {
+            logger.warn(
+                "[KMP Flavors] KMPF-V14: Compose Multiplatform version '$detectedVersion' " +
+                    "is older than $MIN_CMP_VERSION. Per-variant composeResources/ auto-discovery " +
+                    "on custom source sets (commonFree, commonPaid, etc.) lands in CMP 1.7. " +
+                    "Upgrade `org.jetbrains.compose` to >= $MIN_CMP_VERSION OR add the per-flavor " +
+                    "resource directories manually via `kotlin.sourceSets.commonFlavor.resources.srcDir(...)`.",
+            )
+        }
+    }
+
+    private const val MIN_CMP_VERSION_INSTANCE_HOLDER = ""
+    private val MIN_CMP_VERSION: String = "1.7.0"
+
+    /**
+     * Reflectively walks the buildscript classpath for the CMP plugin artifact + reads
+     * its version. Returns null if not resolvable (e.g., CMP plugin not on classpath).
+     */
+    private fun resolveCmpVersion(project: org.gradle.api.Project): String? {
+        // CMP plugin is published as `org.jetbrains.compose:compose-gradle-plugin` on the
+        // plugin classpath. We walk the buildscript configuration for a matching dep.
+        val configurations = project.buildscript.configurations
+        for (cfg in configurations) {
+            if (!cfg.isCanBeResolved) continue
+            try {
+                for (dep in cfg.resolvedConfiguration.firstLevelModuleDependencies) {
+                    if (dep.moduleGroup == "org.jetbrains.compose" &&
+                        (dep.moduleName == "compose-gradle-plugin" || dep.moduleName.endsWith(".gradle.plugin"))
+                    ) {
+                        return dep.moduleVersion
+                    }
+                }
+            } catch (e: Exception) {
+                // Configuration not resolvable in this context — keep walking.
+            }
+        }
+        return null
+    }
+
+    /**
+     * Compare semver-shaped strings naively. Sufficient for CMP's MAJOR.MINOR.PATCH scheme.
+     * Returns true if [a] < [b].
+     */
+    private fun versionIsOlderThan(a: String, b: String): Boolean {
+        val aParts = a.split(".").mapNotNull { it.toIntOrNull() }
+        val bParts = b.split(".").mapNotNull { it.toIntOrNull() }
+        for (i in 0 until minOf(aParts.size, bParts.size)) {
+            if (aParts[i] != bParts[i]) return aParts[i] < bParts[i]
+        }
+        return aParts.size < bParts.size
     }
 }

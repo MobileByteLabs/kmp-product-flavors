@@ -88,6 +88,18 @@ Each entry: `code`, `severity`, `message` (rendered to consumers), `fix` (concre
 
 ---
 
+## KMPF-V14 — Compose Multiplatform version too old for per-variant `composeResources/`
+
+| | |
+|---|---|
+| **Severity** | WARNING |
+| **Since** | v2.2.0 (Phase 0E) |
+| **Message** | Compose Multiplatform version `<x.y.z>` is older than `1.7.0`. Per-variant `composeResources/` auto-discovery on custom source sets (`commonFree`, `commonPaid`, etc.) lands in CMP 1.7. |
+| **Fix** | Upgrade `org.jetbrains.compose` to `>= 1.7.0` OR add the per-flavor resource directories manually via `kotlin.sourceSets.commonFlavor.resources.srcDir(...)` for each flavor. |
+| **Why WARNING, not ERROR** | The plugin still configures everything else correctly — only the per-variant resource auto-discovery may silently no-op on older CMP. Compilation still succeeds; consumers see commonMain resources instead of their per-flavor overrides. |
+
+---
+
 ## KMPF-V08 — Matrix mode opted in but no flavors registered
 
 | | |

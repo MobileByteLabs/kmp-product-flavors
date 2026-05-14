@@ -71,6 +71,7 @@ internal object KmpFlavorPluginValidator {
     const val CODE_UNKNOWN_ACTIVE_VARIANT: String = "KMPF-V06"
     const val CODE_INVALID_BUILD_CONFIG_FIELD_TYPE: String = "KMPF-V07"
     const val CODE_MATRIX_MODE_WITHOUT_FLAVORS: String = "KMPF-V08"
+    const val CODE_CMP_COMPOSE_RESOURCES_VERSION_INCOMPATIBLE: String = "KMPF-V14"
 
     /**
      * Supported Kotlin literal types for `buildConfigField`. Other types
