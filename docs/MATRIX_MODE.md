@@ -27,6 +27,7 @@ After enabling, run:
 ./gradlew assembleAllDesktopVariants                 # all variants on Desktop
 ./gradlew assembleAllVariants                        # all variants on every target
 ./gradlew tasks --group="kmpFlavors variants"        # discover everything
+./gradlew generateVariantRunConfigurations          # v2.1 — emit .run.xml per (variant × target)
 ```
 
 ## Single-point opt-in (RFC §3 Q16-C)
@@ -53,6 +54,10 @@ Two equivalent forms — pick whichever fits your convention plugin / CI ergonom
 | `kmpFlavors.variants` public API | `NamedDomainObjectContainer<KmpFlavorVariant>` for `matching { … }.configureEach { … }` | RFC §3 Q19-B |
 | `variantFilter { setIgnore(true) }` DSL | AGP-shaped filter; `buildType == "staging"` works | RFC §3 Q20-A |
 | `publishMatrix` opt-in | Classifier-tagged Maven publications per variant (JVM) | RFC §3 Q21-D |
+| `dependencyGuardPerVariant` opt-in (v2.1) | Auto-registers per-(variant × target) `dependencyGuard.configuration(...)` baselines | Q24 / v2.1 Phase 4 |
+| `excludeGeneratedFromFormatters` opt-in (v2.1) | Auto-excludes generated `BuildKonfig` paths from Spotless + Detekt | Q24 / v2.1 Phase 4 |
+| `detektPerVariant` opt-in (v2.1) | Registers `detekt{Variant}` task per variant with per-variant baselines | Q24 / v2.1 Phase 4 |
+| `generateVariantRunConfigurations` task (v2.1) | One `.run.xml` per (variant × target) for IDE run-config dropdown | G22 / v2.1 Phase 4 |
 
 ---
 
@@ -122,10 +127,10 @@ Per-variant resources on iOS / native targets flow through the same Kotlin sourc
 | `org.jetbrains.compose` (Compose Multiplatform) | ✅ Compatible (v2.1 adds per-variant resources) | Per-variant compilations honor Compose's own source-set hierarchy. **Per-variant `composeResources/` work end-to-end** via the source-set convention (v2.1 — see "Per-variant resources" above). **Hot-reload is still active-variant only** at v2.1 GA; per-variant hot-reload is v2.2 scope. |
 | `org.jetbrains.kotlin.plugin.serialization` | ✅ Compatible | KSP codegen runs per compilation; per-variant compilations each get their own generated sources. |
 | `org.jetbrains.kotlinx.atomicfu` | ✅ Compatible | Atomicfu's compilation transformer runs per `KotlinCompilation`, including ours. |
-| `dependency-guard` | ⚠ Per-variant baselines | Each variant compilation has its own `compileClasspath`, so dependency-guard sees N baselines. Consumers may need to add explicit `dependencyGuard { configuration("{variant}CompileClasspath") }` entries. |
-| `com.diffplug.spotless` | ⚠ Watch source-set scope | If Spotless rules use a glob that matches generated `BuildKonfig.kt`, the per-variant copies trigger N format checks. Exclude `build/generated/kmpFlavors/**` from Spotless globs. |
-| `io.gitlab.arturbosch.detekt` | ⚠ Watch source-set scope | Same caveat as Spotless. |
-| Kover | ⚠ Coverage per variant | Each variant compilation produces its own coverage; Kover merges them. No special configuration needed; consumers may want to set `kover.useReportSet(...)` to scope. |
+| `dependency-guard` | ✅ Helper API (v2.1) | Set `kmpFlavors { dependencyGuardPerVariant.set(true) }` to auto-register one `dependencyGuard.configuration(...)` entry per (variant × target). Without the opt-in, consumers can still wire them manually. |
+| `com.diffplug.spotless` | ✅ Helper API (v2.1) | Set `kmpFlavors { excludeGeneratedFromFormatters.set(true) }` to auto-exclude `build/generated/kmpFlavors/` from every Spotless task. Without the opt-in, add the exclude pattern manually. |
+| `io.gitlab.arturbosch.detekt` | ✅ Helper APIs (v2.1) | `kmpFlavors { excludeGeneratedFromFormatters.set(true) }` excludes per-variant codegen from Detekt scans. `kmpFlavors { detektPerVariant.set(true) }` registers a `detekt{Variant}` task per variant with per-variant baselines under `config/detekt/{variant}/baseline.xml` — Lint-per-variant for non-Android targets. |
+| Kover | ✅ Per-variant coverage (manual scope) | Each variant compilation produces its own coverage; Kover merges them automatically. To scope reports per variant, set `kover.useReportSet(...)`. The plugin does not auto-configure this because the right scope depends on whether the consumer wants per-variant or merged reporting. |
 
 ---
 

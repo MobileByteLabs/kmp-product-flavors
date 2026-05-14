@@ -21,6 +21,8 @@ import com.mobilebytelabs.kmpflavors.internal.AgpBridge
 import com.mobilebytelabs.kmpflavors.internal.CompilationRegistrar
 import com.mobilebytelabs.kmpflavors.internal.ComposeResourcesConfigurator
 import com.mobilebytelabs.kmpflavors.internal.DependencyConfigurator
+import com.mobilebytelabs.kmpflavors.internal.DependencyGuardHelper
+import com.mobilebytelabs.kmpflavors.internal.DetektPerVariantHelper
 import com.mobilebytelabs.kmpflavors.internal.FlavorVariantResolver
 import com.mobilebytelabs.kmpflavors.internal.GenerateBuildConfigTasksRegistrar
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator
@@ -30,11 +32,13 @@ import com.mobilebytelabs.kmpflavors.internal.PerVariantPublishConfigurator
 import com.mobilebytelabs.kmpflavors.internal.PlatformDetector
 import com.mobilebytelabs.kmpflavors.internal.PlatformPropertiesConfigurator
 import com.mobilebytelabs.kmpflavors.internal.SourceSetConfigurator
+import com.mobilebytelabs.kmpflavors.internal.SpotlessDetektScopeHelper
 import com.mobilebytelabs.kmpflavors.internal.TestCompilationRegistrar
 import com.mobilebytelabs.kmpflavors.tasks.DiagnoseVariantTask
 import com.mobilebytelabs.kmpflavors.tasks.GenerateBuildConfigTask
 import com.mobilebytelabs.kmpflavors.tasks.GenerateRunConfigurationsTask
 import com.mobilebytelabs.kmpflavors.tasks.GenerateSpmManifestTask
+import com.mobilebytelabs.kmpflavors.tasks.GenerateVariantRunConfigurationsTask
 import com.mobilebytelabs.kmpflavors.tasks.InitFlavorSourceSetsTask
 import com.mobilebytelabs.kmpflavors.tasks.ListFlavorsTask
 import com.mobilebytelabs.kmpflavors.tasks.ListVariantCompilationsTask
@@ -422,6 +426,29 @@ class KmpFlavorPlugin : Plugin<Project> {
             logger = logger,
         )
 
+        // v2.1 Phase 4 — adjacent-plugin helpers (opt-in).
+        // Each helper is a no-op unless the consumer flips the corresponding
+        // kmpFlavors property AND applies the matching adjacent plugin.
+        val nonAndroidTargetNames = nonAndroidTargets.map { it.name }
+        DependencyGuardHelper.configure(
+            project = project,
+            allVariants = allVariants,
+            targetNames = nonAndroidTargetNames,
+            enabled = extension.dependencyGuardPerVariant.get(),
+            logger = logger,
+        )
+        SpotlessDetektScopeHelper.configure(
+            project = project,
+            enabled = extension.excludeGeneratedFromFormatters.get(),
+            logger = logger,
+        )
+        DetektPerVariantHelper.configure(
+            project = project,
+            allVariants = allVariants,
+            enabled = extension.detektPerVariant.get(),
+            logger = logger,
+        )
+
         // Q3-A — register one GenerateBuildConfigTask per INACTIVE variant in matrix
         // mode and wire each task's output directory into the corresponding
         // variant compilation's defaultSourceSet. Active variant's BuildConfig
@@ -544,6 +571,22 @@ class KmpFlavorPlugin : Plugin<Project> {
 
         // Register tasks
         registerTasks(project, extension, allVariants, activeVariantResolved, flavors, dimensions, platforms)
+
+        // v2.1 Phase 4 — per-variant × target IDE run configurations. Registered here
+        // (not in registerTasks) because we need `nonAndroidTargets` to derive the
+        // exact KMP target names (jvm("desktop") + jvm("server") → two separate
+        // entries, not collapsed under a single "jvm" platform prefix).
+        project.tasks.register(
+            "generateVariantRunConfigurations",
+            GenerateVariantRunConfigurationsTask::class.java,
+        ).configure {
+            projectName.set(project.name)
+            projectPath.set(project.path)
+            variantNames.set(allVariants.map { it.name })
+            targetNames.set(nonAndroidTargetNames)
+            activeVariantName.set(activeVariantResolved.name)
+            outputDirectory.set(project.rootProject.layout.projectDirectory.dir(".run"))
+        }
 
         // Wire build config generation to compilation if enabled.
         // Multi-module-safe: in a build with multiple subprojects applying this
