@@ -18,6 +18,7 @@ package com.mobilebytelabs.kmpflavors.internal
 
 import com.mobilebytelabs.kmpflavors.BuildTypeConfig
 import com.mobilebytelabs.kmpflavors.FlavorConfig
+import com.mobilebytelabs.kmpflavors.FlavorDimension
 import com.mobilebytelabs.kmpflavors.FlavorVariant
 
 /**
@@ -52,12 +53,12 @@ internal data class KmpFlavorValidationFinding(val code: String, val severity: K
  * | Code | Severity | Meaning |
  * |---|---|---|
  * | KMPF-V01 | ERROR | Flavor name collides with build-type name |
- * | KMPF-V02 | ERROR | Flavor declared without dimension (W2) |
- * | KMPF-V03 | ERROR | Dimension has no flavors assigned (W2 — currently thrown by FlavorVariantResolver) |
+ * | KMPF-V02 | ERROR | Flavor declared without dimension when dimensions are registered |
+ * | KMPF-V03 | ERROR | Dimension has no flavors assigned |
  * | KMPF-V04 | ERROR | Variant filter excluded ALL variants (no buildable variant remains) |
  * | KMPF-V05 | WARNING | Matrix mode opted in but zero KMP targets detected |
- * | KMPF-V06 | ERROR | Unknown active variant (`-PkmpFlavor=ghost` when ghost isn't a flavor) (W2) |
- * | KMPF-V07 | ERROR | `buildConfigField` has an invalid type (W2) |
+ * | KMPF-V06 | WARNING | Unknown active variant (`-PkmpFlavor=ghost` when ghost isn't a flavor) — soft-fall (project-wide property) |
+ * | KMPF-V07 | ERROR | `buildConfigField` has an invalid Kotlin literal type |
  * | KMPF-V08 | ERROR | Matrix mode opted in but no flavors are registered |
  */
 internal object KmpFlavorPluginValidator {
@@ -70,6 +71,13 @@ internal object KmpFlavorPluginValidator {
     const val CODE_UNKNOWN_ACTIVE_VARIANT: String = "KMPF-V06"
     const val CODE_INVALID_BUILD_CONFIG_FIELD_TYPE: String = "KMPF-V07"
     const val CODE_MATRIX_MODE_WITHOUT_FLAVORS: String = "KMPF-V08"
+
+    /**
+     * Supported Kotlin literal types for `buildConfigField`. Other types
+     * (custom classes, generics, nullable wrappers) require runtime
+     * serialization the plugin doesn't perform.
+     */
+    val SUPPORTED_BUILD_CONFIG_FIELD_TYPES: Set<String> = setOf("Boolean", "Int", "Long", "Float", "Double", "String")
 
     /**
      * Validate the resolved plugin configuration and return all findings.
@@ -85,6 +93,8 @@ internal object KmpFlavorPluginValidator {
         resolvedVariants: List<FlavorVariant>,
         matrixModeEnabled: Boolean,
         detectedTargetCount: Int,
+        dimensions: List<FlavorDimension> = emptyList(),
+        requestedVariantName: String? = null,
     ): List<KmpFlavorValidationFinding> {
         val findings = mutableListOf<KmpFlavorValidationFinding>()
 
@@ -103,6 +113,64 @@ internal object KmpFlavorPluginValidator {
             )
         }
 
+        // KMPF-V02: flavor declared without `dimension.set(...)` when dimensions are registered.
+        // Mixed dimension/no-dimension flavors are ambiguous — every flavor must specify which
+        // dimension it belongs to so the cartesian product is well-defined.
+        if (dimensions.isNotEmpty()) {
+            flavors.filter { it.dimension.orNull.isNullOrBlank() }.forEach { flavor ->
+                findings += KmpFlavorValidationFinding(
+                    code = CODE_FLAVOR_MISSING_DIMENSION,
+                    severity = KmpFlavorValidationSeverity.ERROR,
+                    message = "Flavor '${flavor.name}' is declared without a `dimension.set(...)` " +
+                        "call, but ${dimensions.size} dimension(s) are registered " +
+                        "(${dimensions.joinToString { it.name }}). Mixed dimension/no-dimension " +
+                        "flavors are ambiguous — every flavor must specify which dimension it " +
+                        "belongs to.",
+                    fix = "Set the dimension on '${flavor.name}': `kmpFlavors { flavors { " +
+                        "register(\"${flavor.name}\") { dimension.set(\"<dimensionName>\") } } }`. " +
+                        "Or remove all dimensions if you want single-dimension semantics.",
+                )
+            }
+        }
+
+        // KMPF-V03: dimension has no flavors assigned — the dimension can never produce a
+        // variant. Previously thrown by FlavorVariantResolver as IllegalStateException; v2.1
+        // routes it through the structured validator so the message catalogue stays consistent.
+        val dimensionsMissingFlavors = dimensions.filter { dim ->
+            flavors.none { it.dimension.orNull == dim.name }
+        }
+        dimensionsMissingFlavors.forEach { dim ->
+            findings += KmpFlavorValidationFinding(
+                code = CODE_DIMENSION_HAS_NO_FLAVORS,
+                severity = KmpFlavorValidationSeverity.ERROR,
+                message = "Dimension '${dim.name}' has no flavors assigned to it. " +
+                    "The dimension can never produce a variant.",
+                fix = "Either assign at least one flavor to '${dim.name}' " +
+                    "(`kmpFlavors { flavors { register(\"...\") { dimension.set(\"${dim.name}\") } } }`), " +
+                    "or remove the empty dimension from `flavorDimensions { }`.",
+            )
+        }
+
+        // KMPF-V07: `buildConfigField` declared with a type the codegen can't emit as a
+        // Kotlin `const val`. Supported types are Boolean / Int / Long / Float / Double /
+        // String. Other types either require runtime serialization or can't be `const`.
+        flavors.forEach { flavor ->
+            flavor.buildConfigFields.get().values.forEach { field ->
+                if (field.type !in SUPPORTED_BUILD_CONFIG_FIELD_TYPES) {
+                    findings += KmpFlavorValidationFinding(
+                        code = CODE_INVALID_BUILD_CONFIG_FIELD_TYPE,
+                        severity = KmpFlavorValidationSeverity.ERROR,
+                        message = "Flavor '${flavor.name}' declares `buildConfigField` " +
+                            "'${field.name}' with type '${field.type}', which is not a " +
+                            "supported Kotlin literal type. Supported: " +
+                            "${SUPPORTED_BUILD_CONFIG_FIELD_TYPES.sorted().joinToString(", ")}.",
+                        fix = "Pick one of the supported types, or stringify the value: " +
+                            "`buildConfigField(\"String\", \"${field.name}\", \"\\\"<value>\\\"\")`.",
+                    )
+                }
+            }
+        }
+
         // KMPF-V08: matrix mode opted in without any flavors
         if (matrixModeEnabled && flavors.isEmpty()) {
             findings += KmpFlavorValidationFinding(
@@ -116,8 +184,10 @@ internal object KmpFlavorPluginValidator {
             )
         }
 
-        // KMPF-V04: variantFilter excluded every variant — nothing buildable remains
-        if (flavors.isNotEmpty() && resolvedVariants.isEmpty()) {
+        // KMPF-V04: variantFilter excluded every variant — nothing buildable remains.
+        // Gated against V03: if a dimension has no flavors, the resolver legitimately produces
+        // an empty matrix and V03 is the more specific finding; suppress V04 in that case.
+        if (flavors.isNotEmpty() && resolvedVariants.isEmpty() && dimensionsMissingFlavors.isEmpty()) {
             findings += KmpFlavorValidationFinding(
                 code = CODE_VARIANT_FILTER_EXCLUDED_ALL,
                 severity = KmpFlavorValidationSeverity.ERROR,
@@ -142,6 +212,28 @@ internal object KmpFlavorPluginValidator {
                     "If you ARE declaring targets but they're being filtered out — note that " +
                     "the synthetic `metadata` target and the Android JVM target are " +
                     "deliberately excluded from matrix mode.",
+            )
+        }
+
+        // KMPF-V06: `-PkmpFlavor=<name>` references a variant the resolver doesn't know.
+        // WARNING (not ERROR) because the property is project-wide: in multi-project builds
+        // sibling projects with their own variant matrix legitimately won't recognise the
+        // value. Soft-fall to the default variant — V06 surfaces the mismatch without
+        // breaking the whole build.
+        if (!requestedVariantName.isNullOrBlank() &&
+            resolvedVariants.none { it.name.equals(requestedVariantName, ignoreCase = true) }
+        ) {
+            findings += KmpFlavorValidationFinding(
+                code = CODE_UNKNOWN_ACTIVE_VARIANT,
+                severity = KmpFlavorValidationSeverity.WARNING,
+                message = "-PkmpFlavor=$requestedVariantName references variant " +
+                    "'$requestedVariantName', which isn't a registered combination. " +
+                    "Registered variants: [${resolvedVariants.joinToString { it.name }}]. " +
+                    "Falling back to the default variant.",
+                fix = "Pick a registered variant from the list (case-insensitive) OR omit " +
+                    "`-PkmpFlavor` to let the plugin resolve from `isDefault` flags. If the " +
+                    "property is intentional for a sibling project in a multi-project build, " +
+                    "this warning is informational and can be ignored for this project.",
             )
         }
 

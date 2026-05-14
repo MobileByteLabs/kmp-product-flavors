@@ -19,21 +19,31 @@ package com.mobilebytelabs.kmpflavors
 import com.mobilebytelabs.kmpflavors.internal.AggregateTasksRegistrar
 import com.mobilebytelabs.kmpflavors.internal.AgpBridge
 import com.mobilebytelabs.kmpflavors.internal.CompilationRegistrar
+import com.mobilebytelabs.kmpflavors.internal.ComposeResourcesConfigurator
 import com.mobilebytelabs.kmpflavors.internal.DependencyConfigurator
+import com.mobilebytelabs.kmpflavors.internal.DependencyGuardHelper
+import com.mobilebytelabs.kmpflavors.internal.DetektPerVariantHelper
 import com.mobilebytelabs.kmpflavors.internal.FlavorVariantResolver
 import com.mobilebytelabs.kmpflavors.internal.GenerateBuildConfigTasksRegistrar
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorValidationSeverity
 import com.mobilebytelabs.kmpflavors.internal.MatrixModeResolver
+import com.mobilebytelabs.kmpflavors.internal.PerVariantIosPublishConfigurator
+import com.mobilebytelabs.kmpflavors.internal.PerVariantJsPublishConfigurator
 import com.mobilebytelabs.kmpflavors.internal.PerVariantPublishConfigurator
 import com.mobilebytelabs.kmpflavors.internal.PlatformDetector
 import com.mobilebytelabs.kmpflavors.internal.PlatformPropertiesConfigurator
 import com.mobilebytelabs.kmpflavors.internal.SourceSetConfigurator
+import com.mobilebytelabs.kmpflavors.internal.SpotlessDetektScopeHelper
+import com.mobilebytelabs.kmpflavors.internal.TestCompilationRegistrar
+import com.mobilebytelabs.kmpflavors.tasks.DiagnoseVariantTask
 import com.mobilebytelabs.kmpflavors.tasks.GenerateBuildConfigTask
 import com.mobilebytelabs.kmpflavors.tasks.GenerateRunConfigurationsTask
 import com.mobilebytelabs.kmpflavors.tasks.GenerateSpmManifestTask
+import com.mobilebytelabs.kmpflavors.tasks.GenerateVariantRunConfigurationsTask
 import com.mobilebytelabs.kmpflavors.tasks.InitFlavorSourceSetsTask
 import com.mobilebytelabs.kmpflavors.tasks.ListFlavorsTask
+import com.mobilebytelabs.kmpflavors.tasks.ListVariantCompilationsTask
 import com.mobilebytelabs.kmpflavors.tasks.PrintFlavorPropertiesTask
 import com.mobilebytelabs.kmpflavors.tasks.ValidateFlavorsTask
 import org.gradle.api.Action
@@ -155,21 +165,9 @@ class KmpFlavorPlugin : Plugin<Project> {
         val dimensions = extension.flavorDimensions.toList()
 
         // Skip if no flavors configured (v1.x behaviour preserved unless matrix
-        // mode is explicitly opted in, in which case KMPF-V08 must fire).
-        if (flavors.isEmpty()) {
-            if (MatrixModeResolver.isEnabled(project, extension)) {
-                throw GradleException(
-                    "kmpFlavors plugin configuration is invalid (1 error(s)):\n\n" +
-                        "  ${KmpFlavorPluginValidator.CODE_MATRIX_MODE_WITHOUT_FLAVORS}: " +
-                        "kmpFlavors.buildMatrix is enabled but no flavors are registered. " +
-                        "Matrix mode requires at least one flavor to generate compilations from.\n" +
-                        "  Fix: Either register flavors via " +
-                        "`kmpFlavors { flavors { register(\"…\") } }` in the convention " +
-                        "plugin, or remove the `buildMatrix.set(true)` / `gradle.properties: " +
-                        "kmpFlavors.buildMatrix=true` opt-in.\n\n" +
-                        "See docs/ERROR_CODES.md for the full catalog.",
-                )
-            }
+        // mode is explicitly opted in, in which case V08 fires through the validator
+        // below). The early-return only kicks in for v1.x no-flavor builds.
+        if (flavors.isEmpty() && !MatrixModeResolver.isEnabled(project, extension)) {
             logger.info("[KMP Flavors] No flavors configured. Skipping.")
             return
         }
@@ -188,27 +186,42 @@ class KmpFlavorPlugin : Plugin<Project> {
             buildTypes = buildTypesList,
             enableBuildTypes = enableBuildTypesFlag,
         )
+        // Don't early-return on empty allVariants — the validator below needs to see them so
+        // V03/V04/V08 surface as structured findings. We still log the warn line for v1.x
+        // parity, but defer the actual return until after validation.
         if (allVariants.isEmpty()) {
             logger.warn("[KMP Flavors] No variants resolved. Check dimension assignments or variant filters.")
-            return
         }
 
         // Log filtered variants if any were excluded
-        val baseTotal = if (dimensions.isEmpty()) {
-            flavors.size
-        } else {
-            dimensions.fold(1) { acc, dim ->
-                acc * flavors.count { it.dimension.orNull == dim.name }
+        if (allVariants.isNotEmpty()) {
+            val baseTotal = if (dimensions.isEmpty()) {
+                flavors.size
+            } else {
+                dimensions.fold(1) { acc, dim ->
+                    acc * flavors.count { it.dimension.orNull == dim.name }
+                }
+            }
+            val totalPossible = if (enableBuildTypesFlag && buildTypesList.isNotEmpty()) baseTotal * buildTypesList.size else baseTotal
+            if (allVariants.size < totalPossible) {
+                logger.lifecycle("[KMP Flavors] Variant filter excluded ${totalPossible - allVariants.size} variants")
             }
         }
-        val totalPossible = if (enableBuildTypesFlag && buildTypesList.isNotEmpty()) baseTotal * buildTypesList.size else baseTotal
-        if (allVariants.size < totalPossible) {
-            logger.lifecycle("[KMP Flavors] Variant filter excluded ${totalPossible - allVariants.size} variants")
-        }
 
-        // Determine active variant
-        val activeVariant = resolveActiveVariant(project, extension, dimensions, flavors, allVariants, buildTypesList, enableBuildTypesFlag)
-        logger.lifecycle("[KMP Flavors] Active variant: ${activeVariant.name}")
+        // Capture the requested variant name (-PkmpFlavor or activeFlavor.set(...)) so the
+        // validator can surface V06 when the value doesn't match a registered combination.
+        val requestedVariantName: String? = project.findProperty("kmpFlavor")?.toString()
+            ?: extension.activeFlavor.orNull
+
+        // Determine active variant. When allVariants is empty (V03/V04/V08 will throw
+        // shortly via the validator) we leave activeVariant null and unwrap after validation.
+        val activeVariant: FlavorVariant? = if (allVariants.isEmpty()) {
+            null
+        } else {
+            resolveActiveVariant(project, extension, dimensions, flavors, allVariants, buildTypesList, enableBuildTypesFlag).also {
+                logger.lifecycle("[KMP Flavors] Active variant: ${it.name}")
+            }
+        }
 
         // Detect platforms
         val platforms = PlatformDetector.detect(kotlin, logger)
@@ -227,6 +240,8 @@ class KmpFlavorPlugin : Plugin<Project> {
             resolvedVariants = allVariants,
             matrixModeEnabled = matrixModeEnabled,
             detectedTargetCount = nonAndroidTargets.size,
+            dimensions = dimensions,
+            requestedVariantName = requestedVariantName,
         )
         val errors = validationFindings.filter { it.severity == KmpFlavorValidationSeverity.ERROR }
         val warnings = validationFindings.filter { it.severity == KmpFlavorValidationSeverity.WARNING }
@@ -242,6 +257,13 @@ class KmpFlavorPlugin : Plugin<Project> {
                     "$formatted\n\n" +
                     "See docs/ERROR_CODES.md for the full catalog.",
             )
+        }
+        // Safe to unwrap — if we had an empty matrix the validator would have thrown.
+        // The early-return is defensive: only reachable if a future validator change drops
+        // one of V03/V04/V08 without compensating logic upstream.
+        val activeVariantResolved: FlavorVariant = activeVariant ?: run {
+            logger.info("[KMP Flavors] Empty variant matrix after validation — skipping task wiring.")
+            return
         }
 
         // Wire intermediate source sets if needed
@@ -262,7 +284,7 @@ class KmpFlavorPlugin : Plugin<Project> {
         sourceSetConfigurator.configure(
             project = project,
             kotlin = kotlin,
-            activeVariant = activeVariant,
+            activeVariant = activeVariantResolved,
             allFlavors = flavors,
             platforms = platforms,
             platformSourceSets = platformSourceSets,
@@ -289,7 +311,7 @@ class KmpFlavorPlugin : Plugin<Project> {
             // `compile{Active}Kotlin{Target}` naming collision with the
             // existing source-set wiring (KGP rejects sources being in two
             // compilations and dependsOn into a default source set).
-            val activeVariantName = activeVariant.name
+            val activeVariantName = activeVariantResolved.name
             val variantNames = allVariants
                 .map { it.name }
                 .filter { it != activeVariantName }
@@ -342,7 +364,92 @@ class KmpFlavorPlugin : Plugin<Project> {
                     "compilations across ${nonAndroidTargets.size} non-Android target(s) " +
                     "(active variant '$activeVariantName' continues to compile through `main`)",
             )
+
+            // v2.1 Phase 2 (Q10) — register `compile{Variant}TestKotlin{Target}` per inactive
+            // variant × target. The active variant uses KGP's standard `test` compilation.
+            //
+            // Per-variant test source-set wiring: for each flavor in the variant, ensure
+            // `common{Flavor}Test` exists and `dependsOn(commonTest)`. The registrar then
+            // wires the variant test compilation's defaultSourceSet to dependsOn each
+            // per-flavor test source set, so per-flavor test helpers + `internal` symbols
+            // from the variant main are visible exactly the way KMP expects.
+            //
+            // Skipped silently when the module declares no `commonTest` (test-less modules).
+            val commonTestSourceSet = kotlin.sourceSets.findByName("commonTest")
+            if (commonTestSourceSet != null) {
+                val parentTestSourceSetsFor: (String) -> List<org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet> = { name ->
+                    val variant = variantByName[name]
+                    if (variant == null) {
+                        emptyList()
+                    } else {
+                        variant.flavors.map { flavor ->
+                            val ssName = "common${flavor.name.replaceFirstChar { it.uppercase() }}Test"
+                            kotlin.sourceSets.maybeCreate(ssName).also { commonFlavorTest ->
+                                commonFlavorTest.dependsOn(commonTestSourceSet)
+                                commonFlavorTest.kotlin.srcDir("src/$ssName/kotlin")
+                                commonFlavorTest.resources.srcDir("src/$ssName/resources")
+                            }
+                        }
+                    }
+                }
+                val variantSpecificTestSrcDirsFor: (String) -> List<String> = { name ->
+                    listOf("src/${name}Test/kotlin")
+                }
+                nonAndroidTargets.forEach { target ->
+                    TestCompilationRegistrar.register(
+                        target = target,
+                        variantNames = variantNames,
+                        parentTestSourceSetsFor = parentTestSourceSetsFor,
+                        variantSpecificTestSrcDirsFor = variantSpecificTestSrcDirsFor,
+                        logger = logger,
+                    )
+                }
+                logger.lifecycle(
+                    "[KMP Flavors] Matrix mode: registered ${variantNames.size} inactive-variant " +
+                        "TEST compilations across ${nonAndroidTargets.size} non-Android target(s) " +
+                        "(active variant '$activeVariantName' continues to use the standard `test` compilation)",
+                )
+            } else {
+                logger.info(
+                    "[KMP Flavors] No `commonTest` source set on this module — skipping per-variant " +
+                        "test compilation registration (Q10 no-op for test-less modules).",
+                )
+            }
         }
+
+        // v2.1 Phase 3A (per-variant Compose resources) — auto-discovery via CMP convention.
+        // Only logs a lifecycle line when CMP is applied; no source-set wiring needed because
+        // CMP iterates kotlin.sourceSets to apply its composeResources/ convention.
+        ComposeResourcesConfigurator.configure(
+            project = project,
+            kotlin = kotlin,
+            allFlavors = flavors,
+            matrixModeEnabled = matrixModeEnabled,
+            logger = logger,
+        )
+
+        // v2.1 Phase 4 — adjacent-plugin helpers (opt-in).
+        // Each helper is a no-op unless the consumer flips the corresponding
+        // kmpFlavors property AND applies the matching adjacent plugin.
+        val nonAndroidTargetNames = nonAndroidTargets.map { it.name }
+        DependencyGuardHelper.configure(
+            project = project,
+            allVariants = allVariants,
+            targetNames = nonAndroidTargetNames,
+            enabled = extension.dependencyGuardPerVariant.get(),
+            logger = logger,
+        )
+        SpotlessDetektScopeHelper.configure(
+            project = project,
+            enabled = extension.excludeGeneratedFromFormatters.get(),
+            logger = logger,
+        )
+        DetektPerVariantHelper.configure(
+            project = project,
+            allVariants = allVariants,
+            enabled = extension.detektPerVariant.get(),
+            logger = logger,
+        )
 
         // Q3-A — register one GenerateBuildConfigTask per INACTIVE variant in matrix
         // mode and wire each task's output directory into the corresponding
@@ -350,7 +457,7 @@ class KmpFlavorPlugin : Plugin<Project> {
         // is registered by registerTasks() below as `generateFlavorBuildConfig`
         // (v1.x behaviour preserved).
         if (matrixModeEnabled) {
-            val inactiveVariants = allVariants.filter { it.name != activeVariant.name }
+            val inactiveVariants = allVariants.filter { it.name != activeVariantResolved.name }
             GenerateBuildConfigTasksRegistrar.register(
                 project = project,
                 extension = extension,
@@ -385,7 +492,7 @@ class KmpFlavorPlugin : Plugin<Project> {
             // (the active variant compiles through `main`, so its `compilations`
             // map is intentionally empty — consumers asking about the active
             // variant's compilation should query `target.compilations.main`).
-            val inactiveVariantNames = allVariants.map { it.name }.toSet() - activeVariant.name
+            val inactiveVariantNames = allVariants.map { it.name }.toSet() - activeVariantResolved.name
             val resolvedTargets = nonAndroidTargets.toSet()
             // configureEach { } SAM-converts to KmpFlavorVariant.() -> Unit (receiver-style),
             // not (KmpFlavorVariant) -> Unit. So use `this` rather than a named param.
@@ -405,20 +512,39 @@ class KmpFlavorPlugin : Plugin<Project> {
         // Q18-C — register aggregate `assembleAll{Target}Variants` per target +
         // super-aggregate `assembleAllVariants` walking every target × variant.
         if (matrixModeEnabled) {
-            val inactiveVariants = allVariants.filter { it.name != activeVariant.name }
+            val inactiveVariants = allVariants.filter { it.name != activeVariantResolved.name }
             AggregateTasksRegistrar.register(
                 project = project,
                 nonAndroidTargets = nonAndroidTargets,
-                activeVariant = activeVariant,
+                activeVariant = activeVariantResolved,
                 inactiveVariants = inactiveVariants,
             )
         }
 
         // Q21-D — per-variant Maven publishing mechanism. No-op when
         // publishMatrix isn't opted in or when maven-publish isn't applied.
+        // v2.0 ships JVM; v2.1 Phase 5 extends to iOS + JS/WasmJs.
         if (matrixModeEnabled) {
-            val inactiveVariants = allVariants.filter { it.name != activeVariant.name }
+            val inactiveVariants = allVariants.filter { it.name != activeVariantResolved.name }
             PerVariantPublishConfigurator.configure(
+                project = project,
+                extension = extension,
+                inactiveVariants = inactiveVariants,
+                nonAndroidTargets = nonAndroidTargets,
+            )
+            // v2.1 Phase 5A — iOS per-variant publishing (classifier-tagged MavenPublication
+            // per (inactive variant × iOS target); per-variant XCFramework aggregation
+            // deferred to v2.2 — see docs/PUBLISHING.md).
+            PerVariantIosPublishConfigurator.configure(
+                project = project,
+                extension = extension,
+                inactiveVariants = inactiveVariants,
+                nonAndroidTargets = nonAndroidTargets,
+            )
+            // v2.1 Phase 5B+5C — JS/WasmJs per-variant publishing (classifier-tagged
+            // MavenPublication per (inactive variant × JS-family target); npm registry
+            // publishing is consumer-side — see docs/PUBLISHING.md).
+            PerVariantJsPublishConfigurator.configure(
                 project = project,
                 extension = extension,
                 inactiveVariants = inactiveVariants,
@@ -428,7 +554,7 @@ class KmpFlavorPlugin : Plugin<Project> {
 
         // Configure dependencies
         val dependencyConfigurator = DependencyConfigurator(logger)
-        dependencyConfigurator.configure(project, activeVariant)
+        dependencyConfigurator.configure(project, activeVariantResolved)
 
         // AGP bridge — propagate KMP flavors / build types into the Android
         // Gradle Plugin extension when consumer opts in via bridgeAgp* flags.
@@ -445,15 +571,43 @@ class KmpFlavorPlugin : Plugin<Project> {
 
         // SPM manifest generator — opt-in via spm { generateManifest.set(true) }
         if (extension.spm.generateManifest.get()) {
-            registerSpmTask(project, extension, activeVariant)
+            registerSpmTask(project, extension, activeVariantResolved)
         }
 
         // Configure platform-specific properties
         val platformPropertiesConfigurator = PlatformPropertiesConfigurator(logger)
-        platformPropertiesConfigurator.configure(project, activeVariant)
+        platformPropertiesConfigurator.configure(project, activeVariantResolved)
+
+        // Q22/Q13 — register diagnostic tasks (diagnoseVariant + listVariantCompilations).
+        // Always-on (not gated by matrix mode) so they remain useful for v1.x consumers too.
+        registerDiagnosticTasks(
+            project = project,
+            extension = extension,
+            kotlin = kotlin,
+            allVariants = allVariants,
+            activeVariant = activeVariantResolved,
+            nonAndroidTargets = nonAndroidTargets,
+            matrixModeEnabled = matrixModeEnabled,
+        )
 
         // Register tasks
-        registerTasks(project, extension, allVariants, activeVariant, flavors, dimensions, platforms)
+        registerTasks(project, extension, allVariants, activeVariantResolved, flavors, dimensions, platforms)
+
+        // v2.1 Phase 4 — per-variant × target IDE run configurations. Registered here
+        // (not in registerTasks) because we need `nonAndroidTargets` to derive the
+        // exact KMP target names (jvm("desktop") + jvm("server") → two separate
+        // entries, not collapsed under a single "jvm" platform prefix).
+        project.tasks.register(
+            "generateVariantRunConfigurations",
+            GenerateVariantRunConfigurationsTask::class.java,
+        ).configure {
+            projectName.set(project.name)
+            projectPath.set(project.path)
+            variantNames.set(allVariants.map { it.name })
+            targetNames.set(nonAndroidTargetNames)
+            activeVariantName.set(activeVariantResolved.name)
+            outputDirectory.set(project.rootProject.layout.projectDirectory.dir(".run"))
+        }
 
         // Wire build config generation to compilation if enabled.
         // Multi-module-safe: in a build with multiple subprojects applying this
@@ -538,6 +692,100 @@ class KmpFlavorPlugin : Plugin<Project> {
         return false
     }
 
+    /**
+     * Q22 + Q13 — diagnostic tasks. Captures the variant × target compilation
+     * matrix and the per-variant source-set closure at configuration time so
+     * the tasks remain configuration-cache-friendly.
+     */
+    private fun registerDiagnosticTasks(
+        project: Project,
+        extension: KmpFlavorExtension,
+        kotlin: KotlinMultiplatformExtension,
+        allVariants: List<FlavorVariant>,
+        activeVariant: FlavorVariant,
+        nonAndroidTargets: List<org.jetbrains.kotlin.gradle.plugin.KotlinTarget>,
+        matrixModeEnabled: Boolean,
+    ) {
+        if (allVariants.isEmpty()) return
+
+        // Variant -> list of (target, registered-compilation-name) entries.
+        val compilationByVariantTargetData = mutableMapOf<String, String>()
+        val targetsByVariantData = mutableMapOf<String, MutableList<String>>()
+        val sourceSetsByVariantData = mutableMapOf<String, MutableList<String>>()
+
+        for (variant in allVariants) {
+            val targetsForVariant = mutableListOf<String>()
+            val sourceSetsForVariant = mutableSetOf<String>()
+            for (target in nonAndroidTargets) {
+                // Active variant compiles through `main`; inactive variants (in matrix mode)
+                // have their own compilation named after the variant.
+                val compilationName = if (variant.name == activeVariant.name) "main" else variant.name
+                val compilation = target.compilations.findByName(compilationName)
+                    ?: if (variant.name == activeVariant.name) {
+                        target.compilations.findByName("main")
+                    } else {
+                        null
+                    }
+                if (compilation != null) {
+                    compilationByVariantTargetData["${variant.name}::${target.name}"] = compilation.name
+                    targetsForVariant += target.name
+                    // BFS the dependsOn closure starting from defaultSourceSet.
+                    val visited = mutableSetOf<String>()
+                    val frontier = ArrayDeque<org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet>()
+                    frontier.addLast(compilation.defaultSourceSet)
+                    while (frontier.isNotEmpty()) {
+                        val ss = frontier.removeFirst()
+                        if (visited.add(ss.name)) {
+                            ss.dependsOn.forEach { frontier.addLast(it) }
+                        }
+                    }
+                    sourceSetsForVariant += visited
+                }
+            }
+            targetsByVariantData[variant.name] = targetsForVariant.distinct().sorted().toMutableList()
+            sourceSetsByVariantData[variant.name] = sourceSetsForVariant.sorted().toMutableList()
+        }
+
+        val flavorsByVariantData = allVariants.associate { v -> v.name to v.flavorNames }
+        val buildTypeByVariantData = allVariants.associate { v -> v.name to (v.buildType?.name ?: "") }
+        val buildConfigFieldsByVariantData = allVariants.associate { v ->
+            v.name to v.mergedBuildConfigFields.mapValues { (_, field) ->
+                "${field.type}::${field.value}"
+            }
+        }
+        val targetNames = nonAndroidTargets.map { it.name }
+
+        project.tasks.register(
+            "diagnoseVariant",
+            DiagnoseVariantTask::class.java,
+        ).configure {
+            flavorsByVariant.set(flavorsByVariantData)
+            buildTypeByVariant.set(buildTypeByVariantData)
+            sourceSetsByVariant.set(sourceSetsByVariantData.mapValues { it.value.toList() })
+            targetsByVariant.set(targetsByVariantData.mapValues { it.value.toList() })
+            buildConfigFieldsByVariant.set(buildConfigFieldsByVariantData)
+            activeVariantName.set(activeVariant.name)
+            variantFilterCount.set(extension.variantFilterActions.size)
+        }
+
+        project.tasks.register(
+            "listVariantCompilations",
+            ListVariantCompilationsTask::class.java,
+        ).configure {
+            allVariantNames.set(allVariants.map { it.name })
+            allTargetNames.set(targetNames)
+            compilationByVariantTarget.set(compilationByVariantTargetData)
+            activeVariantName.set(activeVariant.name)
+        }
+
+        if (!matrixModeEnabled) {
+            project.logger.info(
+                "[KMP Flavors] Matrix mode is off — diagnoseVariant / listVariantCompilations " +
+                    "will report only the active variant's `main` compilation per target.",
+            )
+        }
+    }
+
     private fun resolveActiveVariant(
         project: Project,
         extension: KmpFlavorExtension,
@@ -558,18 +806,9 @@ class KmpFlavorPlugin : Plugin<Project> {
             if (resolved != null) {
                 resolved
             } else {
-                // Soft-fall to default variant when `-PkmpFlavor` doesn't match this
-                // project's variants. The property is project-wide (set with -P at the
-                // CLI), so in a multi-project build it's normal for sibling projects
-                // not to recognise the value (CI passes -PkmpFlavor=freeDev for one
-                // sample, every other plugin-applied module sees the property too).
-                // KMPF-V06 in docs/ERROR_CODES.md: WARNING-level fall-back, not ERROR.
-                project.logger.warn(
-                    "[KMP Flavors] KMPF-V06: Unknown variant '$activeName' for project " +
-                        "':${project.name}'. Available variants: " +
-                        "${allVariants.joinToString(", ") { it.name }}. " +
-                        "Falling back to default variant.",
-                )
+                // V06 (unknown active variant) is surfaced by the validator as a WARNING-level
+                // finding before this point — see KmpFlavorPluginValidator.validate(). Here we
+                // just soft-fall to the default variant so the build can continue.
                 FlavorVariantResolver.resolveDefaultVariant(dimensions, flavors, buildTypes, enableBuildTypes)
                     ?: allVariants.first()
             }
@@ -583,7 +822,7 @@ class KmpFlavorPlugin : Plugin<Project> {
         project: Project,
         extension: KmpFlavorExtension,
         allVariants: List<FlavorVariant>,
-        activeVariant: FlavorVariant,
+        activeVariantResolved: FlavorVariant,
         flavors: List<FlavorConfig>,
         dimensions: List<FlavorDimension>,
         platforms: List<com.mobilebytelabs.kmpflavors.internal.PlatformGroup>,
@@ -596,12 +835,12 @@ class KmpFlavorPlugin : Plugin<Project> {
             ) {
                 packageName.set(extension.buildConfigPackage)
                 className.set(extension.buildConfigClassName)
-                variantName.set(activeVariant.name)
+                variantName.set(activeVariantResolved.name)
                 allFlavorNames.set(flavors.map { it.name }.toSet())
-                activeFlavorNames.set(activeVariant.flavorNames.toSet())
+                activeFlavorNames.set(activeVariantResolved.flavorNames.toSet())
                 allBuildTypeNames.set(extension.buildTypes.map { it.name }.toSet())
-                activeBuildTypeName.set(activeVariant.buildType?.name ?: "")
-                buildConfigFields.set(activeVariant.mergedBuildConfigFields)
+                activeBuildTypeName.set(activeVariantResolved.buildType?.name ?: "")
+                buildConfigFields.set(activeVariantResolved.mergedBuildConfigFields)
                 outputDirectory.set(
                     project.layout.buildDirectory.dir("generated/kmpFlavors/commonMain/kotlin"),
                 )
@@ -617,13 +856,13 @@ class KmpFlavorPlugin : Plugin<Project> {
             flavorDimensions.set(flavors.associate { it.name to (it.dimension.orNull ?: "") })
             flavorDefaults.set(flavors.associate { it.name to it.isDefault.getOrElse(false) })
             validVariantNames.set(allVariants.map { it.name }.toSet())
-            activeVariantName.set(activeVariant.name)
+            activeVariantName.set(activeVariantResolved.name)
             allFlavorNames.set(flavors.map { it.name })
         }
 
         // List flavors task
         val variantsData = allVariants.associate { it.name to it.flavorNames }
-        val activeVariantNameValue = activeVariant.name
+        val activeVariantNameValue = activeVariantResolved.name
         val dimensionsData = dimensions.associate { it.name to it.priority.getOrElse(0) }
         val platformsData = platforms.filter { !it.isIntermediate }.map { it.prefix }
 
@@ -670,30 +909,30 @@ class KmpFlavorPlugin : Plugin<Project> {
             "printFlavorProperties",
             PrintFlavorPropertiesTask::class.java,
         ).configure {
-            variantName.set(activeVariant.name)
+            variantName.set(activeVariantResolved.name)
             applicationIdSuffix.set(
-                activeVariant.combinedApplicationIdSuffix.ifEmpty { null },
+                activeVariantResolved.combinedApplicationIdSuffix.ifEmpty { null },
             )
             bundleIdSuffix.set(
-                activeVariant.combinedBundleIdSuffix.ifEmpty { null },
+                activeVariantResolved.combinedBundleIdSuffix.ifEmpty { null },
             )
             versionNameSuffix.set(
-                activeVariant.combinedVersionNameSuffix.ifEmpty { null },
+                activeVariantResolved.combinedVersionNameSuffix.ifEmpty { null },
             )
             desktopTitleSuffix.set(
-                activeVariant.combinedDesktopTitleSuffix.ifEmpty { null },
+                activeVariantResolved.combinedDesktopTitleSuffix.ifEmpty { null },
             )
             webTitleSuffix.set(
-                activeVariant.combinedWebTitleSuffix.ifEmpty { null },
+                activeVariantResolved.combinedWebTitleSuffix.ifEmpty { null },
             )
         }
     }
 
-    private fun registerSpmTask(project: org.gradle.api.Project, extension: KmpFlavorExtension, activeVariant: FlavorVariant) {
-        // Resolve the active flavor's name. activeVariant.flavors holds the list of
+    private fun registerSpmTask(project: org.gradle.api.Project, extension: KmpFlavorExtension, activeVariantResolved: FlavorVariant) {
+        // Resolve the active flavor's name. activeVariantResolved.flavors holds the list of
         // FlavorConfig objects forming this variant; we use the first dimension's flavor
         // for {flavor} interpolation, matching the convention applicationIdSuffix uses.
-        val flavorName = activeVariant.flavors.firstOrNull()?.name ?: activeVariant.name
+        val flavorName = activeVariantResolved.flavors.firstOrNull()?.name ?: activeVariantResolved.name
 
         project.tasks.register(
             "generateSpmManifest",
@@ -701,7 +940,7 @@ class KmpFlavorPlugin : Plugin<Project> {
         ).configure {
             group = "kmp flavors"
             description = "Generate Package.swift manifest for SPM distribution of the active flavor variant"
-            variantName.set(activeVariant.name)
+            variantName.set(activeVariantResolved.name)
             this.flavorName.set(flavorName)
             xcframeworkName.set(extension.spm.xcframeworkName)
             distribution.set(extension.spm.distribution)
@@ -709,7 +948,7 @@ class KmpFlavorPlugin : Plugin<Project> {
             xcframeworkPath.set(extension.spm.xcframeworkPath)
             projectVersion.set(project.provider { project.version.toString() })
             checksumStrategy.set(extension.spm.checksumStrategy)
-            outputDirectory.set(project.layout.buildDirectory.dir("spm/${activeVariant.name}"))
+            outputDirectory.set(project.layout.buildDirectory.dir("spm/${activeVariantResolved.name}"))
         }
 
         // Hook into :assemble so generation happens automatically alongside builds.

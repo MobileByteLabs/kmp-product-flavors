@@ -272,6 +272,47 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
     abstract val bridgeAgpBuildTypes: Property<Boolean>
 
     /**
+     * v2.1 Phase 4 — per-variant dependency-guard baselines.
+     *
+     * When `true` AND the consumer applies `com.dropbox.dependency-guard`,
+     * the plugin auto-registers one `dependencyGuard { configuration(...) }`
+     * entry per (variant × target). Closes Q24's documented limitation
+     * around manually listing per-variant compileClasspath configurations.
+     *
+     * Convention: false (opt-in).
+     */
+    abstract val dependencyGuardPerVariant: Property<Boolean>
+
+    /**
+     * v2.1 Phase 4 — auto-exclude generated `BuildKonfig` directories
+     * from Spotless and Detekt globs.
+     *
+     * When `true`, the plugin adds an `exclude` for the generated path
+     * entry to every Spotless task and every Detekt task. Closes Q24's
+     * documented "watch source-set scope" caveat.
+     *
+     * No-op when neither Spotless nor Detekt is applied.
+     *
+     * Convention: false (opt-in).
+     */
+    abstract val excludeGeneratedFromFormatters: Property<Boolean>
+
+    /**
+     * v2.1 Phase 4 — per-variant Detekt analysis.
+     *
+     * When `true` AND the consumer applies `io.gitlab.arturbosch.detekt`,
+     * the plugin registers one `detekt{Variant}` task per variant whose
+     * source scope is the variant's source-set hierarchy and whose
+     * baseline resolves to `config/detekt/{variant}/baseline.xml`.
+     *
+     * Equivalent UX to AGP's "Lint per variant" — the most-requested
+     * adjacent-plugin gap on the v2.0 alpha feedback.
+     *
+     * Convention: false (opt-in).
+     */
+    abstract val detektPerVariant: Property<Boolean>
+
+    /**
      * Internal list of variant filter actions.
      */
     internal val variantFilterActions = mutableListOf<Action<VariantFilter>>()
@@ -367,5 +408,12 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
         // silently. Consumers no longer need to manually toggle these flags.
         bridgeAgpProductFlavors.convention(true)
         bridgeAgpBuildTypes.convention(true)
+        // Phase-4 helpers default to off (opt-in). Consumers wire them via:
+        //   kmpFlavors { dependencyGuardPerVariant.set(true) }
+        //   kmpFlavors { excludeGeneratedFromFormatters.set(true) }
+        //   kmpFlavors { detektPerVariant.set(true) }
+        dependencyGuardPerVariant.convention(false)
+        excludeGeneratedFromFormatters.convention(false)
+        detektPerVariant.convention(false)
     }
 }

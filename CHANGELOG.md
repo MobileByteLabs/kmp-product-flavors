@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-05-14
+
+> **v2.1 — AGP-parity-complete on the Kotlin side.** Closes the deliberate v2.0 deferrals: per-variant test compilations, per-variant resources (CMP + Android), validator hardening (V02/V03/V06/V07), IDE Run Configurations × target, Detekt-per-variant, dependency-guard / Spotless helpers, and native per-variant publishing (iOS klib + JS/WasmJs). No breaking changes for v2.0 consumers — `2.1.0` is a drop-in pin bump.
+
+### Added
+
+- **`diagnoseVariant` task** (RFC §3 Q22) — `./gradlew :module:diagnoseVariant --variant freeDev` prints source-set tree, target list, BuildConfig fields, and active-filter count for one variant. `--json` flag for CI consumption. Configuration-cache friendly.
+- **`listVariantCompilations` task** (RFC §3 Q13) — Markdown table of the full variant × target compilation matrix with ACTIVE/inactive status per row.
+- **`generateVariantRunConfigurations` task** (RFC §3 G22) — one `.run.xml` per (variant × target) under `.run/`. Active variant invokes `compileKotlin{Target}`; inactive variants invoke `compile{Variant}Kotlin{Target}`. Sibling to v2.0's `generateRunConfigurations`.
+- **Per-variant test compilations** (RFC §3 Q10) — matrix mode now registers `compile{Variant}TestKotlin{Target}` per inactive variant × target via `TestCompilationRegistrar`. Per-variant test code can call variant main's `internal` declarations via `associateWith`; cross-variant test isolation holds.
+- **Per-variant Compose resources** — `composeResources/` directories under per-flavor source sets (`src/commonFree/composeResources/...`) are auto-discovered by Compose Multiplatform v1.7+. Leaf source set wins on duplicate keys. Active variant sees `commonMain + commonActiveFlavor`; inactive variants see `commonMain + commonInactiveFlavor`. Cross-variant isolation preserved.
+- **Per-variant Android resources via AGP bridge** — `src/{flavor}/res/values/strings.xml` overrides work unchanged from v1.x. The AGP bridge propagates flavors into AGP's `productFlavors` so AGP's native per-flavor `res/` discovery applies.
+- **`KmpFlavorPluginValidator` codes V02/V03/V06/V07** — `FLAVOR_MISSING_DIMENSION` (ERROR), `DIMENSION_HAS_NO_FLAVORS` (ERROR; migrated from `FlavorVariantResolver`'s `IllegalStateException`), `UNKNOWN_ACTIVE_VARIANT` (WARNING — `-PkmpFlavor` is project-wide in multi-project builds), `INVALID_BUILD_CONFIG_FIELD_TYPE` (ERROR; supported set is `Boolean / Int / Long / Float / Double / String`). V04 gated against V03 to prevent double-fire on empty matrix.
+- **`kmpFlavors.dependencyGuardPerVariant: Property<Boolean>`** (opt-in) — auto-registers one `dependencyGuard.configuration(...)` entry per (variant × target). Closes Q24's documented "consumer must add baselines manually" caveat.
+- **`kmpFlavors.excludeGeneratedFromFormatters: Property<Boolean>`** (opt-in) — auto-excludes the per-variant codegen output path from Spotless + Detekt globs. Closes Q24's "watch source-set scope" caveats.
+- **`kmpFlavors.detektPerVariant: Property<Boolean>`** (opt-in) — registers one `detekt{Variant}` task per variant with per-variant baselines at `config/detekt/{variant}/baseline.xml`. Equivalent UX to AGP's "Lint per variant" for non-Android targets — the most-requested adjacent-plugin gap on v2.0 alpha feedback.
+- **Per-variant iOS publishing** (RFC §3 Q21-D extension) — `PerVariantIosPublishConfigurator` registers a classifier-tagged Zip + MavenPublication per (inactive variant × iOS target). Consumers resolve via `coordinate:1.0.0:paid-iosArm64`.
+- **Per-variant JS / WasmJs publishing** — `PerVariantJsPublishConfigurator` registers classifier-tagged publications for `js(IR)` and `wasmJs()` targets. Consumers resolve via `coordinate:1.0.0:paid-js` or `coordinate:1.0.0:paid-wasmJs`.
+- **`docs/PUBLISHING.md`** — consumer reference for per-variant publishing across JVM / iOS / JS / WasmJs. Documents v2.1 scope vs v2.2 deferrals (XCFramework aggregation, per-variant Package.swift, npm registry publishing).
+- **`docs/MATRIX_MODE.md` updates** — new "Per-variant resources" section; Q24 adjacent-plugin compat table fully ✅ (no ⚠ rows remain); CLI cheat sheet entry for `generateVariantRunConfigurations`; `publishMatrix` row points at `PUBLISHING.md` for the full target catalog.
+
+### Tests
+
+- 35 new tests across Phases 1–5: `KmpFlavorPluginValidatorTest` (+8 cases for V02/V03/V06/V07), `DiagnoseVariantTaskTest` (5 TestKit), `ListVariantCompilationsTaskTest` (2 TestKit), `PerVariantTestCompilationTest` (3 TestKit), `PerVariantComposeResourcesTest` (3 ProjectBuilder + 1 `@Disabled` TestKit), `Phase4HelpersTest` (8 ProjectBuilder), `GenerateVariantRunConfigurationsTaskTest` (3 TestKit), `PerVariantNativePublishingTest` (4 TestKit), `FlavorVariantResolverTest` migrated (throws → returns-empty). Full suite green; `./ci-prepush.sh` 11/11 green at every phase boundary.
+
+### Known limitations
+
+- **Per-variant Compose hot-reload** — still active-variant only. Bumped to **v2.2 Phase 2A**.
+- **Per-variant XCFramework aggregation** — deferred to v2.2. v2.1's iOS scope ships the publishing surface (klib Zip + MavenPublication); consumers wire `XCFramework()` aggregation manually if needed. See `docs/PUBLISHING.md` for the consumer-side workaround.
+- **Per-variant Package.swift (SPM)** — deferred to v2.2 (depends on XCFramework above). The existing `GenerateSpmManifestTask` ships single-variant SPM unchanged.
+- **npm registry publishing** — intentionally consumer-side per the v2.1 plan risk register. The plugin produces the classifier-tagged Maven publication; consumers wire their `~/.npmrc` and `kotlinNpmPublishToRegistry` separately.
+- **CMP integration TestKit** — `@Disabled` due to `withPluginClasspath()` classloader isolation (`Could not find KotlinMultiplatformExtension`). End-to-end verification of per-variant Compose resources delegated to `samples/compose-multiplatform/` and consumer adoption canaries.
+
+### Compatibility
+
+- **No breaking changes for v2.0 consumers**: v2.1.0 with `buildMatrix.set(true)` left untouched is behaviourally identical to v2.0.0 except for the 4 new validator codes — V02/V03/V07 are ERRORs and will fail builds that were silently malformed in v2.0; V06 is a WARNING. Mitigation: V02/V03/V07 conditions were already broken in v2.0 (just less clearly diagnosed); fixing the underlying configuration restores compatibility.
+- Minimum KGP: 2.1+ (tested against 2.2.21 and 2.3.0).
+- Minimum Gradle: 8.5+ (tested against 9.5).
+- Minimum JDK: 17+.
+- For per-variant Compose resources: minimum Compose Multiplatform 1.7.0+. v2.1 ships with light-touch CMP-version detection; older versions still work but per-variant resource auto-discovery may be incomplete.
+
 ## [2.0.0-alpha.1] - 2026-05-14
 
 > **Matrix mode** ships. Build every variant × every non-Android KMP target in one Gradle invocation, AGP-style. Opt-in (`kmpFlavors.buildMatrix=true`), with **zero per-module `build.gradle.kts` change** required from consumers (Zero-Touch Adoption tenet, RFC §1.1).

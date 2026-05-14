@@ -2,7 +2,7 @@
 
 > Stable error codes raised by `KmpFlavorPluginValidator` and related runtime checks. Once shipped at a version, each code retains the same meaning across minor releases so CI tooling (grep, IDE quick-fixes, error-aggregation dashboards) stays portable.
 
-Each entry: `code`, `severity`, `message` (rendered to consumers), `fix` (concrete suggestion), `since` (first plugin version shipping the code).
+Each entry: `code`, `severity`, `message` (rendered to consumers), `fix` (concrete suggestion), `since` (first plugin version shipping the code), and (where relevant) an `example` snippet that triggers the finding.
 
 ---
 
@@ -17,25 +17,28 @@ Each entry: `code`, `severity`, `message` (rendered to consumers), `fix` (concre
 
 ---
 
-## KMPF-V02 — Flavor declared without dimension assignment *(W2 — pending)*
+## KMPF-V02 — Flavor declared without dimension assignment
 
 | | |
 |---|---|
 | **Severity** | ERROR |
-| **Since** | v2.0.0+ (W2 follow-up) |
-| **Message** | Flavor `<name>` is declared without a `dimension.set(...)` call but dimensions are registered. Mixed dimension/no-dimension flavors are ambiguous. |
-| **Fix** | Either set `dimension.set("...")` on every flavor, or remove all dimensions to use single-dimension semantics. |
+| **Since** | v2.1.0 |
+| **Message** | Flavor `<name>` is declared without a `dimension.set(...)` call but `<N>` dimension(s) are registered (`<list>`). Mixed dimension/no-dimension flavors are ambiguous — every flavor must specify which dimension it belongs to. |
+| **Fix** | Either set `dimension.set("<dimensionName>")` on every flavor, or remove all dimensions to use single-dimension semantics. |
+| **Example** | `flavors { register("free") { dimension.set("tier") }; register("paid") /* missing */ }` with `flavorDimensions { register("tier") }`. |
 
 ---
 
-## KMPF-V03 — Dimension has no flavors *(currently thrown by FlavorVariantResolver)*
+## KMPF-V03 — Dimension has no flavors
 
 | | |
 |---|---|
 | **Severity** | ERROR |
-| **Since** | v1.x (currently as `IllegalStateException`; migrated to KMPF-V03 in W2) |
+| **Since** | v2.1.0 (was an `IllegalStateException` from `FlavorVariantResolver` in v1.x / v2.0; migrated to a structured finding in v2.1) |
 | **Message** | Dimension `<name>` has no flavors assigned to it. The dimension can never produce a variant. |
-| **Fix** | Either assign at least one flavor to the dimension via `dimension.set("<name>")` on the flavor, or remove the empty dimension. |
+| **Fix** | Either assign at least one flavor to the dimension via `dimension.set("<name>")` on a flavor, or remove the empty dimension from `flavorDimensions { }`. |
+| **Example** | `flavorDimensions { register("tier"); register("env") }` with only `tier`-dimensioned flavors → V03 fires for `env`. |
+| **Note** | V03 suppresses V04 when both conditions hold (V03 is the more specific finding for an empty matrix). |
 
 ---
 
@@ -61,25 +64,27 @@ Each entry: `code`, `severity`, `message` (rendered to consumers), `fix` (concre
 
 ---
 
-## KMPF-V06 — Unknown active variant *(W2 — pending)*
+## KMPF-V06 — Unknown active variant
 
 | | |
 |---|---|
-| **Severity** | ERROR |
-| **Since** | v2.0.0+ (W2 follow-up) |
-| **Message** | `-PkmpFlavor=<name>` references variant `<name>`, which isn't a registered combination. Registered variants: `[…]`. |
-| **Fix** | Pick a registered variant from the list (case-sensitive) OR omit `-PkmpFlavor` to let the plugin resolve from `isDefault` flags. |
+| **Severity** | WARNING |
+| **Since** | v2.1.0 |
+| **Message** | `-PkmpFlavor=<name>` references variant `<name>`, which isn't a registered combination. Registered variants: `[…]`. Falling back to the default variant. |
+| **Fix** | Pick a registered variant from the list (case-insensitive) OR omit `-PkmpFlavor` to let the plugin resolve from `isDefault` flags. If the property is intentional for a sibling project in a multi-project build, this warning is informational and can be ignored for the projects that don't recognise the value. |
+| **Why WARNING, not ERROR** | The `-PkmpFlavor` property is project-wide: in a multi-project build, sibling projects with their own variant matrix legitimately won't recognise the value. Treating that as an ERROR would break the whole build for a benign case. The plugin soft-falls to the default variant. |
 
 ---
 
-## KMPF-V07 — Invalid `buildConfigField` type *(W2 — pending)*
+## KMPF-V07 — Invalid `buildConfigField` type
 
 | | |
 |---|---|
 | **Severity** | ERROR |
-| **Since** | v2.0.0+ (W2 follow-up; currently as `IllegalArgumentException` in `GenerateBuildConfigTask`) |
-| **Message** | `buildConfigField` declared `<type>` is not a supported Kotlin literal type. Supported: `Boolean`, `Int`, `Long`, `Float`, `Double`, `String`. |
+| **Since** | v2.1.0 |
+| **Message** | Flavor `<flavor>` declares `buildConfigField` `<name>` with type `<type>`, which is not a supported Kotlin literal type. Supported: `Boolean`, `Int`, `Long`, `Float`, `Double`, `String`. |
 | **Fix** | Pick one of the supported types, or stringify the value (e.g. `buildConfigField("String", "X", "\"value\"")`). |
+| **Example** | `buildConfigField("MyClass", "FOO", "Foo()")` → V07 fires because the codegen can only emit Kotlin `const val` literals for the supported types. |
 
 ---
 

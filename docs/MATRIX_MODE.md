@@ -27,6 +27,7 @@ After enabling, run:
 ./gradlew assembleAllDesktopVariants                 # all variants on Desktop
 ./gradlew assembleAllVariants                        # all variants on every target
 ./gradlew tasks --group="kmpFlavors variants"        # discover everything
+./gradlew generateVariantRunConfigurations          # v2.1 — emit .run.xml per (variant × target)
 ```
 
 ## Single-point opt-in (RFC §3 Q16-C)
@@ -52,7 +53,60 @@ Two equivalent forms — pick whichever fits your convention plugin / CI ergonom
 | `generate{Variant}BuildConfig` task per inactive variant | Outputs `build/generated/kmpFlavors/{variantName}/kotlin/...` | RFC §3 Q3-A |
 | `kmpFlavors.variants` public API | `NamedDomainObjectContainer<KmpFlavorVariant>` for `matching { … }.configureEach { … }` | RFC §3 Q19-B |
 | `variantFilter { setIgnore(true) }` DSL | AGP-shaped filter; `buildType == "staging"` works | RFC §3 Q20-A |
-| `publishMatrix` opt-in | Classifier-tagged Maven publications per variant (JVM) | RFC §3 Q21-D |
+| `publishMatrix` opt-in | Classifier-tagged Maven publications per (variant × target): JVM (v2.0), iOS klib (v2.1), JS / WasmJs (v2.1). See [PUBLISHING.md](PUBLISHING.md) for the full catalog. | RFC §3 Q21-D / v2.1 Phase 5 |
+| `dependencyGuardPerVariant` opt-in (v2.1) | Auto-registers per-(variant × target) `dependencyGuard.configuration(...)` baselines | Q24 / v2.1 Phase 4 |
+| `excludeGeneratedFromFormatters` opt-in (v2.1) | Auto-excludes generated `BuildKonfig` paths from Spotless + Detekt | Q24 / v2.1 Phase 4 |
+| `detektPerVariant` opt-in (v2.1) | Registers `detekt{Variant}` task per variant with per-variant baselines | Q24 / v2.1 Phase 4 |
+| `generateVariantRunConfigurations` task (v2.1) | One `.run.xml` per (variant × target) for IDE run-config dropdown | G22 / v2.1 Phase 4 |
+
+---
+
+## Per-variant resources (v2.1+)
+
+Matrix mode supports per-variant resources on **both** Compose Multiplatform and Android targets. The conventions are independent — drop files in the right directory and the variant compilation picks them up; the plugin doesn't add a DSL surface.
+
+### Compose Multiplatform (`composeResources/`)
+
+The Compose Multiplatform plugin (`org.jetbrains.compose` v1.7+) auto-discovers `composeResources/` under any Kotlin source set. Matrix mode's per-flavor source sets (`commonFree`, `commonPaid`, etc.) ARE Kotlin source sets, so the convention applies:
+
+```
+src/
+├── commonMain/composeResources/values/strings.xml   # base value
+├── commonFree/composeResources/values/strings.xml   # override for free variant
+└── commonPaid/composeResources/values/strings.xml   # override for paid variant
+```
+
+Merge precedence: **leaf source set wins on duplicate keys**. For `app_name`:
+- Active variant `free` compiles through `compileKotlinDesktop` → sees `commonMain` + `commonFree` → `app_name` = "free".
+- Inactive variant `paid` compiles through `compilePaidKotlinDesktop` → sees `commonMain` + `commonPaid` → `app_name` = "paid".
+- Cross-variant isolation holds (Q12): the paid variant never sees `commonFree` resources.
+
+No `kmpFlavors` DSL needed. The plugin emits a lifecycle line at apply time announcing the per-flavor paths when CMP is detected.
+
+### Android (`res/<flavor>/`)
+
+AGP handles per-flavor `res/` natively once the KMP→AGP bridge propagates flavors into `productFlavors { … }`. This works **unchanged from v1.x**:
+
+```
+src/
+├── androidMain/res/values/strings.xml         # base
+├── free/res/values/strings.xml                # AGP-discovered for the `free` flavor
+└── paid/res/values/strings.xml                # AGP-discovered for the `paid` flavor
+```
+
+Per the AGP source-set discovery rules, `src/free/res/...` is automatically picked up by any variant whose flavor includes `free` (e.g., `freeDebug`, `freeStaging`, `freeProd`). Per-build-type, per-variant, and combined flavor-buildType directories (`src/freeDebug/res/...`) are also supported by AGP. The KMP-flavors plugin's `bridgeAgpProductFlavors`/`bridgeAgpBuildTypes` flags propagate the flavors/build types into AGP so these conventions Just Work.
+
+### iOS / native targets
+
+Per-variant resources on iOS / native targets flow through the same Kotlin source-set hierarchy. CMP's `composeResources/` convention applies to ALL non-Android targets, so iOS Compose apps get per-variant strings/images via the same `src/commonFree/composeResources/` path.
+
+### Summary table
+
+| Target family | Convention path | Resolver |
+|---|---|---|
+| Compose Multiplatform (Desktop, iOS, JS, WasmJs) | `src/common{Flavor}/composeResources/` | CMP `Res.string.x` accessor — leaf source set wins |
+| Android | `src/{flavor}/res/values/strings.xml` | AGP native; KMP-flavors AGP bridge propagates flavors |
+| iOS native (non-Compose) | `src/common{Flavor}/resources/` (Kotlin source-set resources) | Standard KMP source-set resource merging |
 
 ---
 
@@ -70,13 +124,13 @@ Two equivalent forms — pick whichever fits your convention plugin / CI ergonom
 |---|---|---|
 | `maven-publish` | ✅ Tested | Per-variant `MavenPublication` registered via `publishMatrix.set(true)`. Standard `publishVariant{X}PublicationToMavenLocal` tasks derived by Gradle. |
 | `com.vanniktech.maven.publish` | ✅ Compatible (delegated) | Delegates to `maven-publish`; our `withId("maven-publish")` hook fires regardless of which plugin applied it. Smoke-tested via the W4 `samples/matrix-mode/` sample app — TestKit can't satisfy vanniktech's KotlinBasePlugin classpath, so the unit-level test is `@Disabled`. |
-| `org.jetbrains.compose` (Compose Multiplatform) | ✅ Compatible | Per-variant compilations honor Compose's own source-set hierarchy. **Hot-reload is active-variant only at v2.0 GA** (per-variant hot-reload is v2.1 scope). |
+| `org.jetbrains.compose` (Compose Multiplatform) | ✅ Compatible (v2.1 adds per-variant resources) | Per-variant compilations honor Compose's own source-set hierarchy. **Per-variant `composeResources/` work end-to-end** via the source-set convention (v2.1 — see "Per-variant resources" above). **Hot-reload is still active-variant only** at v2.1 GA; per-variant hot-reload is v2.2 scope. |
 | `org.jetbrains.kotlin.plugin.serialization` | ✅ Compatible | KSP codegen runs per compilation; per-variant compilations each get their own generated sources. |
 | `org.jetbrains.kotlinx.atomicfu` | ✅ Compatible | Atomicfu's compilation transformer runs per `KotlinCompilation`, including ours. |
-| `dependency-guard` | ⚠ Per-variant baselines | Each variant compilation has its own `compileClasspath`, so dependency-guard sees N baselines. Consumers may need to add explicit `dependencyGuard { configuration("{variant}CompileClasspath") }` entries. |
-| `com.diffplug.spotless` | ⚠ Watch source-set scope | If Spotless rules use a glob that matches generated `BuildKonfig.kt`, the per-variant copies trigger N format checks. Exclude `build/generated/kmpFlavors/**` from Spotless globs. |
-| `io.gitlab.arturbosch.detekt` | ⚠ Watch source-set scope | Same caveat as Spotless. |
-| Kover | ⚠ Coverage per variant | Each variant compilation produces its own coverage; Kover merges them. No special configuration needed; consumers may want to set `kover.useReportSet(...)` to scope. |
+| `dependency-guard` | ✅ Helper API (v2.1) | Set `kmpFlavors { dependencyGuardPerVariant.set(true) }` to auto-register one `dependencyGuard.configuration(...)` entry per (variant × target). Without the opt-in, consumers can still wire them manually. |
+| `com.diffplug.spotless` | ✅ Helper API (v2.1) | Set `kmpFlavors { excludeGeneratedFromFormatters.set(true) }` to auto-exclude `build/generated/kmpFlavors/` from every Spotless task. Without the opt-in, add the exclude pattern manually. |
+| `io.gitlab.arturbosch.detekt` | ✅ Helper APIs (v2.1) | `kmpFlavors { excludeGeneratedFromFormatters.set(true) }` excludes per-variant codegen from Detekt scans. `kmpFlavors { detektPerVariant.set(true) }` registers a `detekt{Variant}` task per variant with per-variant baselines under `config/detekt/{variant}/baseline.xml` — Lint-per-variant for non-Android targets. |
+| Kover | ✅ Per-variant coverage (manual scope) | Each variant compilation produces its own coverage; Kover merges them automatically. To scope reports per variant, set `kover.useReportSet(...)`. The plugin does not auto-configure this because the right scope depends on whether the consumer wants per-variant or merged reporting. |
 
 ---
 

@@ -15,8 +15,12 @@
 package com.mobilebytelabs.kmpflavors
 
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator
+import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator.CODE_DIMENSION_HAS_NO_FLAVORS
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator.CODE_FLAVOR_BUILD_TYPE_COLLISION
+import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator.CODE_FLAVOR_MISSING_DIMENSION
+import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator.CODE_INVALID_BUILD_CONFIG_FIELD_TYPE
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator.CODE_MATRIX_MODE_WITHOUT_FLAVORS
+import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator.CODE_UNKNOWN_ACTIVE_VARIANT
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator.CODE_VARIANT_FILTER_EXCLUDED_ALL
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator.CODE_ZERO_KMP_TARGETS
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorValidationFinding
@@ -45,6 +49,8 @@ class KmpFlavorPluginValidatorTest {
     private fun flavor(name: String): FlavorConfig = project.objects.newInstance(FlavorConfig::class.java, name)
 
     private fun buildType(name: String): BuildTypeConfig = project.objects.newInstance(BuildTypeConfig::class.java, name)
+
+    private fun dim(name: String): FlavorDimension = project.objects.newInstance(FlavorDimension::class.java, name)
 
     private fun variant(name: String, flavorNames: List<String> = emptyList()): FlavorVariant = FlavorVariant(name = name, flavors = flavorNames.map { flavor(it) })
 
@@ -154,5 +160,153 @@ class KmpFlavorPluginValidatorTest {
                 "Finding code '${f.code}' must match KMPF-Vxx",
             )
         }
+    }
+
+    @Test
+    fun `KMPF-V02 fires when a flavor is missing dimension but dimensions are registered`() {
+        val tier = dim("tier")
+        val freeWithDim = flavor("free").also { it.dimension.set("tier") }
+        val paidNoDim = flavor("paid") // missing dimension
+        val findings = KmpFlavorPluginValidator.validate(
+            flavors = listOf(freeWithDim, paidNoDim),
+            buildTypes = emptyList(),
+            resolvedVariants = listOf(variant("free")),
+            matrixModeEnabled = false,
+            detectedTargetCount = 1,
+            dimensions = listOf(tier),
+        )
+
+        val v02 = findings.find { it.matches(CODE_FLAVOR_MISSING_DIMENSION) }
+        assertNotNull(v02, "Expected KMPF-V02 finding; got $findings")
+        assertEquals(KmpFlavorValidationSeverity.ERROR, v02!!.severity)
+        assertTrue(v02.message.contains("paid"), "message must name the flavor missing the dimension")
+        assertTrue(v02.fix.contains("dimension.set"), "fix must point at the dimension.set call")
+    }
+
+    @Test
+    fun `KMPF-V02 does not fire when no dimensions are registered (single-dimension semantics)`() {
+        val freeNoDim = flavor("free")
+        val paidNoDim = flavor("paid")
+        val findings = KmpFlavorPluginValidator.validate(
+            flavors = listOf(freeNoDim, paidNoDim),
+            buildTypes = emptyList(),
+            resolvedVariants = listOf(variant("free"), variant("paid")),
+            matrixModeEnabled = false,
+            detectedTargetCount = 1,
+            dimensions = emptyList(),
+        )
+
+        assertTrue(findings.none { it.matches(CODE_FLAVOR_MISSING_DIMENSION) })
+    }
+
+    @Test
+    fun `KMPF-V03 fires when a dimension has no flavors assigned to it`() {
+        val tier = dim("tier")
+        val env = dim("environment")
+        val free = flavor("free").also { it.dimension.set("tier") }
+        // environment dimension has zero flavors → V03
+        val findings = KmpFlavorPluginValidator.validate(
+            flavors = listOf(free),
+            buildTypes = emptyList(),
+            resolvedVariants = emptyList(),
+            matrixModeEnabled = false,
+            detectedTargetCount = 1,
+            dimensions = listOf(tier, env),
+        )
+
+        val v03 = findings.find { it.matches(CODE_DIMENSION_HAS_NO_FLAVORS) }
+        assertNotNull(v03, "Expected KMPF-V03 finding; got $findings")
+        assertEquals(KmpFlavorValidationSeverity.ERROR, v03!!.severity)
+        assertTrue(v03.message.contains("environment"), "message must name the empty dimension")
+    }
+
+    @Test
+    fun `KMPF-V03 suppresses V04 — they are not allowed to double-fire on the same empty matrix`() {
+        val env = dim("environment")
+        val free = flavor("free").also { it.dimension.set("tier") } // not in env dim
+        val findings = KmpFlavorPluginValidator.validate(
+            flavors = listOf(free),
+            buildTypes = emptyList(),
+            resolvedVariants = emptyList(),
+            matrixModeEnabled = false,
+            detectedTargetCount = 1,
+            dimensions = listOf(env),
+        )
+
+        assertTrue(findings.any { it.matches(CODE_DIMENSION_HAS_NO_FLAVORS) }, "V03 must fire")
+        assertTrue(findings.none { it.matches(CODE_VARIANT_FILTER_EXCLUDED_ALL) }, "V04 must NOT double-fire when V03 already explains the empty matrix")
+    }
+
+    @Test
+    fun `KMPF-V06 fires (as WARNING) when -PkmpFlavor names a variant the resolver does not know`() {
+        val findings = KmpFlavorPluginValidator.validate(
+            flavors = listOf(flavor("free"), flavor("paid")),
+            buildTypes = emptyList(),
+            resolvedVariants = listOf(variant("free"), variant("paid")),
+            matrixModeEnabled = false,
+            detectedTargetCount = 1,
+            requestedVariantName = "ghost",
+        )
+
+        val v06 = findings.find { it.matches(CODE_UNKNOWN_ACTIVE_VARIANT) }
+        assertNotNull(v06, "Expected KMPF-V06 finding; got $findings")
+        assertEquals(KmpFlavorValidationSeverity.WARNING, v06!!.severity, "V06 must be WARNING — -PkmpFlavor is project-wide in multi-project builds")
+        assertTrue(v06.message.contains("ghost"), "message must echo the requested variant")
+        assertTrue(v06.message.contains("free") && v06.message.contains("paid"), "message must list registered variants")
+    }
+
+    @Test
+    fun `KMPF-V06 does not fire when the requested variant matches case-insensitively`() {
+        val findings = KmpFlavorPluginValidator.validate(
+            flavors = listOf(flavor("free")),
+            buildTypes = emptyList(),
+            resolvedVariants = listOf(variant("freeDev")),
+            matrixModeEnabled = false,
+            detectedTargetCount = 1,
+            requestedVariantName = "freedev",
+        )
+
+        assertTrue(findings.none { it.matches(CODE_UNKNOWN_ACTIVE_VARIANT) }, "case-insensitive match must suppress V06")
+    }
+
+    @Test
+    fun `KMPF-V07 fires when a flavor declares buildConfigField with an unsupported type`() {
+        val free = flavor("free").also {
+            it.buildConfigField("MyClass", "FOO", "Foo()")
+        }
+        val findings = KmpFlavorPluginValidator.validate(
+            flavors = listOf(free),
+            buildTypes = emptyList(),
+            resolvedVariants = listOf(variant("free", listOf("free"))),
+            matrixModeEnabled = false,
+            detectedTargetCount = 1,
+        )
+
+        val v07 = findings.find { it.matches(CODE_INVALID_BUILD_CONFIG_FIELD_TYPE) }
+        assertNotNull(v07, "Expected KMPF-V07 finding; got $findings")
+        assertEquals(KmpFlavorValidationSeverity.ERROR, v07!!.severity)
+        assertTrue(v07.message.contains("MyClass"), "message must echo the unsupported type")
+        assertTrue(v07.message.contains("FOO"), "message must echo the field name")
+    }
+
+    @Test
+    fun `KMPF-V07 does not fire for any of the supported Kotlin literal types`() {
+        val free = flavor("free").also {
+            it.buildConfigField("Boolean", "A", "true")
+            it.buildConfigField("Int", "B", "42")
+            it.buildConfigField("Long", "C", "42L")
+            it.buildConfigField("Float", "D", "1.0f")
+            it.buildConfigField("Double", "E", "1.0")
+            it.buildConfigField("String", "F", "\"x\"")
+        }
+        val findings = KmpFlavorPluginValidator.validate(
+            flavors = listOf(free),
+            buildTypes = emptyList(),
+            resolvedVariants = listOf(variant("free", listOf("free"))),
+            matrixModeEnabled = false,
+            detectedTargetCount = 1,
+        )
+
+        assertTrue(findings.none { it.matches(CODE_INVALID_BUILD_CONFIG_FIELD_TYPE) })
     }
 }
