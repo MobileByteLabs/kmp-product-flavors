@@ -69,7 +69,7 @@ This plugin supports the following Kotlin Multiplatform targets in the current p
 - **Multi-KGP CI matrix** — nightly cron tests against KGP 2.1 / 2.2 / 2.3.
 - **Auto-canary** — scheduled weekly bump PR against `openMF/kmp-project-template`.
 - **4 new validator codes** — V13 (Project Isolation), V14 (CMP version), V15 (Apple Silicon Rosetta), V16/V17 (CMP × KGP / KGP × Gradle compatibility).
-- **IDE plugin v0.1** ships in the separate [`MobileByteLabs/kmp-product-flavors-ide-plugin`](https://github.com/MobileByteLabs/kmp-product-flavors-ide-plugin) repo alongside this `2.2.0` (initial Marketplace listing: project-view decoration + variant-switcher dropdown + Gradle-tool-window grouping).
+- **IDE plugin v0.1** — live on the [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31779-kmp-product-flavors) (source: [`MobileByteLabs/kmp-product-flavors-ide-plugin`](https://github.com/MobileByteLabs/kmp-product-flavors-ide-plugin)). Install via Settings → Plugins → Marketplace → search "KMP Product Flavors". Adds project-view decoration for per-flavor source sets, status-bar variant-switcher widget, and Gradle-tool-window task grouping.
 
 Drop-in v2.1 → v2.2 upgrade. For strict v2.0 / v2.1 explicit-opt-in semantics, set `kmpFlavors.autoEnable.set(false)`. See [`CHANGELOG.md`](CHANGELOG.md) `[2.2.0]` for the full diff + compatibility notes.
 
