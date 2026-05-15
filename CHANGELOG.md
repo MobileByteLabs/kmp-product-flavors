@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+> v2.3 cycle additions accumulating into the next `2.2.0-alpha.*` publish. These will roll up under the eventual `[2.3.0]` heading once v2.3 cuts.
+
+### Added
+
+- **v2.3 Phase 6A cron safety-net** — `.github/workflows/auto-merge-bump-cron.yml` runs every 10 min; squash-merges open `chore/bump-version-*` PRs from `github-actions[bot]`. Closes the GitHub workflow-token-trigger-suppression limitation surfaced during the v2.2.0-alpha.1 cascade smoke. Cumulative result: maintainer touch-points per release drop from 4 → 0.
+- **v2.3 Phase 1 — Detekt per-target depth (opt-in)** — `kmpFlavors.detektPerVariantPerTarget: Property<Boolean>` (default false). When `true` AND `detektPerVariant=true`, registers `detekt{Variant}{Target}` tasks per (variant × non-Android target). Per-target baselines at `config/detekt/{variant}/{target}/baseline.xml`. Variant-level aggregate task depends on its per-target subtasks. Backwards-compat: existing v2.1 callers unchanged.
+- **v2.3 Phase 2 stub — variant-cache namespacing forward-compat** — `kmpFlavors.variantCacheNamespacing: Property<Boolean>` (default false). Reserved DSL surface; full path-(b) impl gated on cache-miss telemetry on 8+ variant modules. `internal/VariantBuildCacheKeyConfigurator` is currently a no-op stub. KDoc documents the future Task.Inputs fingerprint-injection plan.
+- **v2.3 Phase 4 — Sonatype Snapshots channel** — `.github/workflows/publish-snapshot.yml` (nightly cron at 03:00 UTC + manual dispatch). Reads `gradle.properties.kmpflavors.version`, appends `-SNAPSHOT`, publishes to Maven Central Portal's snapshot repo via vanniktech.maven.publish. Reuses existing release secrets; no new secrets needed. Skips GitHub Release + bump PR + Plugin Portal publish (snapshot-only). Consumer pin path documented in `docs/PUBLISHING.md` "Snapshot channel" section.
+- **v2.3 Phase 7 — Per-variant Compose hot-reload Option A (opt-in)** — `kmpFlavors.composeHotReloadPerVariant: Property<Boolean>` (default false). When `true` AND `org.jetbrains.compose` applied, registers `composeHotReload{Variant}{Target}` per (inactive variant × JVM-family target) wired to the variant compilation. Switching the active variant still requires Gradle daemon restart on CMP 1.7-1.9 (Option B daemon-restart-free path deferred to v2.4 pending CMP-internal classloader API stabilisation).
+
+### Documentation
+
+- **`docs/RELEASE.md`** — end-to-end release flow documentation: 30-second cascade diagram, SemVer-aware bumping matrix (mbl-actionhub-bump-version v1.6+), pre-release-aware Release flag matrix (mbl-actionhub v1.6+), emergency-stop instructions, troubleshooting matrix.
+- **`docs/COMPOSE_HOT_RELOAD.md`** — consumer guide for Phase 7 Option A: smoke-test workflow, CMP compatibility matrix (1.7-1.9 tested), Option B deferral rationale.
+- **`docs/VARIANT_DEPENDENCY_EXCLUDES.md`** — survey-gated docs-only ship per v2.3 Phase 3. Documents the proposed DSL surface, manual workaround for today, and voting instructions (issue #71). Implementation graduates to v2.4 IFF ≥5 consumer requests.
+
+### Dependencies
+
+- **`mbl-actionhub` → `@v1.6.1`** — transitive bump exposing Phase 6D (SemVer-pre-release-aware bumper) + 6E (pre-release-aware GitHub Release flag). Concrete impact: bump PRs for alpha publishes go to `2.2.0-alpha.N+1` instead of `2.2.1`; GitHub Releases auto-flag `isPrerelease=true` on `-alpha.N` / `-beta.N` / `-rc.N` tags.
+
 ## [2.2.0] - 2026-05-15
 
 > **v2.2 — fully-automatic + architecturally complete.** Closes RFC §10 (cross-variant intermediate source sets), every Phase 0 "consumer must manually opt-in" gap, and v2.1's 3 native-publishing deferrals (XCFramework / Package.swift / npm). Drop-in v2.1 → v2.2 upgrade for explicit-opt-in consumers; the master `kmpFlavors.autoEnable.set(false)` opt-out preserves v2.0/v2.1 semantics for shops that don't want the new auto-detection.
