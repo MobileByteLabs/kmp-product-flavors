@@ -729,6 +729,13 @@ class KmpFlavorPlugin : Plugin<Project> {
         // Configure dependencies
         val dependencyConfigurator = DependencyConfigurator(logger)
         dependencyConfigurator.configure(project, activeVariantResolved)
+        // v2.4 Phase 5 — apply per-variant `dependencies { exclude(...) }` registrations
+        // collected via `kmpFlavors.variants.matching { … }.configureEach { … }`.
+        // No-op when no variant registered an exclude (common case for consumers who
+        // don't use the Phase 5 DSL).
+        project.afterEvaluate {
+            dependencyConfigurator.applyVariantExcludes(extension.variants)
+        }
 
         // AGP bridge — propagate KMP flavors / build types into the Android
         // Gradle Plugin extension when consumer opts in via bridgeAgp* flags.

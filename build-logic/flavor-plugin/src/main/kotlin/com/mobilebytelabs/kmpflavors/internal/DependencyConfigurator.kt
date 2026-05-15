@@ -17,7 +17,10 @@
 package com.mobilebytelabs.kmpflavors.internal
 
 import com.mobilebytelabs.kmpflavors.FlavorVariant
+import com.mobilebytelabs.kmpflavors.KmpFlavorVariant
+import org.gradle.api.NamedDomainObjectContainer
 import org.gradle.api.Project
+import org.gradle.api.artifacts.ExcludeRule
 import org.gradle.api.logging.Logger
 
 /**
@@ -102,5 +105,62 @@ class DependencyConfigurator(private val logger: Logger) {
         val chain = mutableListOf(activeVariant.name)
         chain.addAll(activeVariant.mergedMatchingFallbacks)
         return chain.distinct()
+    }
+
+    /**
+     * v2.4 Phase 5 — apply per-variant dependency excludes registered via
+     * `kmpFlavors.variants.matching { … }.configureEach { dependencies { exclude(…) } }`.
+     *
+     * For each variant with non-empty `dependencies.excludes`, walks every
+     * `KotlinCompilation`'s configurations (compile + runtime classpaths)
+     * + adds the exclude rule. Excludes are scoped per-variant: a `free`
+     * variant's exclude does not affect the `paid` variant's classpath
+     * resolution.
+     *
+     * No-op when:
+     *   - No variant has registered excludes (common case for consumers
+     *     who don't use the v2.4 Phase 5 DSL).
+     *   - The variant has not been wired to a compilation (early reads).
+     *
+     * @param variants The plugin-extension's `variants` container; iterates
+     *                 every registered variant to collect excludes.
+     */
+    fun applyVariantExcludes(variants: NamedDomainObjectContainer<KmpFlavorVariant>) {
+        var totalExcludes = 0
+        for (variant in variants) {
+            val excludes = variant.dependencies.excludes
+            if (excludes.isEmpty()) continue
+            for (exclude in excludes) {
+                val attrs = mutableMapOf<String, String>()
+                if (exclude.group.isNotEmpty()) attrs[ExcludeRule.GROUP_KEY] = exclude.group
+                if (exclude.module.isNotEmpty()) attrs[ExcludeRule.MODULE_KEY] = exclude.module
+                if (attrs.isEmpty()) {
+                    logger.warn(
+                        "[KMP Flavors] Phase 5 — variant '${variant.name}' registered an empty " +
+                            "exclude(group=\"\", module=\"\"). Skipping (KMPF-V22 — see ERROR_CODES).",
+                    )
+                    continue
+                }
+                // Walk each compilation's defaultSourceSet → propagate via the
+                // standard classpath configurations Gradle wires per compilation.
+                for ((_, compilation) in variant.compilations) {
+                    val configNames = listOf(
+                        compilation.compileDependencyConfigurationName,
+                        compilation.runtimeDependencyConfigurationName ?: "",
+                    ).filter { it.isNotEmpty() }
+                    for (cfgName in configNames) {
+                        val cfg = compilation.target.project.configurations.findByName(cfgName) ?: continue
+                        cfg.exclude(attrs)
+                        totalExcludes += 1
+                    }
+                }
+            }
+        }
+        if (totalExcludes > 0) {
+            logger.lifecycle(
+                "[KMP Flavors] Phase 5 — applied $totalExcludes per-variant " +
+                    "dependency exclude(s) across registered variants.",
+            )
+        }
     }
 }

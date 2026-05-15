@@ -16,7 +16,9 @@
 
 package com.mobilebytelabs.kmpflavors
 
+import org.gradle.api.Action
 import org.gradle.api.Named
+import org.gradle.api.model.ObjectFactory
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
 import org.jetbrains.kotlin.gradle.plugin.KotlinTarget
@@ -51,9 +53,36 @@ import javax.inject.Inject
  *  - `targets: Set<KotlinTarget>` (populated after matrix-mode wiring),
  *  - `compilations: Map<KotlinTarget, KotlinCompilation<*>>` (same).
  */
-abstract class KmpFlavorVariant @Inject constructor(private val variantName: String) : Named {
+abstract class KmpFlavorVariant @Inject constructor(private val variantName: String, objects: ObjectFactory) : Named {
 
     override fun getName(): String = variantName
+
+    /**
+     * v2.4 Phase 5 — variant-conditional dependency configuration.
+     *
+     * Access the scope to register per-variant excludes:
+     * ```kotlin
+     * kmpFlavors.variants.matching { it.flavors.contains("free") }.configureEach {
+     *     dependencies {
+     *         exclude(group = "com.example", module = "premium-sdk")
+     *     }
+     * }
+     * ```
+     *
+     * Empty by default. Applied at plugin-apply time by
+     * `DependencyConfigurator` after per-variant compilation classpaths
+     * are wired.
+     */
+    val dependencies: VariantDependenciesScope = objects.newInstance(VariantDependenciesScope::class.java)
+
+    /**
+     * DSL helper — apply an action to [dependencies]. Standard Gradle
+     * `configure { … }` pattern; equivalent to writing `dependencies.exclude(…)`
+     * directly inside `configureEach { … }`.
+     */
+    fun dependencies(action: Action<VariantDependenciesScope>) {
+        action.execute(dependencies)
+    }
 
     /**
      * The flavor names that compose this variant, in dimension-priority order
