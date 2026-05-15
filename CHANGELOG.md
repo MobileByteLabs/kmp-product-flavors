@@ -7,25 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-> v2.3 cycle additions accumulating into the next `2.2.0-alpha.*` publish. These will roll up under the eventual `[2.3.0]` heading once v2.3 cuts.
+## [2.4.0] - in development (alpha.0 published 2026-05-16)
 
-### Added
+> v2.3 + early-v2.4 cycle additions. **8 of 9 v2.3 phases + 4 of 5 v2.4 phases shipped 2026-05-15/16** in a single sweep per the "fix-all" session direction.
 
-- **v2.3 Phase 6A cron safety-net** — `.github/workflows/auto-merge-bump-cron.yml` runs every 10 min; squash-merges open `chore/bump-version-*` PRs from `github-actions[bot]`. Closes the GitHub workflow-token-trigger-suppression limitation surfaced during the v2.2.0-alpha.1 cascade smoke. Cumulative result: maintainer touch-points per release drop from 4 → 0.
-- **v2.3 Phase 1 — Detekt per-target depth (opt-in)** — `kmpFlavors.detektPerVariantPerTarget: Property<Boolean>` (default false). When `true` AND `detektPerVariant=true`, registers `detekt{Variant}{Target}` tasks per (variant × non-Android target). Per-target baselines at `config/detekt/{variant}/{target}/baseline.xml`. Variant-level aggregate task depends on its per-target subtasks. Backwards-compat: existing v2.1 callers unchanged.
-- **v2.3 Phase 2 stub — variant-cache namespacing forward-compat** — `kmpFlavors.variantCacheNamespacing: Property<Boolean>` (default false). Reserved DSL surface; full path-(b) impl gated on cache-miss telemetry on 8+ variant modules. `internal/VariantBuildCacheKeyConfigurator` is currently a no-op stub. KDoc documents the future Task.Inputs fingerprint-injection plan.
-- **v2.3 Phase 4 — Sonatype Snapshots channel** — `.github/workflows/publish-snapshot.yml` (nightly cron at 03:00 UTC + manual dispatch). Reads `gradle.properties.kmpflavors.version`, appends `-SNAPSHOT`, publishes to Maven Central Portal's snapshot repo via vanniktech.maven.publish. Reuses existing release secrets; no new secrets needed. Skips GitHub Release + bump PR + Plugin Portal publish (snapshot-only). Consumer pin path documented in `docs/PUBLISHING.md` "Snapshot channel" section.
-- **v2.3 Phase 7 — Per-variant Compose hot-reload Option A (opt-in)** — `kmpFlavors.composeHotReloadPerVariant: Property<Boolean>` (default false). When `true` AND `org.jetbrains.compose` applied, registers `composeHotReload{Variant}{Target}` per (inactive variant × JVM-family target) wired to the variant compilation. Switching the active variant still requires Gradle daemon restart on CMP 1.7-1.9 (Option B daemon-restart-free path deferred to v2.4 pending CMP-internal classloader API stabilisation).
+### Added — v2.3 phases
+
+- **v2.3 Phase 6A cron safety-net** — `.github/workflows/auto-merge-bump-cron.yml` runs every 10 min; squash-merges open `chore/bump-version-*` PRs from `github-actions[bot]`. Closes the GitHub workflow-token-trigger-suppression limitation. Maintainer touch-points per release: 4 → 0.
+- **v2.3 Phase 1 — Detekt per-target depth (opt-in)** — `kmpFlavors.detektPerVariantPerTarget: Property<Boolean>`. Registers `detekt{Variant}{Target}` per (variant × non-Android target) with per-target baselines.
+- **v2.3 Phase 4 — Sonatype Snapshots channel** — nightly cron at 03:00 UTC publishes `{version}-SNAPSHOT` to Maven Central Portal's snapshot repo. See `docs/PUBLISHING.md` "Snapshot channel".
+- **v2.3 Phase 7 — Per-variant Compose hot-reload Option A (opt-in)** — `kmpFlavors.composeHotReloadPerVariant`. Registers `composeHotReload{Variant}{Target}` per (inactive variant × JVM-family target).
+
+### Added — v2.4 phases
+
+- **v2.4 Phase 5 — Variant-conditional dependency excludes** — graduates v2.3 docs-only to full impl. New `VariantDependenciesScope.kt` + `KmpFlavorVariant.dependencies` field + `dependencies(Action)` DSL helper. Excludes scoped per-variant; each `KotlinCompilation`'s classpath gets the exclude rule applied.
+- **v2.4 Phase 2 path-(b) — Cache namespacing impl** — graduates v2.3 stub to actual impl. Injects `kmpFlavorVariant` as `@Input` on every `compileKotlin*` task in matrix mode. Active-variant tasks namespace as "active". Prerequisite: `buildMatrix=true`. Default `false` until telemetry justifies the flip.
+- **v2.4 Phase 3 — `switchVariantAndReload` task** — Option B best-effort workaround. `./gradlew switchVariantAndReload --to=<variant>` persists the new variant + prints the exact follow-up command. **Marked with `CMP-API-WAITING` markers** in 3 source locations + tracked by issue #75 — replace with daemon-restart-free impl when CMP exposes a public hot-reload reset API.
+- **IDE plugin v0.2.0-alpha.1** (separate repo) — gutter icons + variant-aware Refactor → Rename + breakpoint scoping data layer. Published to Marketplace `eap` channel.
 
 ### Documentation
 
-- **`docs/RELEASE.md`** — end-to-end release flow documentation: 30-second cascade diagram, SemVer-aware bumping matrix (mbl-actionhub-bump-version v1.6+), pre-release-aware Release flag matrix (mbl-actionhub v1.6+), emergency-stop instructions, troubleshooting matrix.
-- **`docs/COMPOSE_HOT_RELOAD.md`** — consumer guide for Phase 7 Option A: smoke-test workflow, CMP compatibility matrix (1.7-1.9 tested), Option B deferral rationale.
-- **`docs/VARIANT_DEPENDENCY_EXCLUDES.md`** — survey-gated docs-only ship per v2.3 Phase 3. Documents the proposed DSL surface, manual workaround for today, and voting instructions (issue #71). Implementation graduates to v2.4 IFF ≥5 consumer requests.
+- **`docs/RELEASE.md`** — end-to-end release flow documentation.
+- **`docs/COMPOSE_HOT_RELOAD.md`** — Option A + Option B-workaround consumer guide + "When CMP ships the public hot-reload reset API" migration section.
+- **`docs/VARIANT_DEPENDENCY_EXCLUDES.md`** — graduated from v2.3 docs-only to shipped DSL reference.
 
 ### Dependencies
 
-- **`mbl-actionhub` → `@v1.6.1`** — transitive bump exposing Phase 6D (SemVer-pre-release-aware bumper) + 6E (pre-release-aware GitHub Release flag). Concrete impact: bump PRs for alpha publishes go to `2.2.0-alpha.N+1` instead of `2.2.1`; GitHub Releases auto-flag `isPrerelease=true` on `-alpha.N` / `-beta.N` / `-rc.N` tags.
+- **`mbl-actionhub` → `@v1.6.1`** — Phase 6D SemVer-pre-release bumper + 6E pre-release-aware GitHub Release flag.
+
+### Tracking issues
+
+- **#71** — Phase 3 (v2.3 era; now superseded by v2.4 Phase 5 ship). Closed.
+- **#75** — CMP hot-reload reset API tracking (v2.4 Phase 3 graduation trigger). Open.
 
 ## [2.2.0] - 2026-05-15
 
