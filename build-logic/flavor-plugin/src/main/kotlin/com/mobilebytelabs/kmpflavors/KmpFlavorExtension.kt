@@ -298,6 +298,26 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
     abstract val excludeGeneratedFromFormatters: Property<Boolean>
 
     /**
+     * v2.2 Phase 0 — master opt-out for every auto-detection in Phase 0.
+     *
+     * When `true` (default in v2.2+), the plugin auto-enables several
+     * features based on detected conditions:
+     *   - `buildMatrix` auto-fires when >=2 non-Android targets + >=2 flavors.
+     *   - `publishMatrix` auto-fires when `maven-publish` is applied + matrix on.
+     *   - `dependencyGuardPerVariant` / `excludeGeneratedFromFormatters` /
+     *     `detektPerVariant` auto-fire when their adjacent plugins are detected.
+     *   - `enableBuildTypes` auto-flips to `true` on first `buildTypes { register(...) }`.
+     *
+     * Consumers who want strict v2.0 / v2.1 explicit-opt-in semantics flip this
+     * to `false`. Individual auto-detections can also be overridden via the
+     * corresponding explicit `set(false)` on their property — but the master
+     * switch is the simplest path.
+     *
+     * Convention: true (in v2.2+).
+     */
+    abstract val autoEnable: Property<Boolean>
+
+    /**
      * v2.1 Phase 4 — per-variant Detekt analysis.
      *
      * When `true` AND the consumer applies `io.gitlab.arturbosch.detekt`,
@@ -313,9 +333,74 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
     abstract val detektPerVariant: Property<Boolean>
 
     /**
+     * v2.2 Phase 1A — opt-in for cross-variant intermediate `common{BuildType}` source sets.
+     *
+     * When `true` (AND `enableBuildTypes = true` AND matrix mode is on), the plugin
+     * creates `common{BuildType}` source sets (e.g. `commonStaging`) that
+     * `dependsOn(commonMain)`. Every variant whose `buildType` matches
+     * (e.g. `freeStaging` + `paidStaging`) gains a `dependsOn(commonStaging)` edge
+     * on its compilation's defaultSourceSet — so symbols declared in `commonStaging`
+     * are visible to ALL staging-flavored variants but not to `freeProd` / `paidProd`.
+     *
+     * Closes RFC §10 deferral (cross-variant intermediate source sets). Disabled by
+     * default because the source-set DAG change is opinionated; consumers opt in.
+     *
+     * Convention: `false` (opt-in).
+     */
+    abstract val createIntermediateBuildTypeSourceSets: Property<Boolean>
+
+    /**
+     * v2.2 Phase 3B — per-variant SBOM (Software Bill of Materials) emission.
+     *
+     * When `true` AND `publishMatrix` is on AND the consumer applies
+     * `org.cyclonedx.bom`, the plugin attaches a CycloneDX SBOM artifact
+     * (`coordinate:1.0.0:<variant>-sbom`) to every per-variant MavenPublication.
+     * Consumers' supply-chain tooling (Snyk, Dependabot, GitHub Dependency Graph)
+     * can then audit per-variant dependency graphs separately.
+     *
+     * Convention: `false` (opt-in).
+     */
+    abstract val publishMatrixSbom: Property<Boolean>
+
+    /**
+     * v2.2 Phase 5A — keep v2.1's Zip-shaped iOS MavenPublications as deprecation
+     * aliases when XCFramework path lands. Default `true` in v2.2 (migration window);
+     * flip to `false` once consumers have migrated their dependency coordinates from
+     * `coordinate:1.0.0:paid-iosArm64` (Zip) to `coordinate:1.0.0:paid-xcframework`
+     * (XCFramework). Removed in a future major.
+     *
+     * Convention: `true` (preserves v2.1 behavior on v2.2 upgrade).
+     */
+    abstract val publishMatrixLegacyIosClassifiers: Property<Boolean>
+
+    /**
+     * v2.2 Phase 5C — opt-in for plugin-side npm publishing of JS / WasmJs variants.
+     *
+     * When `true` AND `publishMatrix=true` AND a `js(IR)` or `wasmJs()` target is declared,
+     * the plugin generates a per-variant npm package with `package.json.name = "{prefix}-{variant}"`.
+     * npm credentials remain consumer-side (`~/.npmrc`); the plugin doesn't manage them.
+     *
+     * Convention: `false` (opt-in — consumer-side npm tarball production is the v2.1 default).
+     */
+    abstract val npmPublishMatrix: Property<Boolean>
+
+    /**
+     * v2.2 Phase 5C — npm package-name prefix override. Used as `package.json.name = "{prefix}-{variant}"`.
+     * When unset, defaults to `rootProject.name`.
+     */
+    abstract val npmPackagePrefix: Property<String>
+
+    /**
      * Internal list of variant filter actions.
      */
     internal val variantFilterActions = mutableListOf<Action<VariantFilter>>()
+
+    /**
+     * v2.2 Phase 4A — list of variant promotions declared via `kmpFlavors.promote(...)`.
+     * `KmpFlavorPlugin` reads this at configurePlugin() time and hands it to
+     * `VariantPromotionConfigurator` which registers a `promote{From}To{To}` task per entry.
+     */
+    internal val variantPromotions = mutableListOf<VariantPromotion>()
 
     /**
      * Configure flavor dimensions using a DSL block.
@@ -354,6 +439,32 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
     }
 
     /**
+     * v2.2 Phase 4A — declare a variant promotion. Registers a Gradle task
+     * `promote{From}To{To}` that copies files from `src/common{From}/` to
+     * `src/common{To}/` with optional content transforms applied per file.
+     *
+     * Example:
+     * ```kotlin
+     * kmpFlavors {
+     *     promote(from = "freeDev", to = "freeStaging") {
+     *         applyTransform("renamePackage", "com.example.dev" to "com.example.staging")
+     *         copyResources(true)
+     *         copyTests(true)
+     *     }
+     * }
+     * ```
+     *
+     * Resolve via `./gradlew :module:promoteFreeDevToFreeStaging` (add `-Pdry-run=true`
+     * for preview).
+     */
+    fun promote(from: String, to: String, action: Action<VariantPromotionScope> = Action {}): VariantPromotion {
+        val promotion = VariantPromotion(from = from, to = to)
+        action.execute(VariantPromotionScope(promotion))
+        variantPromotions.add(promotion)
+        return promotion
+    }
+
+    /**
      * Configure build types using a DSL block.
      *
      * Example:
@@ -385,10 +496,25 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
     val spm: SpmConfig = objects.newInstance(SpmConfig::class.java)
 
     /**
+     * v2.2 Phase 4B — feature-flag integration scope. See [FeatureFlagsConfig] for
+     * per-platform sub-configs (GrowthBook / Statsig / LaunchDarkly).
+     *
+     * No-op when none of the platform sub-configs have `defaultPayload` set.
+     */
+    val featureFlags: FeatureFlagsConfig = objects.newInstance(FeatureFlagsConfig::class.java)
+
+    /**
      * Configure the SPM manifest generator using a DSL block.
      */
     fun spm(action: Action<SpmConfig>) {
         action.execute(spm)
+    }
+
+    /**
+     * v2.2 Phase 4B — configure feature-flag integrations.
+     */
+    fun featureFlags(action: Action<FeatureFlagsConfig>) {
+        action.execute(featureFlags)
     }
 
     init {
@@ -412,8 +538,21 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
         //   kmpFlavors { dependencyGuardPerVariant.set(true) }
         //   kmpFlavors { excludeGeneratedFromFormatters.set(true) }
         //   kmpFlavors { detektPerVariant.set(true) }
+        // Phase 4 helpers default to off (opt-in). v2.2 Phase 0C auto-flips them to
+        // true via withPlugin callbacks when their adjacent plugin is detected.
         dependencyGuardPerVariant.convention(false)
         excludeGeneratedFromFormatters.convention(false)
         detektPerVariant.convention(false)
+        // v2.2 Phase 0G — master opt-out. Default `true` for fully-automatic-plugin
+        // ergonomics; consumers wanting strict v2.0 / v2.1 semantics set to `false`.
+        autoEnable.convention(true)
+        // v2.2 Phase 1A — cross-variant intermediate source sets, opt-in.
+        createIntermediateBuildTypeSourceSets.convention(false)
+        // v2.2 Phase 3B — per-variant SBOM, opt-in.
+        publishMatrixSbom.convention(false)
+        // v2.2 Phase 5A — keep v2.1's Zip-shaped iOS publications during the migration window.
+        publishMatrixLegacyIosClassifiers.convention(true)
+        // v2.2 Phase 5C — npm registry publish opt-in.
+        npmPublishMatrix.convention(false)
     }
 }

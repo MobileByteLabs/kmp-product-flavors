@@ -18,30 +18,39 @@ package com.mobilebytelabs.kmpflavors
 
 import com.mobilebytelabs.kmpflavors.internal.AggregateTasksRegistrar
 import com.mobilebytelabs.kmpflavors.internal.AgpBridge
+import com.mobilebytelabs.kmpflavors.internal.BuildScanConfigurator
 import com.mobilebytelabs.kmpflavors.internal.CompilationRegistrar
 import com.mobilebytelabs.kmpflavors.internal.ComposeResourcesConfigurator
 import com.mobilebytelabs.kmpflavors.internal.DependencyConfigurator
 import com.mobilebytelabs.kmpflavors.internal.DependencyGuardHelper
 import com.mobilebytelabs.kmpflavors.internal.DetektPerVariantHelper
+import com.mobilebytelabs.kmpflavors.internal.FeatureFlagHelpers
 import com.mobilebytelabs.kmpflavors.internal.FlavorVariantResolver
 import com.mobilebytelabs.kmpflavors.internal.GenerateBuildConfigTasksRegistrar
+import com.mobilebytelabs.kmpflavors.internal.IntermediateSourceSetConfigurator
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorValidationSeverity
 import com.mobilebytelabs.kmpflavors.internal.MatrixModeResolver
 import com.mobilebytelabs.kmpflavors.internal.PerVariantIosPublishConfigurator
+import com.mobilebytelabs.kmpflavors.internal.PerVariantIosXcframeworkConfigurator
 import com.mobilebytelabs.kmpflavors.internal.PerVariantJsPublishConfigurator
+import com.mobilebytelabs.kmpflavors.internal.PerVariantNpmPublishConfigurator
 import com.mobilebytelabs.kmpflavors.internal.PerVariantPublishConfigurator
+import com.mobilebytelabs.kmpflavors.internal.PerVariantSbomConfigurator
 import com.mobilebytelabs.kmpflavors.internal.PlatformDetector
 import com.mobilebytelabs.kmpflavors.internal.PlatformPropertiesConfigurator
+import com.mobilebytelabs.kmpflavors.internal.ProjectIsolationCompatChecker
 import com.mobilebytelabs.kmpflavors.internal.SourceSetConfigurator
 import com.mobilebytelabs.kmpflavors.internal.SpotlessDetektScopeHelper
 import com.mobilebytelabs.kmpflavors.internal.TestCompilationRegistrar
+import com.mobilebytelabs.kmpflavors.internal.VariantPromotionConfigurator
 import com.mobilebytelabs.kmpflavors.tasks.DiagnoseVariantTask
 import com.mobilebytelabs.kmpflavors.tasks.GenerateBuildConfigTask
 import com.mobilebytelabs.kmpflavors.tasks.GenerateRunConfigurationsTask
 import com.mobilebytelabs.kmpflavors.tasks.GenerateSpmManifestTask
 import com.mobilebytelabs.kmpflavors.tasks.GenerateVariantRunConfigurationsTask
 import com.mobilebytelabs.kmpflavors.tasks.InitFlavorSourceSetsTask
+import com.mobilebytelabs.kmpflavors.tasks.ListActiveVariantTask
 import com.mobilebytelabs.kmpflavors.tasks.ListFlavorsTask
 import com.mobilebytelabs.kmpflavors.tasks.ListVariantCompilationsTask
 import com.mobilebytelabs.kmpflavors.tasks.PrintFlavorPropertiesTask
@@ -145,6 +154,64 @@ class KmpFlavorPlugin : Plugin<Project> {
             extension.flavors.whenObjectAdded(createPerFlavorSourceSet)
         }
 
+        // v2.2 Phase 0D — auto-flip `enableBuildTypes` when the consumer registers any
+        // `buildTypes { register(...) }`. Most consumers forget to flip the flag after
+        // declaring buildTypes; the auto-flip is the obvious DWIM.
+        //
+        // Explicit `enableBuildTypes.set(false)` still wins (consumer wants flavor-only
+        // matrix despite declaring build types) — the hook only fires when the flag is
+        // still false at the time the first buildType is registered.
+        val enableBuildTypesAutoFlip = object : Action<BuildTypeConfig> {
+            override fun execute(buildType: BuildTypeConfig) {
+                if (extension.autoEnable.get() && !extension.enableBuildTypes.get()) {
+                    extension.enableBuildTypes.set(true)
+                    project.logger.info(
+                        "[KMP Flavors] Phase 0D — auto-flipping enableBuildTypes to true " +
+                            "because consumer registered buildType '${buildType.name}'. " +
+                            "Set `kmpFlavors.enableBuildTypes.set(false)` to keep a flavor-only matrix.",
+                    )
+                }
+            }
+        }
+        extension.buildTypes.whenObjectAdded(enableBuildTypesAutoFlip)
+
+        // v2.2 Phase 0B + 0C — auto-enable publishMatrix + adjacent-plugin helpers when
+        // their plugins are detected. Each withPlugin callback latches a flag that we
+        // read inside afterEvaluate so the autoEnable check sees the consumer's
+        // `kmpFlavors { autoEnable.set(false) }` value rather than the convention default.
+        var mavenPublishApplied = false
+        var dependencyGuardApplied = false
+        var spotlessApplied = false
+        var detektApplied = false
+        project.pluginManager.withPlugin("maven-publish") { mavenPublishApplied = true }
+        project.pluginManager.withPlugin("com.dropbox.dependency-guard") { dependencyGuardApplied = true }
+        project.pluginManager.withPlugin("com.diffplug.spotless") { spotlessApplied = true }
+        project.pluginManager.withPlugin("io.gitlab.arturbosch.detekt") { detektApplied = true }
+        project.afterEvaluate {
+            // Phase 0 auto-enables run inside afterEvaluate so the consumer's `kmpFlavors
+            // { autoEnable.set(false) }` has been evaluated by now.
+            if (!extension.autoEnable.get()) return@afterEvaluate
+            if (mavenPublishApplied && !extension.publishMatrix.isPresent) {
+                extension.publishMatrix.set(true)
+                project.logger.info(
+                    "[KMP Flavors] Phase 0B — auto-enabling publishMatrix because " +
+                        "`maven-publish` is applied. Set `kmpFlavors.publishMatrix.set(false)` to opt out.",
+                )
+            }
+            if (dependencyGuardApplied && !extension.dependencyGuardPerVariant.get()) {
+                extension.dependencyGuardPerVariant.set(true)
+                project.logger.info("[KMP Flavors] Phase 0C — auto-enabling dependencyGuardPerVariant.")
+            }
+            if ((spotlessApplied || detektApplied) && !extension.excludeGeneratedFromFormatters.get()) {
+                extension.excludeGeneratedFromFormatters.set(true)
+                project.logger.info("[KMP Flavors] Phase 0C — auto-enabling excludeGeneratedFromFormatters.")
+            }
+            if (detektApplied && !extension.detektPerVariant.get()) {
+                extension.detektPerVariant.set(true)
+                project.logger.info("[KMP Flavors] Phase 0C — auto-enabling detektPerVariant.")
+            }
+        }
+
         // Defer configuration until after project evaluation
         project.afterEvaluate {
             configurePlugin(project, extension)
@@ -230,10 +297,33 @@ class KmpFlavorPlugin : Plugin<Project> {
         // v2.0 fail-fast validation (RFC §3 Q23). Run before the matrix-mode
         // registrar so structured errors are surfaced with stable KMPF-Vxx codes
         // instead of opaque downstream stack traces.
-        val matrixModeEnabled = MatrixModeResolver.isEnabled(project, extension)
+        // v2.2 Phase 0A — compute nonAndroidTargets BEFORE the resolver so the auto-
+        // heuristic has access to target + flavor counts.
         val nonAndroidTargets = kotlin.targets.filter {
             it.name != "android" && it.name != "metadata"
         }
+        val matrixModeEnabled = MatrixModeResolver.isEnabled(
+            project = project,
+            extension = extension,
+            nonAndroidTargetCount = nonAndroidTargets.size,
+            flavorCount = flavors.size,
+        )
+        if (matrixModeEnabled &&
+            !extension.buildMatrix.isPresent &&
+            project.findProperty(MatrixModeResolver.GRADLE_PROPERTY) == null
+        ) {
+            logger.lifecycle(
+                "[KMP Flavors] Phase 0A — auto-enabling matrix mode because " +
+                    "${nonAndroidTargets.size} non-Android target(s) + ${flavors.size} flavor(s) " +
+                    "satisfy the heuristic. Set `kmpFlavors.buildMatrix.set(false)` or " +
+                    "`kmpFlavors.autoEnable.set(false)` to opt out.",
+            )
+        }
+        // v2.2 Phase 1B — Gradle 9 Project Isolation compatibility audit. No-op on
+        // Gradle < 9 or when --project-isolation isn't enabled. Emits KMPF-V13 when
+        // the codegen-claim mechanism triggers a cross-project state violation.
+        ProjectIsolationCompatChecker.check(project, logger)
+
         val validationFindings = KmpFlavorPluginValidator.validate(
             flavors = flavors,
             buildTypes = buildTypesList,
@@ -243,8 +333,24 @@ class KmpFlavorPlugin : Plugin<Project> {
             dimensions = dimensions,
             requestedVariantName = requestedVariantName,
         )
-        val errors = validationFindings.filter { it.severity == KmpFlavorValidationSeverity.ERROR }
-        val warnings = validationFindings.filter { it.severity == KmpFlavorValidationSeverity.WARNING }
+        // v2.2 Phase 0I + 0L — platform + version compatibility findings (V15/V16/V17).
+        val iosTargetNames = nonAndroidTargets.map { it.name }.filter { it.startsWith("ios") }.toSet()
+        val kgpVersion = resolveKgpVersion(project)
+        val cmpVersion = resolveCmpVersion(project)
+        val platformFindings = if (extension.autoEnable.get()) {
+            KmpFlavorPluginValidator.validatePlatformAndVersionCompatibility(
+                hostOsArch = System.getProperty("os.arch") ?: "unknown",
+                gradleVersion = project.gradle.gradleVersion,
+                kgpVersion = kgpVersion,
+                cmpVersion = cmpVersion,
+                declaredIosTargetNames = iosTargetNames,
+            )
+        } else {
+            emptyList()
+        }
+        val combinedFindings = validationFindings + platformFindings
+        val errors = combinedFindings.filter { it.severity == KmpFlavorValidationSeverity.ERROR }
+        val warnings = combinedFindings.filter { it.severity == KmpFlavorValidationSeverity.WARNING }
         warnings.forEach { warning ->
             logger.warn("[KMP Flavors] ${warning.code} — ${warning.message} Fix: ${warning.fix}")
         }
@@ -290,6 +396,11 @@ class KmpFlavorPlugin : Plugin<Project> {
             platformSourceSets = platformSourceSets,
             createIntermediates = createIntermediates,
         )
+
+        // v2.2 Phase 1A — intermediate source-set map; populated inside the matrix-mode
+        // CompilationRegistrar block and read inside the matrix-mode variant API block.
+        // Declared at function scope so both blocks can see it.
+        var intermediateSourceSetsByVariant: Map<String, List<org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet>> = emptyMap()
 
         // v2.0 matrix mode (RFC §3 Q1-Q4): register one KotlinCompilation per
         // (variant × target) across every non-Android target. Source-set wiring,
@@ -363,6 +474,17 @@ class KmpFlavorPlugin : Plugin<Project> {
                 "[KMP Flavors] Matrix mode: registered ${variantNames.size} inactive-variant " +
                     "compilations across ${nonAndroidTargets.size} non-Android target(s) " +
                     "(active variant '$activeVariantName' continues to compile through `main`)",
+            )
+
+            // v2.2 Phase 1A — wire cross-variant intermediate source sets when opted in.
+            // No-op when createIntermediateBuildTypeSourceSets=false OR no buildTypes registered.
+            intermediateSourceSetsByVariant = IntermediateSourceSetConfigurator.configure(
+                kotlin = kotlin,
+                buildTypes = buildTypesList,
+                allVariants = allVariants,
+                nonAndroidTargets = nonAndroidTargets,
+                enabled = extension.createIntermediateBuildTypeSourceSets.get(),
+                logger = logger,
             )
 
             // v2.1 Phase 2 (Q10) — register `compile{Variant}TestKotlin{Target}` per inactive
@@ -505,6 +627,8 @@ class KmpFlavorPlugin : Plugin<Project> {
                             .findByName(name)
                             ?: target.compilations.getByName("main")
                     }
+                    // v2.2 Phase 1A — expose intermediate source sets per variant.
+                    intermediateSourceSets = intermediateSourceSetsByVariant[name].orEmpty()
                 }
             }
         }
@@ -532,10 +656,21 @@ class KmpFlavorPlugin : Plugin<Project> {
                 inactiveVariants = inactiveVariants,
                 nonAndroidTargets = nonAndroidTargets,
             )
-            // v2.1 Phase 5A — iOS per-variant publishing (classifier-tagged MavenPublication
-            // per (inactive variant × iOS target); per-variant XCFramework aggregation
-            // deferred to v2.2 — see docs/PUBLISHING.md).
-            PerVariantIosPublishConfigurator.configure(
+            // v2.1 Phase 5A — iOS Zip + MavenPublication path (klib bundle). v2.2 keeps this
+            // behind `publishMatrixLegacyIosClassifiers` (default `true` for migration window)
+            // alongside Phase 5A's XCFramework path. Consumers depending on v2.1 classifier
+            // coordinates can leave the flag on; ready-to-migrate consumers set it to `false`.
+            if (extension.publishMatrixLegacyIosClassifiers.get()) {
+                PerVariantIosPublishConfigurator.configure(
+                    project = project,
+                    extension = extension,
+                    inactiveVariants = inactiveVariants,
+                    nonAndroidTargets = nonAndroidTargets,
+                )
+            }
+            // v2.2 Phase 5A — XCFramework + MavenPublication path (real Apple framework binaries).
+            // No-op when no iOS targets declared OR maven-publish not applied.
+            PerVariantIosXcframeworkConfigurator.configure(
                 project = project,
                 extension = extension,
                 inactiveVariants = inactiveVariants,
@@ -549,6 +684,22 @@ class KmpFlavorPlugin : Plugin<Project> {
                 extension = extension,
                 inactiveVariants = inactiveVariants,
                 nonAndroidTargets = nonAndroidTargets,
+            )
+            // v2.2 Phase 5C — opt-in per-variant npm tarballs. No-op when npmPublishMatrix=false
+            // OR no js/wasmJs targets declared.
+            PerVariantNpmPublishConfigurator.configure(
+                project = project,
+                extension = extension,
+                inactiveVariants = inactiveVariants,
+                nonAndroidTargets = nonAndroidTargets,
+            )
+            // v2.2 Phase 3B — per-variant SBOM artifacts attached to each MavenPublication.
+            // No-op when publishMatrixSbom=false OR org.cyclonedx.bom not applied.
+            PerVariantSbomConfigurator.configure(
+                project = project,
+                extension = extension,
+                inactiveVariants = inactiveVariants,
+                logger = logger,
             )
         }
 
@@ -569,9 +720,22 @@ class KmpFlavorPlugin : Plugin<Project> {
             logger = logger,
         )
 
-        // SPM manifest generator — opt-in via spm { generateManifest.set(true) }
+        // SPM manifest generator — opt-in via spm { generateManifest.set(true) }.
+        // v2.2 Phase 5B: when matrix mode is ALSO on, register one SPM task per variant
+        // (build/spm/{variantName}/Package.swift). v1.x consumers without matrix mode get
+        // the single-variant SPM manifest unchanged.
         if (extension.spm.generateManifest.get()) {
-            registerSpmTask(project, extension, activeVariantResolved)
+            if (matrixModeEnabled) {
+                for (variant in allVariants) {
+                    registerSpmTaskForVariant(project, extension, variant)
+                }
+                logger.lifecycle(
+                    "[KMP Flavors] Phase 5B — registered ${allVariants.size} per-variant SPM " +
+                        "manifest task(s) at `build/spm/{variant}/Package.swift`.",
+                )
+            } else {
+                registerSpmTask(project, extension, activeVariantResolved)
+            }
         }
 
         // Configure platform-specific properties
@@ -588,6 +752,33 @@ class KmpFlavorPlugin : Plugin<Project> {
             activeVariant = activeVariantResolved,
             nonAndroidTargets = nonAndroidTargets,
             matrixModeEnabled = matrixModeEnabled,
+        )
+
+        // v2.2 Phase 4A — variant promotion tasks. No-op when no promotions declared.
+        VariantPromotionConfigurator.configure(
+            project = project,
+            flavors = flavors,
+            promotions = extension.variantPromotions,
+            logger = logger,
+        )
+
+        // v2.2 Phase 4B — feature-flag generator (GrowthBook / Statsig / LaunchDarkly).
+        // No-op when no platform sub-config has defaultPayload set, OR matrix mode is off.
+        FeatureFlagHelpers.configure(
+            project = project,
+            extension = extension,
+            allVariants = allVariants,
+            matrixModeEnabled = matrixModeEnabled,
+            logger = logger,
+        )
+
+        // v2.2 Phase 3A — per-variant Build Scan tagging. No-op when Develocity not applied.
+        BuildScanConfigurator.configure(
+            project = project,
+            allVariants = allVariants,
+            nonAndroidTargets = nonAndroidTargets,
+            matrixModeEnabled = matrixModeEnabled,
+            logger = logger,
         )
 
         // Register tasks
@@ -686,6 +877,21 @@ class KmpFlavorPlugin : Plugin<Project> {
             return true
         }
         if (existing == project.path) return true
+        // v2.2 Phase 0J — deterministic election: when multiple projects compete for
+        // the same codegen claim, the lexicographically-lower `project.path` always wins.
+        // v1.1.5's "first applier wins" was deterministic per build but non-obvious; the
+        // lex-comparison makes the winner predictable across builds AND under parallel
+        // configuration (Gradle 8.5+ with `org.gradle.parallel=true` may interleave
+        // shouldGenerateCodegen calls). Explicit `codegenHost.set(true)` still wins
+        // (handled in the explicitHost branch above).
+        if (project.path < existing) {
+            project.logger.info(
+                "[KMP Flavors] ${project.path} taking over codegen claim from $existing " +
+                    "(Phase 0J deterministic election — '${project.path}' < '$existing')",
+            )
+            rootExtras.set(key, project.path)
+            return true
+        }
         project.logger.lifecycle(
             "[KMP Flavors] ${project.path} skipping FlavorConfig codegen — already generated by $existing",
         )
@@ -873,6 +1079,16 @@ class KmpFlavorPlugin : Plugin<Project> {
             this.platforms.set(platformsData)
         }
 
+        // v2.2 Phase 2A (Option B) — listActiveVariant task. CLI helper for the
+        // documented "Compose hot-reload still active-only" UX.
+        project.tasks.register(
+            "listActiveVariant",
+            ListActiveVariantTask::class.java,
+        ).configure {
+            activeVariantName.set(activeVariantNameValue)
+            allVariantNames.set(allVariants.map { it.name })
+        }
+
         // Generate run configurations task
         project.tasks.register(
             "generateRunConfigurations",
@@ -901,6 +1117,9 @@ class KmpFlavorPlugin : Plugin<Project> {
             createExampleFiles.set(false)
             createReadmePerSourceSet.set(true)
             examplePackage.set(extension.buildConfigPackage)
+            // v2.2 Phase 0K — wire sample-code-generation inputs.
+            generateSampleCode.set(extension.autoEnable)
+            buildConfigClassName.set(extension.buildConfigClassName)
             sourceDirectory.set(project.layout.projectDirectory.dir("src"))
         }
 
@@ -925,6 +1144,33 @@ class KmpFlavorPlugin : Plugin<Project> {
             webTitleSuffix.set(
                 activeVariantResolved.combinedWebTitleSuffix.ifEmpty { null },
             )
+        }
+    }
+
+    /**
+     * v2.2 Phase 5B — per-variant SPM manifest registration. Mirrors `registerSpmTask` but
+     * produces one `generate{Variant}SpmManifest` task per variant, writing to
+     * `build/spm/{variant}/Package.swift`.
+     */
+    private fun registerSpmTaskForVariant(project: org.gradle.api.Project, extension: KmpFlavorExtension, variant: FlavorVariant) {
+        val flavorName = variant.flavors.firstOrNull()?.name ?: variant.name
+        val variantCap = variant.name.replaceFirstChar { it.uppercase() }
+        project.tasks.register(
+            "generate${variantCap}SpmManifest",
+            GenerateSpmManifestTask::class.java,
+        ).configure {
+            group = "kmpFlavors variants"
+            description = "Generate per-variant Package.swift manifest for SPM distribution " +
+                "of variant '${variant.name}' (Phase 5B)."
+            variantName.set(variant.name)
+            this.flavorName.set(flavorName)
+            xcframeworkName.set(extension.spm.xcframeworkName)
+            distribution.set(extension.spm.distribution)
+            binaryUrlTemplate.set(extension.spm.binaryUrlTemplate)
+            xcframeworkPath.set(extension.spm.xcframeworkPath)
+            projectVersion.set(project.provider { project.version.toString() })
+            checksumStrategy.set(extension.spm.checksumStrategy)
+            outputDirectory.set(project.layout.buildDirectory.dir("spm/${variant.name}"))
         }
     }
 
@@ -955,6 +1201,52 @@ class KmpFlavorPlugin : Plugin<Project> {
         project.tasks.matching { it.name == "assemble" }.configureEach {
             dependsOn("generateSpmManifest")
         }
+    }
+
+    /**
+     * v2.2 Phase 0L — reflective KGP version read from the buildscript classpath.
+     * Returns null when KGP isn't resolvable. Used by `validatePlatformAndVersionCompatibility`
+     * for V17 (KGP × Gradle compat).
+     */
+    private fun resolveKgpVersion(project: Project): String? {
+        for (cfg in project.buildscript.configurations) {
+            if (!cfg.isCanBeResolved) continue
+            try {
+                for (dep in cfg.resolvedConfiguration.firstLevelModuleDependencies) {
+                    if (dep.moduleGroup == "org.jetbrains.kotlin" &&
+                        dep.moduleName == "kotlin-gradle-plugin"
+                    ) {
+                        return dep.moduleVersion
+                    }
+                }
+            } catch (e: Exception) {
+                // Best-effort.
+            }
+        }
+        return null
+    }
+
+    /**
+     * v2.2 Phase 0L — reflective Compose Multiplatform version read. Returns null when
+     * CMP isn't applied. Used by `ComposeResourcesConfigurator` (V14) AND by
+     * `validatePlatformAndVersionCompatibility` (V16, CMP × KGP compat).
+     */
+    private fun resolveCmpVersion(project: Project): String? {
+        for (cfg in project.buildscript.configurations) {
+            if (!cfg.isCanBeResolved) continue
+            try {
+                for (dep in cfg.resolvedConfiguration.firstLevelModuleDependencies) {
+                    if (dep.moduleGroup == "org.jetbrains.compose" &&
+                        (dep.moduleName == "compose-gradle-plugin" || dep.moduleName.endsWith(".gradle.plugin"))
+                    ) {
+                        return dep.moduleVersion
+                    }
+                }
+            } catch (e: Exception) {
+                // Best-effort.
+            }
+        }
+        return null
     }
 
     private fun wireGenerateBuildConfigToCompilation(

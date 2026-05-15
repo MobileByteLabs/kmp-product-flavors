@@ -1,0 +1,34 @@
+# Multi-version KGP CI matrix — v2.2 Phase 2B
+#
+# Version pins for the nightly `multi-kgp-matrix.yml` workflow that runs the
+# plugin's TestKit suite against multiple Kotlin Gradle Plugin versions.
+#
+# Update this file as new KGP minor versions ship — the workflow reads from it,
+# so a single TOML edit propagates the new pin through CI.
+#
+# Schema:
+#   - `versions` — array of KGP version strings the workflow exercises.
+#   - `gradle-version` — the Gradle version each row of the matrix runs against
+#     (held constant; varying both axes would be a 9-cell matrix and not worth
+#     the CI minutes).
+#   - `compose-multiplatform` — CMP version pinned per KGP row (CMP ↔ KGP have
+#     specific compat constraints; pinning per-row avoids muddying signal).
+
+[matrix]
+gradle-version = "9.0"
+
+[[matrix.kgp]]
+version = "2.1.0"
+# CMP 1.6.x is the canonical CMP for KGP 2.1.x; 1.7+ requires KGP 2.2+.
+compose-multiplatform = "1.6.11"
+
+[[matrix.kgp]]
+version = "2.2.21"
+# CMP 1.7.x is the line that introduced composeResources/ auto-discovery on
+# custom source sets — the v2.1 happy-path version.
+compose-multiplatform = "1.7.3"
+
+[[matrix.kgp]]
+version = "2.3.0"
+# CMP 1.10.x is the latest as of v2.2 cut; tracks Kotlin 2.3 release line.
+compose-multiplatform = "1.10.3"

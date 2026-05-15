@@ -50,6 +50,12 @@ class KMPFlavorsConventionPlugin : Plugin<Project> {
             pluginManager.apply(KmpFlavorPlugin::class.java)
 
             extensions.configure<KmpFlavorExtension> {
+                // v2.2 — preserve v2.1 explicit-opt-in semantics for this template sample.
+                // The template's AppVariant.kt reads BuildKonfig from commonMain; auto-enabling
+                // matrix mode (Phase 0A) moves BuildKonfig into per-flavor source sets, which
+                // commonMain can't see. Explicit opt-out keeps the v2.1 active-variant-only
+                // codegen + demonstrates the documented `autoEnable.set(false)` migration path.
+                autoEnable.set(false)
                 buildConfigPackage.set("org.openmf.kmptemplate")
                 // v1.1.5+ — uses default buildConfigClassName = "BuildKonfig"; remove
                 // override only if you want a custom name. Bridge defaults

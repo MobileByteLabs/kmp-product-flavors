@@ -48,6 +48,13 @@ kotlin {
 }
 
 kmpFlavors {
+    // v2.2 Phase 0A introduces an auto-enable heuristic that flips `buildMatrix` to
+    // true when a module has ≥2 non-Android targets + ≥2 flavors. This sample is the
+    // v1.x active-variant demo (its `commonMain/App.kt` references `AppConfig` which
+    // matrix mode moves out of commonMain). Opt out of Phase 0 auto-detection to keep
+    // the v1.x behavior. The separate `samples/matrix-mode/` exercises matrix mode.
+    autoEnable.set(false)
+
     // Enable BuildConfig generation
     generateBuildConfig.set(true)
     buildConfigPackage.set("com.example.sample")

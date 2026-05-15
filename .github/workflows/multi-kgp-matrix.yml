@@ -1,0 +1,89 @@
+# Multi-version KGP CI matrix — v2.2 Phase 2B
+#
+# Runs the plugin's TestKit suite against multiple Kotlin Gradle Plugin versions
+# to catch KGP regression breakage early. Pin set lives in `gradle/kgp-matrix.toml`.
+#
+# Triggers:
+#   - schedule: nightly at 02:00 UTC.
+#   - workflow_dispatch (manual; can target a single KGP row via inputs.kgp-version).
+
+name: Multi-KGP CI matrix
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      kgp-version:
+        description: 'Pin to one specific KGP row (leave empty to fan out across all rows)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  matrix-build:
+    name: KGP ${{ matrix.kgp-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Pinned KGP versions. Source of truth: gradle/kgp-matrix.toml. Update
+        # in lock-step with the TOML when adding a new KGP minor.
+        kgp-version: ['2.1.0', '2.2.21', '2.3.0']
+        compose-multiplatform: ['1.6.11', '1.7.3', '1.10.3']
+        exclude:
+          # Pair KGP version with the canonical CMP for that line (1:1 mapping).
+          - kgp-version: '2.1.0'
+            compose-multiplatform: '1.7.3'
+          - kgp-version: '2.1.0'
+            compose-multiplatform: '1.10.3'
+          - kgp-version: '2.2.21'
+            compose-multiplatform: '1.6.11'
+          - kgp-version: '2.2.21'
+            compose-multiplatform: '1.10.3'
+          - kgp-version: '2.3.0'
+            compose-multiplatform: '1.6.11'
+          - kgp-version: '2.3.0'
+            compose-multiplatform: '1.7.3'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Skip when manual dispatch targets a different row
+        if: github.event_name == 'workflow_dispatch' && inputs.kgp-version != '' && inputs.kgp-version != matrix.kgp-version
+        run: |
+          echo "::notice::Manual dispatch targets KGP ${{ inputs.kgp-version }}; skipping row ${{ matrix.kgp-version }}."
+          exit 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '21'
+
+      - name: Setup Gradle 9.0
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.0'
+
+      - name: Run plugin TestKit against KGP ${{ matrix.kgp-version }} / CMP ${{ matrix.compose-multiplatform }}
+        env:
+          # Pass the KGP + CMP pins through to the plugin's TestKit fixtures. The
+          # fixtures look for these env vars and substitute into the plugins {} block
+          # of generated test projects.
+          KMPF_TEST_KGP_VERSION: ${{ matrix.kgp-version }}
+          KMPF_TEST_CMP_VERSION: ${{ matrix.compose-multiplatform }}
+        run: |
+          ./gradlew :build-logic:flavor-plugin:test --info \
+            --warning-mode=all \
+            -Pkmpflavor.test.kgp.version=${{ matrix.kgp-version }} \
+            -Pkmpflavor.test.cmp.version=${{ matrix.compose-multiplatform }}
+
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-kgp-${{ matrix.kgp-version }}
+          path: build-logic/flavor-plugin/build/reports/tests/test/

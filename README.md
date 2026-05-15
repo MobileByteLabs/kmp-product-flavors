@@ -55,6 +55,24 @@ This plugin supports the following Kotlin Multiplatform targets in the current p
 - 🛠️ **IDE Run Configurations** - Auto-generated configs for each build variant
 - 💾 **Build cache support** - Cacheable tasks for efficient builds
 
+## What's new in v2.2
+
+**Fully-automatic + architecturally complete.** Closes RFC §10 and every "consumer must manually opt-in" gap.
+
+- **Phase 0 — Fully-automatic defaults.** `buildMatrix` auto-enables on ≥2 non-Android targets + ≥2 flavors. `publishMatrix` auto-fires when `maven-publish` is applied. Detekt-per-variant + Spotless-exclusion + dependency-guard-baselines auto-fire when their plugins are detected. `enableBuildTypes` auto-flips on first `buildTypes { register(…) }`. Master opt-out via `kmpFlavors.autoEnable.set(false)`.
+- **Cross-variant intermediate source sets** (RFC §10 closer) — `commonStaging` shared between `freeStaging` + `paidStaging` via `kmpFlavors.createIntermediateBuildTypeSourceSets.set(true)`.
+- **Variant promotion DSL** — `kmpFlavors.promote("freeDev", "freeStaging") { applyTransform("renamePackage", … to …) }` automates source-set graduation between buildTypes.
+- **Per-variant feature-flag hooks** — `kmpFlavors.featureFlags { growthbook { defaultPayload.set(file("flags/growthbook.json")) } }` generates per-variant `FeatureFlags.kt` for GrowthBook / Statsig / LaunchDarkly.
+- **Native publishing completeness** — closes v2.1's 3 deferrals: per-variant XCFramework (iOS), per-variant `Package.swift` (SPM), opt-in npm registry publishing. See [`docs/PUBLISHING.md`](docs/PUBLISHING.md).
+- **Observability** — Build Scan per-variant tagging when Develocity is applied + per-variant CycloneDX SBOM artifacts (opt-in via `publishMatrixSbom`).
+- **Gradle 9 Project Isolation audit** — KMPF-V13 WARNING surfaces the known codegen-claim violation; nightly `project-isolation-check.yml` workflow exercises the suite.
+- **Multi-KGP CI matrix** — nightly cron tests against KGP 2.1 / 2.2 / 2.3.
+- **Auto-canary** — scheduled weekly bump PR against `openMF/kmp-project-template`.
+- **4 new validator codes** — V13 (Project Isolation), V14 (CMP version), V15 (Apple Silicon Rosetta), V16/V17 (CMP × KGP / KGP × Gradle compatibility).
+- **IDE plugin v0.1** ships in the separate [`MobileByteLabs/kmp-product-flavors-ide-plugin`](https://github.com/MobileByteLabs/kmp-product-flavors-ide-plugin) repo alongside this `2.2.0` (initial Marketplace listing: project-view decoration + variant-switcher dropdown + Gradle-tool-window grouping).
+
+Drop-in v2.1 → v2.2 upgrade. For strict v2.0 / v2.1 explicit-opt-in semantics, set `kmpFlavors.autoEnable.set(false)`. See [`CHANGELOG.md`](CHANGELOG.md) `[2.2.0]` for the full diff + compatibility notes.
+
 ## What's new in v2.1
 
 **AGP-parity-complete** on the Kotlin side. Closes v2.0's deliberate deferrals:

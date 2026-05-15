@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-05-15
+
+> **v2.2 — fully-automatic + architecturally complete.** Closes RFC §10 (cross-variant intermediate source sets), every Phase 0 "consumer must manually opt-in" gap, and v2.1's 3 native-publishing deferrals (XCFramework / Package.swift / npm). Drop-in v2.1 → v2.2 upgrade for explicit-opt-in consumers; the master `kmpFlavors.autoEnable.set(false)` opt-out preserves v2.0/v2.1 semantics for shops that don't want the new auto-detection.
+
+### Added
+
+- **Phase 0 — Fully-automatic defaults** (11 of 12 sub-tracks; cross-repo bump-PR auto-merge cascade deferred).
+  - `kmpFlavors.autoEnable: Property<Boolean>` master opt-out (default `true`).
+  - **Auto-enable `buildMatrix`** when ≥2 non-Android targets + ≥2 flavors (Phase 0A).
+  - **Auto-enable `publishMatrix`** when `maven-publish` applied + matrix mode on (Phase 0B).
+  - **Auto-enable 3 adjacent-plugin helpers** (`dependencyGuardPerVariant` / `excludeGeneratedFromFormatters` / `detektPerVariant`) when their plugin is detected + matrix on (Phase 0C).
+  - **Auto-flip `enableBuildTypes`** on first `buildTypes { register(…) }` (Phase 0D).
+  - **CMP version detection** — KMPF-V14 WARNING when Compose Multiplatform < 1.7 (Phase 0E).
+  - **Auto-canary** scheduled workflow against `openMF/kmp-project-template` weekly (Phase 0H).
+  - **Deterministic codegen-host election** by lexicographic project path (Phase 0J).
+  - **`kmpFlavorInit` sample-code generation** — drops `commonMain/Sample.kt` consuming BuildKonfig (Phase 0K).
+  - **Compatibility-matrix validator** — KMPF-V15 (Apple Silicon Rosetta), KMPF-V16 (CMP × KGP), KMPF-V17 (KGP × Gradle) (Phases 0I + 0L).
+- **Phase 1A — Cross-variant intermediate source sets** (RFC §10 closer). New `kmpFlavors.createIntermediateBuildTypeSourceSets: Property<Boolean>` opt-in creates `common{BuildType}` + `{target}{BuildType}` source sets. `KmpFlavorVariant.intermediateSourceSets: List<KotlinSourceSet>` exposes the per-variant set.
+- **Phase 1B — Gradle 9 Project Isolation audit** — `ProjectIsolationCompatChecker` runs at apply() under Gradle 9.0+ AND `--project-isolation`; emits KMPF-V13 WARNING surfacing the codegen-claim cross-project-state violation. Nightly `project-isolation-check.yml` workflow audits the suite.
+- **Phase 2A (Option B) — `listActiveVariant` task** + documented honest "Compose hot-reload still active-only" UX with `-PkmpFlavor=…` switch.
+- **Phase 2B — Multi-KGP CI matrix workflow** — nightly cron against KGP 2.1 / 2.2 / 2.3 × pinned CMP versions (`.github/workflows/multi-kgp-matrix.yml` + `gradle/kgp-matrix.toml`).
+- **Phase 3A — Build Scan per-variant tagging** — `BuildScanConfigurator` reflectively attaches `kmpFlavors.variant` + `kmpFlavors.target` Develocity custom values to per-variant compile tasks.
+- **Phase 3B — Per-variant SBOM** — `PerVariantSbomConfigurator` attaches CycloneDX SBOM artifacts to per-variant MavenPublications. Opt-in via `kmpFlavors.publishMatrixSbom.set(true)`.
+- **Phase 4A — Variant promotion DSL** — `kmpFlavors.promote(from, to) { applyTransform("renamePackage", … to …) }`. Registers `promote{From}To{To}` task per declared promotion with `-Pdry-run=true` preview support.
+- **Phase 4B — Per-variant feature-flag hooks** — `kmpFlavors.featureFlags { growthbook { defaultPayload.set(file("flags/growthbook.json")) } }`. Generates per-variant `FeatureFlags.kt` consumed by GrowthBook / Statsig / LaunchDarkly SDKs at runtime. Per-variant override via `flags/<platform>.<variant>.json`.
+- **Phase 5A — Per-variant XCFramework aggregation (iOS)** — `PerVariantIosXcframeworkConfigurator` registers Framework binaries linked to per-variant compilations + aggregates into XCFramework via reflective KGP-Apple API. Classifier-tagged MavenPublication: `coordinate:1.0.0:{variant}-xcframework`.
+- **Phase 5B — Per-variant `Package.swift` (SPM)** — `KmpFlavorPlugin` registers one `generate{Variant}SpmManifest` task per variant in matrix mode. Output: `build/spm/{variant}/Package.swift`.
+- **Phase 5C — Per-variant npm registry publishing (opt-in)** — `PerVariantNpmPublishConfigurator` generates per-variant `package.json` + Tar tarball (.tgz). Opt-in via `kmpFlavors.npmPublishMatrix.set(true)`. Configurable `kmpFlavors.npmPackagePrefix`.
+- **`kmpFlavors.publishMatrixLegacyIosClassifiers: Property<Boolean>`** (default `true`) — keeps v2.1's Zip-shaped iOS MavenPublications as deprecation aliases during the migration window. Flip to `false` once consumers move to `:{variant}-xcframework` coordinates.
+
+### Tests
+
+- 11 new TestKit / ProjectBuilder cases across Phase 0 + Phase 1A. Phase 5 + Phase 4B paths are best validated via consumer adoption canaries + macOS-runner end-to-end (XCFramework + SPM); Develocity / CycloneDX configurators tested only at the no-op guard layer (full integration blocked by TestKit classloader isolation, same as CMP).
+- ci-prepush 11/11 green at every phase boundary.
+
+### Known limitations
+
+- **Phase 0F (auto-merge bump PR cascade)** — deferred to a separate `mbl-actionhub-bump-version` cross-repo session.
+- **Phase 2A Option A (true per-variant Compose hot-reload)** — Option B's CLI-switch UX ships here; full per-variant hot-reload is v2.3+ scope pending CMP hot-reload task-graph research.
+- **Phase 6 — IDE plugin v0.1** — code lives in the separate `MobileByteLabs/kmp-product-flavors-ide-plugin` repo (initial v0.1 scaffolding tracked there).
+- **KGP "Invalid Source Set Dependency Across Trees" warnings** on Phase 1A's variant→commonBuildType edges remain cosmetic — proper fix via KGP's `applyHierarchyTemplate` API is v2.2 beta polish.
+
+### Compatibility
+
+- **No breaking changes** for v2.0 / v2.1 consumers who set `kmpFlavors.autoEnable.set(false)`.
+- **For default consumers** (with `autoEnable=true`, the v2.2 default): matrix mode auto-fires on modules with ≥2 non-Android targets + ≥2 flavors; per-variant publications auto-register when `maven-publish` is applied; the 3 Phase 4 adjacent-plugin helpers fire when their plugin is detected. Set `autoEnable.set(false)` to opt out at once, OR override individual flags via explicit `set(false)`.
+- Minimum KGP: 2.1+ (tested against 2.2.21 + 2.3.0; nightly multi-KGP matrix covers 2.1.0 / 2.2.21 / 2.3.0).
+- Minimum Gradle: 8.5+ (tested 9.0; Project Isolation strict mode emits KMPF-V13 informational warning).
+- Minimum JDK: 17+.
+
 ## [2.1.0] - 2026-05-14
 
 > **v2.1 — AGP-parity-complete on the Kotlin side.** Closes the deliberate v2.0 deferrals: per-variant test compilations, per-variant resources (CMP + Android), validator hardening (V02/V03/V06/V07), IDE Run Configurations × target, Detekt-per-variant, dependency-guard / Spotless helpers, and native per-variant publishing (iOS klib + JS/WasmJs). No breaking changes for v2.0 consumers — `2.1.0` is a drop-in pin bump.

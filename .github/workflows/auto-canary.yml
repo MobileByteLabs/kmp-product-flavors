@@ -1,0 +1,160 @@
+# Auto-canary — v2.2 Phase 0H
+#
+# Scheduled workflow that opens a bump PR against openMF/kmp-project-template
+# tracking the latest released kmp-product-flavors version. Replaces the manual
+# Phase 6C / Phase 7C canary step from earlier release plans.
+#
+# Idempotent — if a same-version PR is already open against the template, the
+# workflow skips (no duplicate PRs).
+#
+# Triggers:
+#   - cron: '0 0 * * 1' (Mondays 00:00 UTC).
+#   - workflow_dispatch (manual override; takes an optional version input).
+
+name: Auto-canary against kmp-project-template
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Override version to canary (leave empty to use latest GitHub release tag of kmp-product-flavors)'
+        required: false
+        type: string
+      template-repo:
+        description: 'Target template repo (default: openMF/kmp-project-template)'
+        required: false
+        type: string
+        default: openMF/kmp-project-template
+
+permissions:
+  contents: read
+
+env:
+  TEMPLATE_REPO: ${{ inputs.template-repo || 'openMF/kmp-project-template' }}
+
+jobs:
+  open-canary-pr:
+    name: Open canary PR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve target version
+        id: ver
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OVERRIDE_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -n "$OVERRIDE_VERSION" ]; then
+            VERSION="$OVERRIDE_VERSION"
+          else
+            # Latest released tag of THIS repo. The cron job lives in the
+            # kmp-product-flavors repo itself, so $GITHUB_REPOSITORY points here.
+            VERSION=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq '.tagName' | sed 's/^v//')
+          fi
+          if [ -z "$VERSION" ]; then
+            echo "::error::Could not resolve a target version. Aborting."
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Resolved canary version: $VERSION"
+
+      - name: Check for an existing PR with this version
+        id: dedupe
+        env:
+          GH_TOKEN: ${{ secrets.PAT_CANARY_PR || secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          BRANCH_NAME="canary/kmp-product-flavors-$VERSION"
+          EXISTING=$(gh pr list \
+            --repo "$TEMPLATE_REPO" \
+            --head "$BRANCH_NAME" \
+            --state open \
+            --json number \
+            --jq 'length' || echo 0)
+          if [ "$EXISTING" -gt 0 ]; then
+            echo "::notice::A canary PR for $VERSION is already open on $TEMPLATE_REPO. Skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout template repo
+        if: steps.dedupe.outputs.skip == 'false'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.TEMPLATE_REPO }}
+          token: ${{ secrets.PAT_CANARY_PR }}
+          ref: main
+          fetch-depth: 0
+
+      - name: Bump kmpProductFlavors pin in libs.versions.toml
+        if: steps.dedupe.outputs.skip == 'false'
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          FILE="gradle/libs.versions.toml"
+          if [ ! -f "$FILE" ]; then
+            echo "::error::$FILE not found in $TEMPLATE_REPO — template structure may have changed."
+            exit 1
+          fi
+          # Match `kmpProductFlavors = "x.y.z"` (with optional pre-release).
+          # Use sed -i with a portable backup for cross-platform safety.
+          if grep -qE '^kmpProductFlavors\s*=\s*"' "$FILE"; then
+            sed -i.bak -E "s/^(kmpProductFlavors\s*=\s*\")[^\"]+(\")/\1$VERSION\2/" "$FILE"
+            rm "$FILE.bak"
+            echo "Updated $FILE → kmpProductFlavors = \"$VERSION\""
+            grep '^kmpProductFlavors' "$FILE"
+          else
+            echo "::error::Could not find kmpProductFlavors pin in $FILE."
+            exit 1
+          fi
+
+      - name: Commit + push canary branch
+        if: steps.dedupe.outputs.skip == 'false'
+        env:
+          BRANCH_NAME: ${{ steps.dedupe.outputs.branch_name }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH_NAME"
+          git add gradle/libs.versions.toml
+          git commit -m "chore(canary): bump kmpProductFlavors to $VERSION
+
+          Auto-canary opened by kmp-product-flavors's v2.2 Phase 0H workflow.
+          Tracks the latest released kmp-product-flavors version on Maven Central + Plugin Portal."
+          git push -u origin "$BRANCH_NAME"
+
+      - name: Open PR
+        if: steps.dedupe.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.PAT_CANARY_PR }}
+          BRANCH_NAME: ${{ steps.dedupe.outputs.branch_name }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          gh pr create \
+            --repo "$TEMPLATE_REPO" \
+            --base main \
+            --head "$BRANCH_NAME" \
+            --title "chore(canary): bump kmpProductFlavors to $VERSION" \
+            --body "Automated canary PR opened by [kmp-product-flavors](https://github.com/MobileByteLabs/kmp-product-flavors) v2.2 Phase 0H scheduled workflow.
+
+          ## What
+          Bumps \`kmpProductFlavors\` pin to **\`$VERSION\`** in \`gradle/libs.versions.toml\`.
+
+          ## Why
+          Continuous canary integration. Tracks the latest \`kmp-product-flavors\` release on Maven Central + Plugin Portal so consumers of \`openMF/kmp-project-template\` get the newest matrix-mode features without waiting for a manual update.
+
+          ## Review checklist
+          - [ ] Template builds green against the new version.
+          - [ ] No DSL breakage in any flavor / build-type combination.
+          - [ ] Sample apps (cmp-shared, etc.) compile + run.
+
+          Cadence: scheduled every Monday 00:00 UTC. Idempotent — already-open canary PRs for the same version are skipped."

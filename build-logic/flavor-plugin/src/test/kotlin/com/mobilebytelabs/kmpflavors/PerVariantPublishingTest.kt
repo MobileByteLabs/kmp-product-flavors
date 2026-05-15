@@ -102,6 +102,8 @@ class PerVariantPublishingTest {
 
     @Test
     fun `publishMatrix=false (default) registers NO per-variant publish tasks`() {
+        // v2.2: opt out of Phase 0B auto-enable so the test exercises the strict v2.0/v2.1
+        // semantics (publishMatrix must be explicitly opted in).
         File(testProjectDir, "build.gradle.kts").writeText(
             """
             plugins {
@@ -113,8 +115,9 @@ class PerVariantPublishingTest {
             version = "0.1.0"
 
             kmpFlavors {
+                autoEnable.set(false)
                 buildMatrix.set(true)
-                // publishMatrix not opted in
+                // publishMatrix not opted in; autoEnable=false suppresses Phase 0B.
                 generateBuildConfig.set(false)
                 flavors {
                     register("free") { isDefault.set(true) }

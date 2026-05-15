@@ -18,6 +18,7 @@ package com.mobilebytelabs.kmpflavors
 
 import org.gradle.api.Named
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
+import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
 import org.jetbrains.kotlin.gradle.plugin.KotlinTarget
 import javax.inject.Inject
 
@@ -82,5 +83,16 @@ abstract class KmpFlavorVariant @Inject constructor(private val variantName: Str
      * lazy-population caveat as [targets].
      */
     var compilations: Map<KotlinTarget, KotlinCompilation<*>> = emptyMap()
+        internal set
+
+    /**
+     * v2.2 Phase 1A — intermediate source sets this variant transitively `dependsOn`,
+     * populated when `kmpFlavors.createIntermediateBuildTypeSourceSets = true` AND the
+     * module has registered build types. Each entry is a `common{BuildType}` source set
+     * (e.g. `commonStaging`) shared between sibling variants on the same build type.
+     *
+     * Empty when build-type-axis intermediate source sets are not opted in.
+     */
+    var intermediateSourceSets: List<KotlinSourceSet> = emptyList()
         internal set
 }
