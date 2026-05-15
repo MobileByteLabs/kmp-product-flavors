@@ -350,6 +350,19 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
     abstract val createIntermediateBuildTypeSourceSets: Property<Boolean>
 
     /**
+     * v2.2 Phase 3B — per-variant SBOM (Software Bill of Materials) emission.
+     *
+     * When `true` AND `publishMatrix` is on AND the consumer applies
+     * `org.cyclonedx.bom`, the plugin attaches a CycloneDX SBOM artifact
+     * (`coordinate:1.0.0:<variant>-sbom`) to every per-variant MavenPublication.
+     * Consumers' supply-chain tooling (Snyk, Dependabot, GitHub Dependency Graph)
+     * can then audit per-variant dependency graphs separately.
+     *
+     * Convention: `false` (opt-in).
+     */
+    abstract val publishMatrixSbom: Property<Boolean>
+
+    /**
      * Internal list of variant filter actions.
      */
     internal val variantFilterActions = mutableListOf<Action<VariantFilter>>()
@@ -459,5 +472,7 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
         autoEnable.convention(true)
         // v2.2 Phase 1A — cross-variant intermediate source sets, opt-in.
         createIntermediateBuildTypeSourceSets.convention(false)
+        // v2.2 Phase 3B — per-variant SBOM, opt-in.
+        publishMatrixSbom.convention(false)
     }
 }

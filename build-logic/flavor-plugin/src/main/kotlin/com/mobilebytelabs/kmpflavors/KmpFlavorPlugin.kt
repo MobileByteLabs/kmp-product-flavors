@@ -18,6 +18,7 @@ package com.mobilebytelabs.kmpflavors
 
 import com.mobilebytelabs.kmpflavors.internal.AggregateTasksRegistrar
 import com.mobilebytelabs.kmpflavors.internal.AgpBridge
+import com.mobilebytelabs.kmpflavors.internal.BuildScanConfigurator
 import com.mobilebytelabs.kmpflavors.internal.CompilationRegistrar
 import com.mobilebytelabs.kmpflavors.internal.ComposeResourcesConfigurator
 import com.mobilebytelabs.kmpflavors.internal.DependencyConfigurator
@@ -32,6 +33,7 @@ import com.mobilebytelabs.kmpflavors.internal.MatrixModeResolver
 import com.mobilebytelabs.kmpflavors.internal.PerVariantIosPublishConfigurator
 import com.mobilebytelabs.kmpflavors.internal.PerVariantJsPublishConfigurator
 import com.mobilebytelabs.kmpflavors.internal.PerVariantPublishConfigurator
+import com.mobilebytelabs.kmpflavors.internal.PerVariantSbomConfigurator
 import com.mobilebytelabs.kmpflavors.internal.PlatformDetector
 import com.mobilebytelabs.kmpflavors.internal.PlatformPropertiesConfigurator
 import com.mobilebytelabs.kmpflavors.internal.ProjectIsolationCompatChecker
@@ -667,6 +669,14 @@ class KmpFlavorPlugin : Plugin<Project> {
                 inactiveVariants = inactiveVariants,
                 nonAndroidTargets = nonAndroidTargets,
             )
+            // v2.2 Phase 3B — per-variant SBOM artifacts attached to each MavenPublication.
+            // No-op when publishMatrixSbom=false OR org.cyclonedx.bom not applied.
+            PerVariantSbomConfigurator.configure(
+                project = project,
+                extension = extension,
+                inactiveVariants = inactiveVariants,
+                logger = logger,
+            )
         }
 
         // Configure dependencies
@@ -705,6 +715,15 @@ class KmpFlavorPlugin : Plugin<Project> {
             activeVariant = activeVariantResolved,
             nonAndroidTargets = nonAndroidTargets,
             matrixModeEnabled = matrixModeEnabled,
+        )
+
+        // v2.2 Phase 3A — per-variant Build Scan tagging. No-op when Develocity not applied.
+        BuildScanConfigurator.configure(
+            project = project,
+            allVariants = allVariants,
+            nonAndroidTargets = nonAndroidTargets,
+            matrixModeEnabled = matrixModeEnabled,
+            logger = logger,
         )
 
         // Register tasks
