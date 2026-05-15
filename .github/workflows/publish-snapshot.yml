@@ -1,0 +1,140 @@
+# v2.3 Phase 4 — nightly snapshot publish to Sonatype OSS Snapshots / Central Portal.
+#
+# Adopters who want to track unreleased HEAD on the development branch can pin
+# against the SNAPSHOT artefact instead of waiting for a tagged release. The
+# nightly cron + manual dispatch keep snapshots fresh; the SNAPSHOT suffix means
+# Maven Central allows overwrites (unlike release versions).
+#
+# Trigger model:
+#   - schedule: nightly 03:00 UTC (off-peak; daylight savings drift acceptable).
+#   - workflow_dispatch: on-demand manual trigger from Actions UI for ad-hoc
+#     debug snapshots between cron runs.
+#
+# Differences vs publish-release.yml:
+#   - Reads kmpflavors.version → appends `-SNAPSHOT` (idempotent if already
+#     SNAPSHOT-suffixed).
+#   - Publishes to Maven Central Portal's snapshot repo (the same vanniktech
+#     plugin handles snapshot routing automatically when the version ends
+#     in `-SNAPSHOT`).
+#   - Skips Gradle Plugin Portal publish (Plugin Portal doesn't accept
+#     SNAPSHOTs).
+#   - Skips GitHub Release + bump PR (snapshots are not first-class releases).
+#   - Skips Maven Central pre-flight version-uniqueness check (SNAPSHOTs
+#     legitimately overwrite each cron run).
+
+name: Publish Snapshot
+
+on:
+  schedule:
+    - cron: '0 3 * * *'   # nightly 03:00 UTC
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch / SHA to publish from (defaults to development)'
+        required: false
+        type: string
+        default: 'development'
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  publish:
+    name: Publish SNAPSHOT to Maven Central Portal
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || 'development' }}
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'zulu'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Resolve SNAPSHOT version
+        id: version
+        run: |
+          set -euo pipefail
+          BASE=$(grep '^kmpflavors.version=' gradle.properties | cut -d= -f2)
+          # Already SNAPSHOT? idempotent. Otherwise append `-SNAPSHOT`.
+          if [[ "$BASE" == *-SNAPSHOT ]]; then
+            SNAPSHOT="$BASE"
+          else
+            SNAPSHOT="${BASE}-SNAPSHOT"
+          fi
+          echo "value=$SNAPSHOT" >> "$GITHUB_OUTPUT"
+          echo "Resolved SNAPSHOT version: $SNAPSHOT (from base $BASE)"
+
+      - name: Rewrite gradle.properties for this run (not committed)
+        env:
+          SNAPSHOT: ${{ steps.version.outputs.value }}
+        run: |
+          set -euo pipefail
+          # In-place edit — this checkout is throwaway; never committed.
+          sed -i.bak "s|^kmpflavors.version=.*|kmpflavors.version=$SNAPSHOT|" gradle.properties
+          rm -f gradle.properties.bak
+          echo "gradle.properties now reads:"
+          grep '^kmpflavors.version=' gradle.properties
+
+      - name: Decode GPG key
+        env:
+          GPG_KEY_CONTENTS: ${{ secrets.GPG_KEY_CONTENTS }}
+        run: |
+          echo "$GPG_KEY_CONTENTS" | base64 -d > /tmp/signing-key.gpg
+          echo "ORG_GRADLE_PROJECT_signingInMemoryKey=$(cat /tmp/signing-key.gpg | base64 -w0)" >> $GITHUB_ENV
+
+      - name: Publish to Maven Central Portal (snapshot repo)
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.SIGNING_KEY_ID }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
+        run: |
+          ./gradlew :build-logic:flavor-plugin:publishAllPublicationsToMavenCentralRepository \
+              --stacktrace
+
+      - name: Snapshot summary
+        if: always()
+        env:
+          SNAPSHOT: ${{ steps.version.outputs.value }}
+          RUN_RESULT: ${{ job.status }}
+        run: |
+          {
+            echo "### Snapshot publish — $SNAPSHOT"
+            echo ""
+            if [ "$RUN_RESULT" = "success" ]; then
+              echo "✅ Published to Maven Central Portal snapshot repo."
+              echo ""
+              echo "**Resolve via:**"
+              echo ""
+              echo '```kotlin'
+              echo "// settings.gradle.kts"
+              echo "pluginManagement {"
+              echo "    repositories {"
+              echo "        gradlePluginPortal()"
+              echo "        mavenCentral()"
+              echo "        maven {"
+              echo "            url = uri(\"https://central.sonatype.com/repository/maven-snapshots/\")"
+              echo "            mavenContent { snapshotsOnly() }"
+              echo "        }"
+              echo "    }"
+              echo "}"
+              echo ""
+              echo "// build.gradle.kts (consumer project)"
+              echo "plugins {"
+              echo "    id(\"io.github.mobilebytelabs.kmpflavors\") version \"$SNAPSHOT\""
+              echo "}"
+              echo '```'
+            else
+              echo "❌ Publish failed — inspect job logs above."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

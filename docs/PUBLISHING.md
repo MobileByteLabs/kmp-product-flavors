@@ -142,3 +142,62 @@ Setting `publishMatrix.set(false)` (or removing the opt-in entirely) removes all
 - `MATRIX_MODE.md` — the broader matrix-mode reference (compilation, source sets, BuildConfig, resources).
 - `ERROR_CODES.md` — KMPF-Vxx validator code catalog.
 - RFC §3 Q21 — the original design rationale for per-variant publishing.
+
+
+---
+
+## Snapshot channel (v2.3+)
+
+Adopters who want to track unreleased HEAD on the `development` branch can pin against the snapshot artefact instead of waiting for a tagged release. Nightly cron at `03:00 UTC` republishes the latest `development` commit as `{currentVersion}-SNAPSHOT` to Maven Central Portal's snapshot repo.
+
+### Consumer setup
+
+```kotlin
+// settings.gradle.kts
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+        maven {
+            url = uri("https://central.sonatype.com/repository/maven-snapshots/")
+            mavenContent { snapshotsOnly() }   // safety — only fetch snapshots from here
+        }
+    }
+}
+
+// build.gradle.kts (any consumer)
+plugins {
+    id("io.github.mobilebytelabs.kmpflavors") version "2.2.0-alpha.2-SNAPSHOT"
+}
+```
+
+Replace `2.2.0-alpha.2-SNAPSHOT` with whatever `gradle.properties.kmpflavors.version` reads on `development` at the time of the snapshot publish (or just `*-SNAPSHOT` if your Gradle Maven resolver supports it — the snapshot repo always serves the latest).
+
+### Trigger model
+
+- **Nightly cron** at `03:00 UTC` — fires `publish-snapshot.yml` against the latest `development` commit.
+- **Manual dispatch** for ad-hoc snapshots between cron runs:
+
+```bash
+gh workflow run "Publish Snapshot" --repo MobileByteLabs/kmp-product-flavors --ref development
+# Or override the ref:
+gh workflow run "Publish Snapshot" --repo MobileByteLabs/kmp-product-flavors --ref development \
+    --raw-field ref=some-feature-branch
+```
+
+### What snapshots skip vs releases
+
+| Step | Release path | Snapshot path |
+|---|---|---|
+| Maven Central Portal upload | ✅ | ✅ |
+| Gradle Plugin Portal upload | ✅ | ❌ (Plugin Portal rejects SNAPSHOTs) |
+| Version-uniqueness pre-flight check | ✅ | ❌ (SNAPSHOTs legitimately overwrite) |
+| GitHub Release + git tag | ✅ | ❌ (no first-class release entry) |
+| Auto-bump PR | ✅ | ❌ (no version bump on snapshot publish) |
+| `gradle.properties` rewrite | Permanent (via bump PR) | In-memory only (CI checkout is throwaway) |
+
+### Caveats
+
+- **Snapshots are not signed for Marketplace-style installability** — the Maven Central Portal snapshot repo serves them as-is. Consumers should NOT rely on snapshot artefacts for production deployments; they're development-track only.
+- **Gradle's `--refresh-dependencies` flag** is needed when an existing snapshot version changes between cron runs (Gradle caches snapshots for 24h by default). For real-time dev iteration, set `resolutionStrategy.cacheChangingModulesFor(0, "seconds")` in `settings.gradle.kts`.
+- **No SLA on cron timing** — GitHub Actions cron is best-effort + may drift by 5-15 min during peak load. Adopters needing deterministic timing should use the manual dispatch.
