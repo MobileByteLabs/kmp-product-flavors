@@ -17,6 +17,7 @@ package com.mobilebytelabs.kmpflavors
 import com.mobilebytelabs.kmpflavors.internal.DependencyGuardHelper
 import com.mobilebytelabs.kmpflavors.internal.DetektPerVariantHelper
 import com.mobilebytelabs.kmpflavors.internal.SpotlessDetektScopeHelper
+import com.mobilebytelabs.kmpflavors.internal.VariantBuildCacheKeyConfigurator
 import org.gradle.testfixtures.ProjectBuilder
 import org.junit.jupiter.api.Assertions.assertDoesNotThrow
 import org.junit.jupiter.api.Assertions.assertNull
@@ -213,5 +214,35 @@ class Phase4HelpersTest {
                 logger = project.logger,
             )
         }
+    }
+
+    // ── v2.3 Phase 2 — VariantBuildCacheKeyConfigurator stub ───────────────
+
+    @Test
+    fun `VariantBuildCacheKeyConfigurator is a no-op when flag is false (default)`() {
+        val project = newProject()
+        project.pluginManager.apply("io.github.mobilebytelabs.kmp-product-flavors")
+        val extension = project.extensions.getByType(com.mobilebytelabs.kmpflavors.KmpFlavorExtension::class.java)
+        // Default: flag is false. Configurator returns early.
+        assertDoesNotThrow {
+            VariantBuildCacheKeyConfigurator.configure(project = project, extension = extension)
+        }
+        // No tasks registered — stub doesn't modify any task graph nodes.
+        assertNull(project.tasks.findByName("compileKotlinDesktop"))
+    }
+
+    @Test
+    fun `VariantBuildCacheKeyConfigurator logs but no-ops when flag is true`() {
+        val project = newProject()
+        project.pluginManager.apply("io.github.mobilebytelabs.kmp-product-flavors")
+        val extension = project.extensions.getByType(com.mobilebytelabs.kmpflavors.KmpFlavorExtension::class.java)
+        extension.variantCacheNamespacing.set(true)
+        // Path-(a) stub behaviour: emits an INFO log line + returns. No
+        // task-graph modifications even when flag is true; full impl is
+        // gated on telemetry per the v2.3 plan.
+        assertDoesNotThrow {
+            VariantBuildCacheKeyConfigurator.configure(project = project, extension = extension)
+        }
+        assertNull(project.tasks.findByName("compileKotlinDesktop"))
     }
 }

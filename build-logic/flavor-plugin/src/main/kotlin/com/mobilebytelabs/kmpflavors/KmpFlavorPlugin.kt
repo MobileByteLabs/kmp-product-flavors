@@ -44,6 +44,7 @@ import com.mobilebytelabs.kmpflavors.internal.ProjectIsolationCompatChecker
 import com.mobilebytelabs.kmpflavors.internal.SourceSetConfigurator
 import com.mobilebytelabs.kmpflavors.internal.SpotlessDetektScopeHelper
 import com.mobilebytelabs.kmpflavors.internal.TestCompilationRegistrar
+import com.mobilebytelabs.kmpflavors.internal.VariantBuildCacheKeyConfigurator
 import com.mobilebytelabs.kmpflavors.internal.VariantPromotionConfigurator
 import com.mobilebytelabs.kmpflavors.tasks.DiagnoseVariantTask
 import com.mobilebytelabs.kmpflavors.tasks.GenerateBuildConfigTask
@@ -575,6 +576,13 @@ class KmpFlavorPlugin : Plugin<Project> {
             // v2.3 Phase 1 — opt-in per-(variant × target) Detekt depth.
             perTarget = extension.detektPerVariantPerTarget.get(),
             nonAndroidTargets = nonAndroidTargets,
+        )
+        // v2.3 Phase 2 stub — variant-scoped build cache namespacing. Currently
+        // a no-op pending real cache-miss telemetry on 8+ variant modules;
+        // exposed for forward-compat opt-in. See configurator KDoc.
+        VariantBuildCacheKeyConfigurator.configure(
+            project = project,
+            extension = extension,
         )
 
         // Q3-A — register one GenerateBuildConfigTask per INACTIVE variant in matrix
