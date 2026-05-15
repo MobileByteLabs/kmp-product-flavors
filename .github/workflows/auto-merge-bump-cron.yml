@@ -1,0 +1,97 @@
+# v2.3 Phase 6A (cron safety-net) — periodic merge of stale bumper PRs.
+#
+# Why this exists:
+#   The v2.3 plan's primary safety-net `auto-merge-bump.yml` listens to
+#   `pull_request` + `check_suite` events. Both are SUPPRESSED for PRs
+#   opened with the default `GITHUB_TOKEN` (GitHub's documented loop-
+#   prevention rule). The 2026-05-15 cascade smoke (publishing
+#   `v2.2.0-alpha.1`) confirmed neither trigger fires for bump PRs
+#   opened by `mbl-actionhub-bump-version`.
+#
+#   This cron-based fallback runs every 10 minutes, scans for open bump
+#   PRs matching `chore/bump-version-*` (owner = `github-actions[bot]`),
+#   and squash-merges them directly. Bypasses the `--auto` wait-for-
+#   checks behaviour because no CI runs on workflow-token-pushed
+#   branches anyway.
+#
+# Safety:
+#   - Strict head-ref match: only `chore/bump-version-*` PRs from
+#     `github-actions[bot]` qualify. A feature PR opened by a human
+#     with that branch prefix is NOT auto-merged (author check rejects).
+#   - --delete-branch on merge — keeps origin tidy.
+#   - Idempotent: re-running on the same PR is a no-op (gh pr merge
+#     fails gracefully if the PR is already merged).
+#   - Manual emergency stop: `gh workflow disable "Auto-merge bump PRs (cron)"`.
+#
+# Trade-off vs the event-driven safety-net:
+#   - +5-10 min average latency on the merge (cron resolution).
+#   - +1 cheap workflow run every 10 min (idle when no bump PRs open).
+#   - 100% triggers regardless of who opened the PR.
+
+name: Auto-merge bump PRs (cron)
+
+on:
+  schedule:
+    # Every 10 minutes. GitHub Actions cron resolution is best-effort
+    # but typically fires within ~1-2 min of schedule.
+    - cron: '*/10 * * * *'
+  workflow_dispatch: {}   # also exposed for manual nudge during incidents.
+
+permissions:
+  pull-requests: write
+  contents: write
+
+jobs:
+  scan-and-merge:
+    name: Scan + merge stale bump PRs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Scan + merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # Find open PRs whose head ref matches the bumper convention AND
+          # whose author is the GitHub Actions bot. Returns JSON list of
+          # {number, headRefName, author.login}.
+          MATCHES=$(gh pr list \
+              --repo "$GITHUB_REPOSITORY" \
+              --state open \
+              --limit 25 \
+              --json number,headRefName,author \
+              --jq '[.[] | select(.headRefName | startswith("chore/bump-version-")) | select(.author.login == "app/github-actions" or .author.login == "github-actions" or .author.login == "github-actions[bot]")]')
+
+          COUNT=$(echo "$MATCHES" | jq 'length')
+          echo "Found $COUNT open bumper PR(s) matching the safe-set."
+          if [ "$COUNT" -eq 0 ]; then
+              echo "::notice::No bump PRs to merge."
+              exit 0
+          fi
+
+          # Merge each one. Failures on a single PR don't stop the loop —
+          # we want at least the others to land if one is non-mergeable.
+          FAILED=0
+          echo "$MATCHES" | jq -c '.[]' | while IFS= read -r entry; do
+              NUMBER=$(echo "$entry" | jq -r .number)
+              HEAD=$(echo "$entry" | jq -r .headRefName)
+              echo ""
+              echo "── merging PR #${NUMBER} (head=${HEAD}) ──"
+              if gh pr merge "$NUMBER" \
+                  --repo "$GITHUB_REPOSITORY" \
+                  --squash \
+                  --delete-branch \
+                  --subject "chore(version): $(gh pr view "$NUMBER" --repo "$GITHUB_REPOSITORY" --json title --jq .title) (#${NUMBER})" \
+                  --body "Auto-merged by the bump-PR cron safety-net (v2.3 Phase 6A). See docs/RELEASE.md." 2>&1 | tee /tmp/gh-merge.log; then
+                  echo "::notice::Merged PR #${NUMBER}"
+              else
+                  echo "::warning::Failed to merge PR #${NUMBER} — likely branch protection or missing checks. See log."
+                  FAILED=$((FAILED+1))
+              fi
+          done
+
+          if [ "${FAILED:-0}" -gt 0 ]; then
+              echo "::error::${FAILED} bump PR(s) failed to merge. Inspect logs + merge manually."
+              exit 1
+          fi
