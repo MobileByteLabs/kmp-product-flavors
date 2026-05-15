@@ -391,6 +391,25 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
     abstract val npmPackagePrefix: Property<String>
 
     /**
+     * v2.3 Phase 7 — opt-in per-variant Compose hot-reload task registration.
+     *
+     * When `true` AND `org.jetbrains.compose` is applied AND matrix mode is enabled,
+     * registers a `composeHotReload{Variant}` task per inactive variant (Option A from
+     * the v2.3 plan). Each task is wired to the variant's compilation so editing a
+     * variant-specific source file triggers a hot-reload scoped to that variant.
+     *
+     * **Limitations** (Phase 7A research outcome):
+     * - Switching the active variant still requires Gradle daemon restart on most
+     *   CMP versions (Option B requires CMP-internal classloader changes — deferred).
+     * - The CMP hot-reload subsystem is unstable across CMP versions; v2.3 supports
+     *   CMP 1.7-1.9. Outside that matrix, KMPF-V18 surfaces a WARNING.
+     *
+     * Convention: `false` (opt-in — Option B's CLI helper + IDE plugin variant
+     * switcher remain the v2.3 default UX).
+     */
+    abstract val composeHotReloadPerVariant: Property<Boolean>
+
+    /**
      * Internal list of variant filter actions.
      */
     internal val variantFilterActions = mutableListOf<Action<VariantFilter>>()
