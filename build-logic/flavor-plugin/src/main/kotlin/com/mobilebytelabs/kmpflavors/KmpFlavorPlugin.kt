@@ -50,6 +50,7 @@ import com.mobilebytelabs.kmpflavors.tasks.GenerateRunConfigurationsTask
 import com.mobilebytelabs.kmpflavors.tasks.GenerateSpmManifestTask
 import com.mobilebytelabs.kmpflavors.tasks.GenerateVariantRunConfigurationsTask
 import com.mobilebytelabs.kmpflavors.tasks.InitFlavorSourceSetsTask
+import com.mobilebytelabs.kmpflavors.tasks.ListActiveVariantTask
 import com.mobilebytelabs.kmpflavors.tasks.ListFlavorsTask
 import com.mobilebytelabs.kmpflavors.tasks.ListVariantCompilationsTask
 import com.mobilebytelabs.kmpflavors.tasks.PrintFlavorPropertiesTask
@@ -1076,6 +1077,16 @@ class KmpFlavorPlugin : Plugin<Project> {
             this.activeVariant.set(activeVariantNameValue)
             this.dimensions.set(dimensionsData)
             this.platforms.set(platformsData)
+        }
+
+        // v2.2 Phase 2A (Option B) — listActiveVariant task. CLI helper for the
+        // documented "Compose hot-reload still active-only" UX.
+        project.tasks.register(
+            "listActiveVariant",
+            ListActiveVariantTask::class.java,
+        ).configure {
+            activeVariantName.set(activeVariantNameValue)
+            allVariantNames.set(allVariants.map { it.name })
         }
 
         // Generate run configurations task

@@ -58,6 +58,16 @@ Two equivalent forms — pick whichever fits your convention plugin / CI ergonom
 | `excludeGeneratedFromFormatters` opt-in (v2.1) | Auto-excludes generated `BuildKonfig` paths from Spotless + Detekt | Q24 / v2.1 Phase 4 |
 | `detektPerVariant` opt-in (v2.1) | Registers `detekt{Variant}` task per variant with per-variant baselines | Q24 / v2.1 Phase 4 |
 | `generateVariantRunConfigurations` task (v2.1) | One `.run.xml` per (variant × target) for IDE run-config dropdown | G22 / v2.1 Phase 4 |
+| `listActiveVariant` task (v2.2) | Prints active variant + all registered variants + `-PkmpFlavor=…` switch instructions | v2.2 Phase 2A Option B |
+| `autoEnable` (v2.2 default `true`) | Auto-flips `buildMatrix` / `publishMatrix` / `detektPerVariant` / `excludeGeneratedFromFormatters` / `dependencyGuardPerVariant` / `enableBuildTypes` based on plugin detection + module shape | v2.2 Phase 0 |
+| `createIntermediateBuildTypeSourceSets` opt-in (v2.2) | Materializes `common{BuildType}` source sets shared across sibling-buildType variants (e.g., `commonStaging` between `freeStaging` + `paidStaging`) | RFC §10 / v2.2 Phase 1A |
+| `promote(from, to) { applyTransform(...) }` DSL (v2.2) | Automates source-set graduation between buildTypes (e.g., `freeDev` → `freeStaging`) with package rename transforms; `-Pdry-run=true` previews without writing | v2.2 Phase 4A |
+| `featureFlags { growthbook { defaultPayload.set(...) } }` (v2.2) | Generates per-variant `FeatureFlags.kt` for GrowthBook / Statsig / LaunchDarkly defaults | v2.2 Phase 4B |
+| `publishMatrixSbom` opt-in (v2.2) | Attaches per-variant CycloneDX SBOM artifacts to each `MavenPublication` | v2.2 Phase 3 |
+| `npmPublishMatrix` opt-in (v2.2) | Generates per-variant `package.json` + `.tgz` tarball for `js(IR)` / `wasmJs()` targets | v2.2 Phase 5C |
+| Per-variant XCFramework MavenPublication (v2.2) | One `.xcframework` artifact per (inactive variant × iOS target) when `publishMatrix=true`; v2.1 Zip publications coexist behind `publishMatrixLegacyIosClassifiers` (default `true`) | v2.2 Phase 5A |
+| Per-variant `Package.swift` (v2.2) | One `build/spm/{variant}/Package.swift` per variant when matrix mode is enabled | v2.2 Phase 5B |
+| Build Scan + SBOM observability (v2.2) | Develocity custom-values per variant when `com.gradle.develocity` is applied; CycloneDX SBOM emission per variant when `publishMatrixSbom=true` | v2.2 Phase 3 |
 
 ---
 
@@ -124,7 +134,7 @@ Per-variant resources on iOS / native targets flow through the same Kotlin sourc
 |---|---|---|
 | `maven-publish` | ✅ Tested | Per-variant `MavenPublication` registered via `publishMatrix.set(true)`. Standard `publishVariant{X}PublicationToMavenLocal` tasks derived by Gradle. |
 | `com.vanniktech.maven.publish` | ✅ Compatible (delegated) | Delegates to `maven-publish`; our `withId("maven-publish")` hook fires regardless of which plugin applied it. Smoke-tested via the W4 `samples/matrix-mode/` sample app — TestKit can't satisfy vanniktech's KotlinBasePlugin classpath, so the unit-level test is `@Disabled`. |
-| `org.jetbrains.compose` (Compose Multiplatform) | ✅ Compatible (v2.1 adds per-variant resources) | Per-variant compilations honor Compose's own source-set hierarchy. **Per-variant `composeResources/` work end-to-end** via the source-set convention (v2.1 — see "Per-variant resources" above). **Hot-reload is still active-variant only** at v2.1 GA; per-variant hot-reload is v2.2 scope. |
+| `org.jetbrains.compose` (Compose Multiplatform) | ✅ Compatible (v2.2 adds Option B switcher + IDE plugin) | Per-variant compilations honor Compose's own source-set hierarchy. **Per-variant `composeResources/` work end-to-end** via the source-set convention (v2.1+). **Hot-reload is still active-variant only**; per-variant hot-reload (true Option A) is deferred to v2.3+. v2.2 ships Option B: the `./gradlew listActiveVariant` CLI helper + the [`kmp-product-flavors-ide-plugin`](https://github.com/MobileByteLabs/kmp-product-flavors-ide-plugin) IntelliJ plugin (variant-switcher dropdown + Gradle-tool-window grouping) for a workable per-variant hot-reload UX (switch via `-PkmpFlavor=…`, then re-run `composeApp:run`). |
 | `org.jetbrains.kotlin.plugin.serialization` | ✅ Compatible | KSP codegen runs per compilation; per-variant compilations each get their own generated sources. |
 | `org.jetbrains.kotlinx.atomicfu` | ✅ Compatible | Atomicfu's compilation transformer runs per `KotlinCompilation`, including ours. |
 | `dependency-guard` | ✅ Helper API (v2.1) | Set `kmpFlavors { dependencyGuardPerVariant.set(true) }` to auto-register one `dependencyGuard.configuration(...)` entry per (variant × target). Without the opt-in, consumers can still wire them manually. |
@@ -179,5 +189,10 @@ See `docs/ERROR_CODES.md` (W5 deliverable). Quick reference:
 | KMPF-V04 | ERROR | `variantFilter` excluded every variant |
 | KMPF-V05 | WARNING | Matrix mode enabled but zero non-Android KMP targets |
 | KMPF-V08 | ERROR | Matrix mode enabled but no flavors registered |
+| KMPF-V13 | WARNING | Gradle 9 Project Isolation: codegen-host election cross-project read (documented limitation) |
+| KMPF-V14 | ERROR | Compose Multiplatform version below floor (need >= 1.7.0) |
+| KMPF-V15 | WARNING | Apple Silicon under Rosetta — recommend native arm64 JDK |
+| KMPF-V16 | WARNING | Compose Multiplatform × KGP version skew |
+| KMPF-V17 | WARNING | KGP × Gradle version skew |
 
-More codes (V02, V03, V06, V07) ship in W5+ as the validator is extended.
+More codes (V02, V03, V06, V07) ship in future revisions as the validator is extended.
