@@ -99,6 +99,26 @@ When branch protection requires bot-bypass approval or the bumper's auto-merge a
 
 Scope is intentionally narrow — only PRs from the `github-actions[bot]` user with the `chore/bump-version-*` head prefix are eligible. A feature PR opened with that branch name by a human will NOT be auto-merged.
 
+### Cron fallback (`.github/workflows/auto-merge-bump-cron.yml`)
+
+The event-driven safety-net above is suppressed for PRs opened with the default `GITHUB_TOKEN` (GitHub's documented workflow-loop-prevention rule). The 2026-05-15 cascade smoke confirmed neither `pull_request` nor `check_suite` triggers fire for bumper-opened PRs.
+
+The cron-based fallback closes the gap:
+
+- Runs every 10 minutes.
+- Scans for open bump PRs (`chore/bump-version-*` head ref + `github-actions[bot]` author).
+- Squash-merges each one directly (no `--auto` wait-for-checks — workflow-token-pushed branches never get checks anyway).
+
+Same scope restrictions: feature PRs opened by humans with the bump-prefix branch name are NOT auto-merged.
+
+Trade-off: 5-10 min average merge latency vs the event-driven path. Worth it to avoid the alternative (PAT setup on every consumer repo, or manual `gh pr merge` after every publish).
+
+Manual nudge during incidents:
+
+```bash
+gh workflow run "Auto-merge bump PRs (cron)" --repo MobileByteLabs/kmp-product-flavors
+```
+
 ---
 
 ## Emergency stop
