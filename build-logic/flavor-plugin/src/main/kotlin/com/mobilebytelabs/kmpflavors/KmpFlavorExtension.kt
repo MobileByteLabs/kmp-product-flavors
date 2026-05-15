@@ -468,10 +468,25 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
     val spm: SpmConfig = objects.newInstance(SpmConfig::class.java)
 
     /**
+     * v2.2 Phase 4B — feature-flag integration scope. See [FeatureFlagsConfig] for
+     * per-platform sub-configs (GrowthBook / Statsig / LaunchDarkly).
+     *
+     * No-op when none of the platform sub-configs have `defaultPayload` set.
+     */
+    val featureFlags: FeatureFlagsConfig = objects.newInstance(FeatureFlagsConfig::class.java)
+
+    /**
      * Configure the SPM manifest generator using a DSL block.
      */
     fun spm(action: Action<SpmConfig>) {
         action.execute(spm)
+    }
+
+    /**
+     * v2.2 Phase 4B — configure feature-flag integrations.
+     */
+    fun featureFlags(action: Action<FeatureFlagsConfig>) {
+        action.execute(featureFlags)
     }
 
     init {

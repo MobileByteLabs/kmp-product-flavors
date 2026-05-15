@@ -24,6 +24,7 @@ import com.mobilebytelabs.kmpflavors.internal.ComposeResourcesConfigurator
 import com.mobilebytelabs.kmpflavors.internal.DependencyConfigurator
 import com.mobilebytelabs.kmpflavors.internal.DependencyGuardHelper
 import com.mobilebytelabs.kmpflavors.internal.DetektPerVariantHelper
+import com.mobilebytelabs.kmpflavors.internal.FeatureFlagHelpers
 import com.mobilebytelabs.kmpflavors.internal.FlavorVariantResolver
 import com.mobilebytelabs.kmpflavors.internal.GenerateBuildConfigTasksRegistrar
 import com.mobilebytelabs.kmpflavors.internal.IntermediateSourceSetConfigurator
@@ -723,6 +724,16 @@ class KmpFlavorPlugin : Plugin<Project> {
             project = project,
             flavors = flavors,
             promotions = extension.variantPromotions,
+            logger = logger,
+        )
+
+        // v2.2 Phase 4B — feature-flag generator (GrowthBook / Statsig / LaunchDarkly).
+        // No-op when no platform sub-config has defaultPayload set, OR matrix mode is off.
+        FeatureFlagHelpers.configure(
+            project = project,
+            extension = extension,
+            allVariants = allVariants,
+            matrixModeEnabled = matrixModeEnabled,
             logger = logger,
         )
 
