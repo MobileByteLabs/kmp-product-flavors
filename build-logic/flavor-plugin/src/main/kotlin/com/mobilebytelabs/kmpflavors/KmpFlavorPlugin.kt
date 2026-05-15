@@ -32,7 +32,9 @@ import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorValidationSeverity
 import com.mobilebytelabs.kmpflavors.internal.MatrixModeResolver
 import com.mobilebytelabs.kmpflavors.internal.PerVariantIosPublishConfigurator
+import com.mobilebytelabs.kmpflavors.internal.PerVariantIosXcframeworkConfigurator
 import com.mobilebytelabs.kmpflavors.internal.PerVariantJsPublishConfigurator
+import com.mobilebytelabs.kmpflavors.internal.PerVariantNpmPublishConfigurator
 import com.mobilebytelabs.kmpflavors.internal.PerVariantPublishConfigurator
 import com.mobilebytelabs.kmpflavors.internal.PerVariantSbomConfigurator
 import com.mobilebytelabs.kmpflavors.internal.PlatformDetector
@@ -653,10 +655,21 @@ class KmpFlavorPlugin : Plugin<Project> {
                 inactiveVariants = inactiveVariants,
                 nonAndroidTargets = nonAndroidTargets,
             )
-            // v2.1 Phase 5A — iOS per-variant publishing (classifier-tagged MavenPublication
-            // per (inactive variant × iOS target); per-variant XCFramework aggregation
-            // deferred to v2.2 — see docs/PUBLISHING.md).
-            PerVariantIosPublishConfigurator.configure(
+            // v2.1 Phase 5A — iOS Zip + MavenPublication path (klib bundle). v2.2 keeps this
+            // behind `publishMatrixLegacyIosClassifiers` (default `true` for migration window)
+            // alongside Phase 5A's XCFramework path. Consumers depending on v2.1 classifier
+            // coordinates can leave the flag on; ready-to-migrate consumers set it to `false`.
+            if (extension.publishMatrixLegacyIosClassifiers.get()) {
+                PerVariantIosPublishConfigurator.configure(
+                    project = project,
+                    extension = extension,
+                    inactiveVariants = inactiveVariants,
+                    nonAndroidTargets = nonAndroidTargets,
+                )
+            }
+            // v2.2 Phase 5A — XCFramework + MavenPublication path (real Apple framework binaries).
+            // No-op when no iOS targets declared OR maven-publish not applied.
+            PerVariantIosXcframeworkConfigurator.configure(
                 project = project,
                 extension = extension,
                 inactiveVariants = inactiveVariants,
@@ -666,6 +679,14 @@ class KmpFlavorPlugin : Plugin<Project> {
             // MavenPublication per (inactive variant × JS-family target); npm registry
             // publishing is consumer-side — see docs/PUBLISHING.md).
             PerVariantJsPublishConfigurator.configure(
+                project = project,
+                extension = extension,
+                inactiveVariants = inactiveVariants,
+                nonAndroidTargets = nonAndroidTargets,
+            )
+            // v2.2 Phase 5C — opt-in per-variant npm tarballs. No-op when npmPublishMatrix=false
+            // OR no js/wasmJs targets declared.
+            PerVariantNpmPublishConfigurator.configure(
                 project = project,
                 extension = extension,
                 inactiveVariants = inactiveVariants,
@@ -698,9 +719,22 @@ class KmpFlavorPlugin : Plugin<Project> {
             logger = logger,
         )
 
-        // SPM manifest generator — opt-in via spm { generateManifest.set(true) }
+        // SPM manifest generator — opt-in via spm { generateManifest.set(true) }.
+        // v2.2 Phase 5B: when matrix mode is ALSO on, register one SPM task per variant
+        // (build/spm/{variantName}/Package.swift). v1.x consumers without matrix mode get
+        // the single-variant SPM manifest unchanged.
         if (extension.spm.generateManifest.get()) {
-            registerSpmTask(project, extension, activeVariantResolved)
+            if (matrixModeEnabled) {
+                for (variant in allVariants) {
+                    registerSpmTaskForVariant(project, extension, variant)
+                }
+                logger.lifecycle(
+                    "[KMP Flavors] Phase 5B — registered ${allVariants.size} per-variant SPM " +
+                        "manifest task(s) at `build/spm/{variant}/Package.swift`.",
+                )
+            } else {
+                registerSpmTask(project, extension, activeVariantResolved)
+            }
         }
 
         // Configure platform-specific properties
@@ -1099,6 +1133,33 @@ class KmpFlavorPlugin : Plugin<Project> {
             webTitleSuffix.set(
                 activeVariantResolved.combinedWebTitleSuffix.ifEmpty { null },
             )
+        }
+    }
+
+    /**
+     * v2.2 Phase 5B — per-variant SPM manifest registration. Mirrors `registerSpmTask` but
+     * produces one `generate{Variant}SpmManifest` task per variant, writing to
+     * `build/spm/{variant}/Package.swift`.
+     */
+    private fun registerSpmTaskForVariant(project: org.gradle.api.Project, extension: KmpFlavorExtension, variant: FlavorVariant) {
+        val flavorName = variant.flavors.firstOrNull()?.name ?: variant.name
+        val variantCap = variant.name.replaceFirstChar { it.uppercase() }
+        project.tasks.register(
+            "generate${variantCap}SpmManifest",
+            GenerateSpmManifestTask::class.java,
+        ).configure {
+            group = "kmpFlavors variants"
+            description = "Generate per-variant Package.swift manifest for SPM distribution " +
+                "of variant '${variant.name}' (Phase 5B)."
+            variantName.set(variant.name)
+            this.flavorName.set(flavorName)
+            xcframeworkName.set(extension.spm.xcframeworkName)
+            distribution.set(extension.spm.distribution)
+            binaryUrlTemplate.set(extension.spm.binaryUrlTemplate)
+            xcframeworkPath.set(extension.spm.xcframeworkPath)
+            projectVersion.set(project.provider { project.version.toString() })
+            checksumStrategy.set(extension.spm.checksumStrategy)
+            outputDirectory.set(project.layout.buildDirectory.dir("spm/${variant.name}"))
         }
     }
 

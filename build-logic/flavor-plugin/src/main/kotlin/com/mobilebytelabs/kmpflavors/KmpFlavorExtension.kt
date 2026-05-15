@@ -363,6 +363,34 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
     abstract val publishMatrixSbom: Property<Boolean>
 
     /**
+     * v2.2 Phase 5A — keep v2.1's Zip-shaped iOS MavenPublications as deprecation
+     * aliases when XCFramework path lands. Default `true` in v2.2 (migration window);
+     * flip to `false` once consumers have migrated their dependency coordinates from
+     * `coordinate:1.0.0:paid-iosArm64` (Zip) to `coordinate:1.0.0:paid-xcframework`
+     * (XCFramework). Removed in a future major.
+     *
+     * Convention: `true` (preserves v2.1 behavior on v2.2 upgrade).
+     */
+    abstract val publishMatrixLegacyIosClassifiers: Property<Boolean>
+
+    /**
+     * v2.2 Phase 5C — opt-in for plugin-side npm publishing of JS / WasmJs variants.
+     *
+     * When `true` AND `publishMatrix=true` AND a `js(IR)` or `wasmJs()` target is declared,
+     * the plugin generates a per-variant npm package with `package.json.name = "{prefix}-{variant}"`.
+     * npm credentials remain consumer-side (`~/.npmrc`); the plugin doesn't manage them.
+     *
+     * Convention: `false` (opt-in — consumer-side npm tarball production is the v2.1 default).
+     */
+    abstract val npmPublishMatrix: Property<Boolean>
+
+    /**
+     * v2.2 Phase 5C — npm package-name prefix override. Used as `package.json.name = "{prefix}-{variant}"`.
+     * When unset, defaults to `rootProject.name`.
+     */
+    abstract val npmPackagePrefix: Property<String>
+
+    /**
      * Internal list of variant filter actions.
      */
     internal val variantFilterActions = mutableListOf<Action<VariantFilter>>()
@@ -522,5 +550,9 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
         createIntermediateBuildTypeSourceSets.convention(false)
         // v2.2 Phase 3B — per-variant SBOM, opt-in.
         publishMatrixSbom.convention(false)
+        // v2.2 Phase 5A — keep v2.1's Zip-shaped iOS publications during the migration window.
+        publishMatrixLegacyIosClassifiers.convention(true)
+        // v2.2 Phase 5C — npm registry publish opt-in.
+        npmPublishMatrix.convention(false)
     }
 }
