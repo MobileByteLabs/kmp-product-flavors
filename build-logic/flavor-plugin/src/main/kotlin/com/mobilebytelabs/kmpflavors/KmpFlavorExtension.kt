@@ -333,6 +333,30 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
     abstract val detektPerVariant: Property<Boolean>
 
     /**
+     * v2.3 Phase 1 — opt-in for per-(variant × target) Detekt depth.
+     *
+     * Extends [detektPerVariant]: instead of one `detekt{Variant}` task per
+     * inactive variant, registers `detekt{Variant}{Target}` (e.g.
+     * `detektFreeDevDesktop`, `detektFreeDevIosArm64`) so per-target rule
+     * overrides + per-target baselines are first-class.
+     *
+     * Motivation: a `commonPaid` symbol that compiles cleanly on Desktop may
+     * fail Detekt on iOS because some Detekt rules depend on the target's
+     * stdlib. v2.1's per-variant scope mixes target-specific signals into one
+     * task, blunting the signal-to-noise.
+     *
+     * Per-target baseline path: `config/detekt/{variant}/{target}/baseline.xml`.
+     * Variant-level aggregate tasks (`detekt{Variant}`) continue to exist +
+     * depend on the per-target subtasks when this flag is on.
+     *
+     * Requires `detektPerVariant=true`. No-op when `detektPerVariant=false`.
+     *
+     * Convention: `false` (opt-in — narrows the v2.1 scope; consumers who don't
+     * want N×M tasks stay on the per-variant default).
+     */
+    abstract val detektPerVariantPerTarget: Property<Boolean>
+
+    /**
      * v2.2 Phase 1A — opt-in for cross-variant intermediate `common{BuildType}` source sets.
      *
      * When `true` (AND `enableBuildTypes = true` AND matrix mode is on), the plugin
@@ -562,6 +586,7 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
         dependencyGuardPerVariant.convention(false)
         excludeGeneratedFromFormatters.convention(false)
         detektPerVariant.convention(false)
+        detektPerVariantPerTarget.convention(false)
         // v2.2 Phase 0G — master opt-out. Default `true` for fully-automatic-plugin
         // ergonomics; consumers wanting strict v2.0 / v2.1 semantics set to `false`.
         autoEnable.convention(true)

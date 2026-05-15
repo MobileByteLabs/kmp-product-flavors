@@ -572,6 +572,9 @@ class KmpFlavorPlugin : Plugin<Project> {
             allVariants = allVariants,
             enabled = extension.detektPerVariant.get(),
             logger = logger,
+            // v2.3 Phase 1 — opt-in per-(variant × target) Detekt depth.
+            perTarget = extension.detektPerVariantPerTarget.get(),
+            nonAndroidTargets = nonAndroidTargets,
         )
 
         // Q3-A — register one GenerateBuildConfigTask per INACTIVE variant in matrix

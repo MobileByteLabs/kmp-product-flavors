@@ -19,6 +19,7 @@ import com.mobilebytelabs.kmpflavors.internal.DetektPerVariantHelper
 import com.mobilebytelabs.kmpflavors.internal.SpotlessDetektScopeHelper
 import org.gradle.testfixtures.ProjectBuilder
 import org.junit.jupiter.api.Assertions.assertDoesNotThrow
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 
 /**
@@ -142,6 +143,66 @@ class Phase4HelpersTest {
 
     @Test
     fun `DetektPerVariantHelper is a no-op when Detekt plugin is not applied`() {
+        val project = newProject()
+        val variant = FlavorVariant(name = "free", flavors = emptyList())
+        assertDoesNotThrow {
+            DetektPerVariantHelper.configure(
+                project = project,
+                allVariants = listOf(variant),
+                enabled = true,
+                logger = project.logger,
+            )
+        }
+    }
+
+    // ── v2.3 Phase 1 — detektPerVariantPerTarget overload ──────────────────
+    //
+    // The helper's perTarget branch should be a no-op when Detekt isn't
+    // applied (mirror of the per-variant case above) AND when nonAndroidTargets
+    // is empty even if perTarget=true (degrades to per-variant scope safely).
+
+    @Test
+    fun `DetektPerVariantHelper perTarget overload is a no-op when Detekt not applied`() {
+        val project = newProject()
+        val variant = FlavorVariant(name = "freeDev", flavors = emptyList())
+        assertDoesNotThrow {
+            DetektPerVariantHelper.configure(
+                project = project,
+                allVariants = listOf(variant),
+                enabled = true,
+                logger = project.logger,
+                perTarget = true,
+                nonAndroidTargets = emptyList(),
+            )
+        }
+    }
+
+    @Test
+    fun `DetektPerVariantHelper perTarget overload degrades to per-variant when no targets`() {
+        // perTarget=true but nonAndroidTargets=[] → branch falls through to the
+        // per-variant path, which is itself a no-op without the Detekt plugin.
+        // Concrete assertion: no exception, no spurious task registration.
+        val project = newProject()
+        val variant = FlavorVariant(name = "paidProd", flavors = emptyList())
+        assertDoesNotThrow {
+            DetektPerVariantHelper.configure(
+                project = project,
+                allVariants = listOf(variant),
+                enabled = true,
+                logger = project.logger,
+                perTarget = true,
+                nonAndroidTargets = emptyList(),
+            )
+        }
+        // No detekt* task registered (Detekt plugin not applied).
+        assertNull(project.tasks.findByName("detektPaidProd"))
+        assertNull(project.tasks.findByName("detektPaidProdDesktop"))
+    }
+
+    @Test
+    fun `DetektPerVariantHelper backwards-compat — original signature still works`() {
+        // perTarget + nonAndroidTargets default to (false, emptyList()).
+        // Existing v2.1 callers that don't pass the new params keep compiling.
         val project = newProject()
         val variant = FlavorVariant(name = "free", flavors = emptyList())
         assertDoesNotThrow {
