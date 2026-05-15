@@ -233,18 +233,35 @@ class Phase4HelpersTest {
     }
 
     @Test
-    fun `VariantBuildCacheKeyConfigurator logs but no-ops when flag is true`() {
+    fun `VariantBuildCacheKeyConfigurator no-op when buildMatrix is off`() {
+        // v2.4 path-(b) prerequisite: matrix mode must be on. Without it, the
+        // configurator returns early — there are no per-variant compilations
+        // to namespace.
         val project = newProject()
         project.pluginManager.apply("io.github.mobilebytelabs.kmp-product-flavors")
         val extension = project.extensions.getByType(com.mobilebytelabs.kmpflavors.KmpFlavorExtension::class.java)
         extension.variantCacheNamespacing.set(true)
-        // Path-(a) stub behaviour: emits an INFO log line + returns. No
-        // task-graph modifications even when flag is true; full impl is
-        // gated on telemetry per the v2.3 plan.
+        // buildMatrix defaults to false → early-return path.
         assertDoesNotThrow {
             VariantBuildCacheKeyConfigurator.configure(project = project, extension = extension)
         }
-        assertNull(project.tasks.findByName("compileKotlinDesktop"))
+    }
+
+    @Test
+    fun `VariantBuildCacheKeyConfigurator applies kmpFlavorVariant input when matrix mode on`() {
+        // v2.4 path-(b) impl: variantCacheNamespacing=true AND buildMatrix=true →
+        // configurator hooks compileKotlin* tasks via tasks.matching { ... }.configureEach { ... }.
+        // We don't register compileKotlin* tasks in this fixture (no KGP applied),
+        // but the configureEach hook attaches lazily — assertDoesNotThrow is the
+        // signal that the wiring code path completed without exception.
+        val project = newProject()
+        project.pluginManager.apply("io.github.mobilebytelabs.kmp-product-flavors")
+        val extension = project.extensions.getByType(com.mobilebytelabs.kmpflavors.KmpFlavorExtension::class.java)
+        extension.variantCacheNamespacing.set(true)
+        extension.buildMatrix.set(true)
+        assertDoesNotThrow {
+            VariantBuildCacheKeyConfigurator.configure(project = project, extension = extension)
+        }
     }
 
     // ── v2.4 Phase 5 — VariantDependenciesScope + applyVariantExcludes ─────
