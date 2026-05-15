@@ -31,6 +31,7 @@ import com.mobilebytelabs.kmpflavors.internal.IntermediateSourceSetConfigurator
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorValidationSeverity
 import com.mobilebytelabs.kmpflavors.internal.MatrixModeResolver
+import com.mobilebytelabs.kmpflavors.internal.PerVariantComposeHotReloadConfigurator
 import com.mobilebytelabs.kmpflavors.internal.PerVariantIosPublishConfigurator
 import com.mobilebytelabs.kmpflavors.internal.PerVariantIosXcframeworkConfigurator
 import com.mobilebytelabs.kmpflavors.internal.PerVariantJsPublishConfigurator
@@ -700,6 +701,17 @@ class KmpFlavorPlugin : Plugin<Project> {
                 extension = extension,
                 inactiveVariants = inactiveVariants,
                 logger = logger,
+            )
+            // v2.3 Phase 7 — opt-in per-variant Compose hot-reload (Option A).
+            // No-op when composeHotReloadPerVariant=false OR org.jetbrains.compose
+            // not applied OR no JVM-family targets declared. Option B (daemon-
+            // restart-free switcher) is deferred to v2.4 pending CMP-internal
+            // classloader API surface stabilisation — see configurator KDoc.
+            PerVariantComposeHotReloadConfigurator.configure(
+                project = project,
+                extension = extension,
+                inactiveVariants = inactiveVariants,
+                nonAndroidTargets = nonAndroidTargets,
             )
         }
 
