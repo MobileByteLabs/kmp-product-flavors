@@ -132,6 +132,31 @@ pluginManagement {
 }
 ```
 
+### Snapshot channel (v2.3+) — track unreleased HEAD
+
+For pinning against the latest `development` commit instead of a tagged release:
+
+```kotlin
+// settings.gradle.kts
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+        maven {
+            url = uri("https://central.sonatype.com/repository/maven-snapshots/")
+            mavenContent { snapshotsOnly() }
+        }
+    }
+}
+
+// build.gradle.kts
+plugins {
+    id("io.github.mobilebytelabs.kmpflavors") version "<base-version>-SNAPSHOT"
+}
+```
+
+Snapshots are republished nightly at 03:00 UTC. See [`docs/PUBLISHING.md`](docs/PUBLISHING.md#snapshot-channel-v23) for the full snapshot channel reference, including caveats around Gradle's snapshot caching and Marketplace signing differences.
+
 ## Quick Start
 
 ```kotlin
