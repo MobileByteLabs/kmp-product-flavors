@@ -100,7 +100,11 @@ jobs:
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
         run: |
           export ORG_GRADLE_PROJECT_signingInMemoryKey="$(cat /tmp/mbl-signing-key.asc)"
+          # --no-configuration-cache: Gradle 9.x's Sign task isn't config-cache-safe
+          # ("cannot serialize Gradle script object references"). The release path
+          # also runs with config cache disabled for the same reason.
           ./gradlew :build-logic:flavor-plugin:publishAllPublicationsToMavenCentralRepository \
+              --no-configuration-cache \
               --stacktrace
 
       - name: Snapshot summary
