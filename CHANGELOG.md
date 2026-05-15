@@ -46,7 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Phase 0F (auto-merge bump PR cascade)** — deferred to a separate `mbl-actionhub-bump-version` cross-repo session.
 - **Phase 2A Option A (true per-variant Compose hot-reload)** — Option B's CLI-switch UX ships here; full per-variant hot-reload is v2.3+ scope pending CMP hot-reload task-graph research.
-- **Phase 6 — IDE plugin v0.1** — code lives in the separate `MobileByteLabs/kmp-product-flavors-ide-plugin` repo (initial v0.1 scaffolding tracked there).
+- **Phase 6 — IDE plugin v0.1** — 🚢 published to [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31779-kmp-product-flavors) 2026-05-15 as part of the v2.3 cycle (was deferred from v2.2). Source: [`MobileByteLabs/kmp-product-flavors-ide-plugin`](https://github.com/MobileByteLabs/kmp-product-flavors-ide-plugin).
 - **KGP "Invalid Source Set Dependency Across Trees" warnings** on Phase 1A's variant→commonBuildType edges remain cosmetic — proper fix via KGP's `applyHierarchyTemplate` API is v2.2 beta polish.
 
 ### Compatibility
