@@ -56,6 +56,7 @@ import com.mobilebytelabs.kmpflavors.tasks.ListActiveVariantTask
 import com.mobilebytelabs.kmpflavors.tasks.ListFlavorsTask
 import com.mobilebytelabs.kmpflavors.tasks.ListVariantCompilationsTask
 import com.mobilebytelabs.kmpflavors.tasks.PrintFlavorPropertiesTask
+import com.mobilebytelabs.kmpflavors.tasks.SwitchVariantAndReloadTask
 import com.mobilebytelabs.kmpflavors.tasks.ValidateFlavorsTask
 import org.gradle.api.Action
 import org.gradle.api.GradleException
@@ -1117,6 +1118,18 @@ class KmpFlavorPlugin : Plugin<Project> {
         ).configure {
             activeVariantName.set(activeVariantNameValue)
             allVariantNames.set(allVariants.map { it.name })
+        }
+
+        // v2.4 Phase 3 — switchVariantAndReload task. Best-effort Option B
+        // workaround until CMP exposes a public hot-reload reset API. Wires
+        // even when CMP isn't applied — the task body itself is a no-op-ish
+        // helper that prints next steps; consumers can dispatch it from any
+        // matrix-mode project.
+        project.tasks.register(
+            "switchVariantAndReload",
+            SwitchVariantAndReloadTask::class.java,
+        ).configure {
+            knownVariants.set(allVariants.map { it.name })
         }
 
         // Generate run configurations task
