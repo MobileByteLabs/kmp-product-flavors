@@ -20,6 +20,7 @@ import com.mobilebytelabs.kmpflavors.internal.SpotlessDetektScopeHelper
 import com.mobilebytelabs.kmpflavors.internal.VariantBuildCacheKeyConfigurator
 import org.gradle.testfixtures.ProjectBuilder
 import org.junit.jupiter.api.Assertions.assertDoesNotThrow
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 
@@ -244,5 +245,20 @@ class Phase4HelpersTest {
             VariantBuildCacheKeyConfigurator.configure(project = project, extension = extension)
         }
         assertNull(project.tasks.findByName("compileKotlinDesktop"))
+    }
+
+    // ── v2.4 Phase 5 — VariantDependenciesScope + applyVariantExcludes ─────
+
+    @Test
+    fun `applyVariantExcludes is a no-op when no variant has registered excludes`() {
+        val project = newProject()
+        project.pluginManager.apply("io.github.mobilebytelabs.kmp-product-flavors")
+        val extension = project.extensions.getByType(
+            com.mobilebytelabs.kmpflavors.KmpFlavorExtension::class.java,
+        )
+        val cfg = com.mobilebytelabs.kmpflavors.internal.DependencyConfigurator(project.logger)
+        assertDoesNotThrow {
+            cfg.applyVariantExcludes(extension.variants)
+        }
     }
 }
