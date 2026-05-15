@@ -357,6 +357,33 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
     abstract val detektPerVariantPerTarget: Property<Boolean>
 
     /**
+     * v2.3 Phase 2 — opt-in for variant-scoped Gradle build cache namespacing.
+     *
+     * **Status: stub (ships as no-op pending telemetry).** The v2.3 plan's Phase 2
+     * acceptance gate splits two paths:
+     *   - (a) v2.2 / v2.3 Build Scan data shows acceptable cache-hit rates on
+     *     8+ variant modules → ship this property + a no-op
+     *     `VariantBuildCacheKeyConfigurator`, documented as such.
+     *   - (b) Real cache-miss data → ship the implementation + flip the
+     *     convention to `true`.
+     *
+     * This v2.3 cycle ships path (a). When `true`, the configurator hooks the
+     * `compileKotlin*` tasks' cache-key inputs to inject variant-scoped
+     * namespacing — but the implementation is currently a documented no-op
+     * pending real cache-miss data. The property is exposed now so consumers
+     * who want to forward-declare opt-in for future v2.3.x / v2.4 releases
+     * can do so without a DSL break.
+     *
+     * Symptom that would unblock the path-(b) implementation: a 50-variant
+     * module on a multi-target KMP project pushing the cache key space past
+     * Gradle's default 10K-entry limit, causing eviction → cache-miss
+     * explosion in Build Scan reports.
+     *
+     * Convention: `false` (opt-in stub).
+     */
+    abstract val variantCacheNamespacing: Property<Boolean>
+
+    /**
      * v2.2 Phase 1A — opt-in for cross-variant intermediate `common{BuildType}` source sets.
      *
      * When `true` (AND `enableBuildTypes = true` AND matrix mode is on), the plugin
@@ -587,6 +614,7 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
         excludeGeneratedFromFormatters.convention(false)
         detektPerVariant.convention(false)
         detektPerVariantPerTarget.convention(false)
+        variantCacheNamespacing.convention(false)
         // v2.2 Phase 0G — master opt-out. Default `true` for fully-automatic-plugin
         // ergonomics; consumers wanting strict v2.0 / v2.1 semantics set to `false`.
         autoEnable.convention(true)
