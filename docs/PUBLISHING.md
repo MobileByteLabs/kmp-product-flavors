@@ -196,6 +196,18 @@ gh workflow run "Publish Snapshot" --repo MobileByteLabs/kmp-product-flavors --r
 | Auto-bump PR | ✅ | ❌ (no version bump on snapshot publish) |
 | `gradle.properties` rewrite | Permanent (via bump PR) | In-memory only (CI checkout is throwaway) |
 
+### One-time Sonatype Central Portal enablement
+
+Central Portal namespaces are not snapshot-enabled by default. **Before the first snapshot publish succeeds**, the namespace owner must enable snapshots:
+
+1. Sign in to https://central.sonatype.com with the namespace-owner account.
+2. Navigate to **Namespaces** → `io.github.mobilebytelabs` → **Settings**.
+3. Toggle **Publish SNAPSHOTs** on (or accept the snapshot publisher agreement if prompted).
+
+Once enabled, the existing `MAVEN_CENTRAL_USERNAME` / `MAVEN_CENTRAL_PASSWORD` credentials work for snapshots — no new secrets needed. The publish-snapshot workflow will succeed on its next dispatch.
+
+Symptom when this isn't enabled: `403 Forbidden` from `central.sonatype.com/repository/maven-snapshots/...` during the upload step.
+
 ### Caveats
 
 - **Snapshots are not signed for Marketplace-style installability** — the Maven Central Portal snapshot repo serves them as-is. Consumers should NOT rely on snapshot artefacts for production deployments; they're development-track only.
