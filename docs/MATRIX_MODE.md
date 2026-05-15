@@ -57,6 +57,7 @@ Two equivalent forms — pick whichever fits your convention plugin / CI ergonom
 | `dependencyGuardPerVariant` opt-in (v2.1) | Auto-registers per-(variant × target) `dependencyGuard.configuration(...)` baselines | Q24 / v2.1 Phase 4 |
 | `excludeGeneratedFromFormatters` opt-in (v2.1) | Auto-excludes generated `BuildKonfig` paths from Spotless + Detekt | Q24 / v2.1 Phase 4 |
 | `detektPerVariant` opt-in (v2.1) | Registers `detekt{Variant}` task per variant with per-variant baselines | Q24 / v2.1 Phase 4 |
+| `detektPerVariantPerTarget` opt-in (v2.3) | Extends `detektPerVariant`: registers `detekt{Variant}{Target}` per (variant × non-Android target) with per-target baselines at `config/detekt/{variant}/{target}/baseline.xml`. Variant-level `detekt{Variant}` aggregate task depends on its per-target subtasks. Requires `detektPerVariant=true`. | v2.3 Phase 1 |
 | `generateVariantRunConfigurations` task (v2.1) | One `.run.xml` per (variant × target) for IDE run-config dropdown | G22 / v2.1 Phase 4 |
 | `listActiveVariant` task (v2.2) | Prints active variant + all registered variants + `-PkmpFlavor=…` switch instructions | v2.2 Phase 2A Option B |
 | `autoEnable` (v2.2 default `true`) | Auto-flips `buildMatrix` / `publishMatrix` / `detektPerVariant` / `excludeGeneratedFromFormatters` / `dependencyGuardPerVariant` / `enableBuildTypes` based on plugin detection + module shape | v2.2 Phase 0 |

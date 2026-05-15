@@ -20,6 +20,7 @@ import com.mobilebytelabs.kmpflavors.FlavorVariant
 import org.gradle.api.Project
 import org.gradle.api.file.ConfigurableFileTree
 import org.gradle.api.logging.Logger
+import org.jetbrains.kotlin.gradle.plugin.KotlinTarget
 
 /**
  * v2.1 Phase 4 — per-variant Detekt analysis.
@@ -56,7 +57,14 @@ internal object DetektPerVariantHelper {
     private const val DETEKT_PLUGIN_ID: String = "io.gitlab.arturbosch.detekt"
     private const val DETEKT_TASK_CLASS_FQ: String = "io.gitlab.arturbosch.detekt.Detekt"
 
-    fun configure(project: Project, allVariants: List<FlavorVariant>, enabled: Boolean, logger: Logger) {
+    fun configure(
+        project: Project,
+        allVariants: List<FlavorVariant>,
+        enabled: Boolean,
+        logger: Logger,
+        perTarget: Boolean = false,
+        nonAndroidTargets: List<KotlinTarget> = emptyList(),
+    ) {
         if (!enabled || allVariants.isEmpty()) return
 
         project.pluginManager.withPlugin(DETEKT_PLUGIN_ID) {
@@ -71,46 +79,132 @@ internal object DetektPerVariantHelper {
             }
             if (detektTaskClass == null) return@withPlugin
 
-            var registered = 0
-            for (variant in allVariants) {
-                val variantCap = variant.name.replaceFirstChar { it.uppercase() }
-                val taskName = "detekt$variantCap"
-                val sourceDirs = collectSourceDirsForVariant(project, variant)
+            @Suppress("UNCHECKED_CAST")
+            val taskClass = detektTaskClass as Class<org.gradle.api.Task>
 
-                @Suppress("UNCHECKED_CAST")
-                val taskClass = detektTaskClass as Class<org.gradle.api.Task>
+            // v2.3 Phase 1 — per-(variant × target) mode. Branches on the perTarget
+            // flag. Both modes share the same task-registration helper below.
+            if (perTarget && nonAndroidTargets.isNotEmpty()) {
+                registerPerVariantPerTarget(project, allVariants, nonAndroidTargets, taskClass, logger)
+            } else {
+                registerPerVariant(project, allVariants, taskClass, logger)
+            }
+        }
+    }
+
+    /**
+     * v2.1 mode — one `detekt{Variant}` per variant.
+     */
+    private fun registerPerVariant(project: Project, allVariants: List<FlavorVariant>, taskClass: Class<org.gradle.api.Task>, logger: Logger) {
+        var registered = 0
+        for (variant in allVariants) {
+            val variantCap = variant.name.replaceFirstChar { it.uppercase() }
+            val taskName = "detekt$variantCap"
+            val sourceDirs = collectSourceDirsForVariant(project, variant)
+
+            try {
+                val configureDetektTask = object : org.gradle.api.Action<org.gradle.api.Task> {
+                    override fun execute(detektTask: org.gradle.api.Task) {
+                        detektTask.group = "verification"
+                        detektTask.description = "Run Detekt analysis for variant '${variant.name}' " +
+                            "(scope: ${sourceDirs.joinToString(", ")})"
+                        configureSource(detektTask, project, sourceDirs, logger)
+                        configureBaseline(detektTask, project, variant.name, null, logger)
+                    }
+                }
+                project.tasks.register(taskName, taskClass, configureDetektTask)
+                registered += 1
+            } catch (e: Exception) {
+                logger.warn(
+                    "[KMP Flavors] detektPerVariant: failed to register '$taskName' " +
+                        "(${e.message ?: e::class.simpleName}). Skipping this variant.",
+                )
+            }
+        }
+        logger.lifecycle(
+            "[KMP Flavors] detektPerVariant: registered $registered detekt{Variant} task(s) " +
+                "(one per variant). Baselines resolve under config/detekt/{variant}/baseline.xml.",
+        )
+    }
+
+    /**
+     * v2.3 Phase 1 mode — `detekt{Variant}{Target}` per (variant × non-Android target),
+     * plus a `detekt{Variant}` aggregate task that depends on its per-target subtasks
+     * (so consumers can run the existing variant-scoped detekt command + get the
+     * fan-out for free).
+     */
+    private fun registerPerVariantPerTarget(
+        project: Project,
+        allVariants: List<FlavorVariant>,
+        nonAndroidTargets: List<KotlinTarget>,
+        taskClass: Class<org.gradle.api.Task>,
+        logger: Logger,
+    ) {
+        var registered = 0
+        for (variant in allVariants) {
+            val variantCap = variant.name.replaceFirstChar { it.uppercase() }
+            val sourceDirs = collectSourceDirsForVariant(project, variant)
+
+            val perTargetTaskNames = mutableListOf<String>()
+            for (target in nonAndroidTargets) {
+                val targetCap = target.name.replaceFirstChar { it.uppercase() }
+                val taskName = "detekt$variantCap$targetCap"
+                val targetSourceDirs = sourceDirs + "src/${variant.name}/${target.name}/kotlin"
+                val filteredSources = targetSourceDirs.filter { project.file(it).exists() }
+                    .ifEmpty { sourceDirs }
+
                 try {
-                    // org.gradle.api.tasks.TaskContainer.register(name, type, Action<in T>).
-                    // Kotlin's SAM conversion of `Action<T> { … }` is receiver-style and
-                    // produces a type mismatch on this signature — use the anonymous-object
-                    // form to keep the parameter form straightforward.
                     val configureDetektTask = object : org.gradle.api.Action<org.gradle.api.Task> {
                         override fun execute(detektTask: org.gradle.api.Task) {
                             detektTask.group = "verification"
                             detektTask.description = "Run Detekt analysis for variant '${variant.name}' " +
-                                "(scope: ${sourceDirs.joinToString(", ")})"
-                            // Reflectively configure Detekt task properties. Detekt task surface:
-                            //   - source: ConfigurableFileCollection
-                            //   - baseline: RegularFileProperty
-                            //   - reports: configurable report block
-                            configureSource(detektTask, project, sourceDirs, logger)
-                            configureBaseline(detektTask, project, variant.name, logger)
+                                "on target '${target.name}' (scope: ${filteredSources.joinToString(", ")})"
+                            configureSource(detektTask, project, filteredSources, logger)
+                            configureBaseline(detektTask, project, variant.name, target.name, logger)
                         }
                     }
                     project.tasks.register(taskName, taskClass, configureDetektTask)
+                    perTargetTaskNames += taskName
                     registered += 1
                 } catch (e: Exception) {
                     logger.warn(
-                        "[KMP Flavors] detektPerVariant: failed to register '$taskName' " +
-                            "(${e.message ?: e::class.simpleName}). Skipping this variant.",
+                        "[KMP Flavors] detektPerVariantPerTarget: failed to register '$taskName' " +
+                            "(${e.message ?: e::class.simpleName}). Skipping this (variant × target).",
                     )
                 }
             }
-            logger.lifecycle(
-                "[KMP Flavors] detektPerVariant: registered $registered detekt{Variant} task(s) " +
-                    "(one per variant). Baselines resolve under config/detekt/{variant}/baseline.xml.",
-            )
+
+            // Variant-level aggregate task — runs every per-target subtask for the variant.
+            // Uses untyped registration; aggregate doesn't run Detekt directly. Use the
+            // anonymous-object Action<Task> form to bypass Kotlin's SAM-conversion of
+            // `{ task -> ... }` to a receiver-style lambda (same pattern as the typed
+            // registrations above + PerVariantIosXcframeworkConfigurator).
+            val aggregateName = "detekt$variantCap"
+            val captured = perTargetTaskNames.toList()
+            try {
+                project.tasks.register(
+                    aggregateName,
+                    object : org.gradle.api.Action<org.gradle.api.Task> {
+                        override fun execute(task: org.gradle.api.Task) {
+                            task.group = "verification"
+                            task.description = "Aggregate: runs detekt{Variant}{Target} subtasks for variant " +
+                                "'${variant.name}' across ${nonAndroidTargets.size} target(s)."
+                            task.dependsOn(captured)
+                        }
+                    },
+                )
+            } catch (e: Exception) {
+                logger.info(
+                    "[KMP Flavors] detektPerVariantPerTarget: aggregate task '$aggregateName' " +
+                        "already exists (${e.message}). Skipping aggregate registration.",
+                )
+            }
         }
+        logger.lifecycle(
+            "[KMP Flavors] detektPerVariantPerTarget: registered $registered detekt{Variant}{Target} " +
+                "task(s) across ${allVariants.size} variant(s) × ${nonAndroidTargets.size} target(s). " +
+                "Baselines resolve under config/detekt/{variant}/{target}/baseline.xml.",
+        )
     }
 
     /**
@@ -150,7 +244,7 @@ internal object DetektPerVariantHelper {
         }
     }
 
-    private fun configureBaseline(detektTask: Any, project: Project, variantName: String, logger: Logger) {
+    private fun configureBaseline(detektTask: Any, project: Project, variantName: String, targetName: String?, logger: Logger) {
         try {
             val getBaselineMethod = detektTask.javaClass.methods.firstOrNull { it.name == "getBaseline" }
             if (getBaselineMethod != null) {
@@ -161,14 +255,20 @@ internal object DetektPerVariantHelper {
                     it.name == "fileValue" && it.parameterCount == 1
                 }
                 if (setMethod != null) {
-                    val baselineFile = project.file("config/detekt/$variantName/baseline.xml")
+                    val baselinePath = if (targetName != null) {
+                        "config/detekt/$variantName/$targetName/baseline.xml"
+                    } else {
+                        "config/detekt/$variantName/baseline.xml"
+                    }
+                    val baselineFile = project.file(baselinePath)
                     setMethod.invoke(baselineProperty, baselineFile)
                 }
             }
         } catch (e: Exception) {
             logger.info(
                 "[KMP Flavors] detektPerVariant: baseline reflective wiring failed for variant " +
-                    "'$variantName' (${e.message}). Consumer can wire it manually.",
+                    "'$variantName'${if (targetName != null) " on target '$targetName'" else ""} " +
+                    "(${e.message}). Consumer can wire it manually.",
             )
         }
     }
