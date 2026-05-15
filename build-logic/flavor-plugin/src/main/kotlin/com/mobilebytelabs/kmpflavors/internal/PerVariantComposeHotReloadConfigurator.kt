@@ -71,6 +71,18 @@ import org.jetbrains.kotlin.gradle.plugin.KotlinTarget
  *   - Falls back to a documented no-op on incompatible CMP versions rather
  *     than failing the build.
  */
+// CMP-API-WAITING: This file ships Option A (separate per-variant hot-reload tasks)
+// because CMP doesn't yet expose a public reset API for the hot-reload watcher.
+// When CMP ships the reset API (tracked at https://github.com/MobileByteLabs/kmp-product-flavors/issues/75),
+// extend this configurator with the daemon-restart-free Option B path:
+//   1. Reflectively detect the reset API via Class.forName(...) on the new CMP class.
+//   2. Register a `composeSwitchVariantInPlace{Variant}` task that fires the reset hook
+//      + rewires the watcher to the new variant compilation without restarting the JVM.
+//   3. Make Option B the default when the reset API is present; fall back to Option A
+//      otherwise. Both stay opt-in behind composeHotReloadPerVariant.
+//   4. Update docs/COMPOSE_HOT_RELOAD.md compatibility-matrix to call out the CMP
+//      version that unlocks Option B.
+// Also remove the same marker from tasks/SwitchVariantAndReloadTask.kt + docs/COMPOSE_HOT_RELOAD.md.
 internal object PerVariantComposeHotReloadConfigurator {
 
     private const val HOT_RELOAD_TASK_CLASS_FQ: String =

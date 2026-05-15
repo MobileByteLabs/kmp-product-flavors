@@ -95,3 +95,21 @@ echo 'kmpFlavors.composeHotReloadPerVariant = true' >> gradle.properties
 - **No KSP-style incremental invalidation** — full hot-reload semantics apply (whole-compilation reload on change). Per-symbol incremental reload is a CMP-side concern.
 
 For the full v2.3 plan + the v2.4 roadmap, see `plan-layer/plans/2026-05-14-kmp-product-flavors-v2.3-plan.md` Phase 7.
+
+---
+
+## When CMP ships the public hot-reload reset API
+
+Both Option A and the v2.4 `switchVariantAndReload` Option B-workaround are tagged with the comment marker `CMP-API-WAITING` in the source. When JetBrains releases the public hot-reload reset API (tracked at https://github.com/MobileByteLabs/kmp-product-flavors/issues/75, replace with the real issue link once filed), grep for every occurrence:
+
+```bash
+grep -rn "CMP-API-WAITING" .
+```
+
+Each marker block contains the per-file migration checklist. The expected migration:
+
+1. Replace `SwitchVariantAndReloadTask`'s body with a direct call to CMP's reset hook (no daemon stop required).
+2. Extend `PerVariantComposeHotReloadConfigurator` with a daemon-restart-free Option B branch that's preferred when the reset API is detected at apply time (reflective `Class.forName` check).
+3. Flip this doc's compatibility matrix: Option B "supported on CMP X.Y+" + the table's "Hot-reload is still active-variant only" caveat is removed.
+4. Optionally flip `kmpFlavors.composeHotReloadPerVariant` convention from `false` → `true` for matrix-mode-enabled modules. Decision deferred until real-world cache-hit data + CMP reset-API stability survey.
+5. Remove every `CMP-API-WAITING` marker after the migration ships.
