@@ -88,6 +88,17 @@ Each entry: `code`, `severity`, `message` (rendered to consumers), `fix` (concre
 
 ---
 
+## KMPF-V13 — Gradle 9 Project Isolation violation in codegen-claim
+
+| | |
+|---|---|
+| **Severity** | WARNING |
+| **Since** | v2.2.0 (Phase 1B) |
+| **Message** | Project Isolation enabled on Gradle 9.0+. The plugin's codegen-claim mechanism reads/writes `rootProject.extraProperties` to coordinate multi-module codegen-host election; this triggers a cross-project state warning under `--project-isolation`. |
+| **Fix** | Set `kmpFlavors.codegenHost.set(true)` explicitly on your designated codegen-host module + `set(false)` on every other module that applies the plugin. Explicit claims short-circuit the rootProject-extras lookup. Full refactor to Gradle's `IsolatedProjects` API tracked for v2.3. |
+
+---
+
 ## KMPF-V14 — Compose Multiplatform version too old for per-variant `composeResources/`
 
 | | |

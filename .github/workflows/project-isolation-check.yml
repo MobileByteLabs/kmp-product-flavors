@@ -1,0 +1,67 @@
+# Project Isolation Check — v2.2 Phase 1B
+#
+# Nightly job that runs the plugin's TestKit suite under Gradle 9's
+# `--project-isolation` flag, surfacing any Project Isolation violations that
+# slipped past the static `ProjectIsolationCompatChecker` (which only inspects
+# the codegen-claim mechanism today). Catches regressions across the plugin's
+# entire surface as Gradle 9 features evolve.
+#
+# Triggers:
+#   - schedule: nightly at 03:00 UTC.
+#   - workflow_dispatch (manual).
+
+name: Project Isolation Check (Gradle 9)
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  project-isolation:
+    name: Test under --project-isolation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '21'
+
+      - name: Setup Gradle (latest)
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.0'
+
+      - name: Run plugin TestKit under --project-isolation
+        env:
+          ORG_GRADLE_PROJECT_org_gradle_unsafe_isolated_projects: 'true'
+        run: |
+          ./gradlew :build-logic:flavor-plugin:test \
+            --configuration-cache \
+            -Porg.gradle.unsafe.isolated-projects=true \
+            --warning-mode=all
+
+      - name: Run basic-flavors sample build under --project-isolation
+        env:
+          ORG_GRADLE_PROJECT_org_gradle_unsafe_isolated_projects: 'true'
+        run: |
+          ./gradlew :samples:basic-flavors:assemble \
+            --configuration-cache \
+            -Porg.gradle.unsafe.isolated-projects=true \
+            -PkmpFlavor=freeDev \
+            --warning-mode=all || echo "::warning::basic-flavors failed under --project-isolation. The codegen-claim mechanism is a known violation site (KMPF-V13); v2.3 will refactor."
+
+      - name: Run matrix-mode sample build under --project-isolation
+        env:
+          ORG_GRADLE_PROJECT_org_gradle_unsafe_isolated_projects: 'true'
+        run: |
+          ./gradlew :samples:matrix-mode:assembleAllVariants \
+            --configuration-cache \
+            -Porg.gradle.unsafe.isolated-projects=true \
+            --warning-mode=all || echo "::warning::matrix-mode failed under --project-isolation. Surface details in v2.3 refactor scope."

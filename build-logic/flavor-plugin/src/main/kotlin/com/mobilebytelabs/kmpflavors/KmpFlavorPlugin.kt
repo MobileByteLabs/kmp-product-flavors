@@ -34,6 +34,7 @@ import com.mobilebytelabs.kmpflavors.internal.PerVariantJsPublishConfigurator
 import com.mobilebytelabs.kmpflavors.internal.PerVariantPublishConfigurator
 import com.mobilebytelabs.kmpflavors.internal.PlatformDetector
 import com.mobilebytelabs.kmpflavors.internal.PlatformPropertiesConfigurator
+import com.mobilebytelabs.kmpflavors.internal.ProjectIsolationCompatChecker
 import com.mobilebytelabs.kmpflavors.internal.SourceSetConfigurator
 import com.mobilebytelabs.kmpflavors.internal.SpotlessDetektScopeHelper
 import com.mobilebytelabs.kmpflavors.internal.TestCompilationRegistrar
@@ -311,6 +312,11 @@ class KmpFlavorPlugin : Plugin<Project> {
                     "`kmpFlavors.autoEnable.set(false)` to opt out.",
             )
         }
+        // v2.2 Phase 1B — Gradle 9 Project Isolation compatibility audit. No-op on
+        // Gradle < 9 or when --project-isolation isn't enabled. Emits KMPF-V13 when
+        // the codegen-claim mechanism triggers a cross-project state violation.
+        ProjectIsolationCompatChecker.check(project, logger)
+
         val validationFindings = KmpFlavorPluginValidator.validate(
             flavors = flavors,
             buildTypes = buildTypesList,
