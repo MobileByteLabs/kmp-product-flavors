@@ -368,6 +368,13 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
     internal val variantFilterActions = mutableListOf<Action<VariantFilter>>()
 
     /**
+     * v2.2 Phase 4A — list of variant promotions declared via `kmpFlavors.promote(...)`.
+     * `KmpFlavorPlugin` reads this at configurePlugin() time and hands it to
+     * `VariantPromotionConfigurator` which registers a `promote{From}To{To}` task per entry.
+     */
+    internal val variantPromotions = mutableListOf<VariantPromotion>()
+
+    /**
      * Configure flavor dimensions using a DSL block.
      */
     fun flavorDimensions(action: Action<NamedDomainObjectContainer<FlavorDimension>>) {
@@ -401,6 +408,32 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
      */
     fun variantFilter(action: Action<VariantFilter>) {
         variantFilterActions.add(action)
+    }
+
+    /**
+     * v2.2 Phase 4A — declare a variant promotion. Registers a Gradle task
+     * `promote{From}To{To}` that copies files from `src/common{From}/` to
+     * `src/common{To}/` with optional content transforms applied per file.
+     *
+     * Example:
+     * ```kotlin
+     * kmpFlavors {
+     *     promote(from = "freeDev", to = "freeStaging") {
+     *         applyTransform("renamePackage", "com.example.dev" to "com.example.staging")
+     *         copyResources(true)
+     *         copyTests(true)
+     *     }
+     * }
+     * ```
+     *
+     * Resolve via `./gradlew :module:promoteFreeDevToFreeStaging` (add `-Pdry-run=true`
+     * for preview).
+     */
+    fun promote(from: String, to: String, action: Action<VariantPromotionScope> = Action {}): VariantPromotion {
+        val promotion = VariantPromotion(from = from, to = to)
+        action.execute(VariantPromotionScope(promotion))
+        variantPromotions.add(promotion)
+        return promotion
     }
 
     /**

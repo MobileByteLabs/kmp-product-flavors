@@ -40,6 +40,7 @@ import com.mobilebytelabs.kmpflavors.internal.ProjectIsolationCompatChecker
 import com.mobilebytelabs.kmpflavors.internal.SourceSetConfigurator
 import com.mobilebytelabs.kmpflavors.internal.SpotlessDetektScopeHelper
 import com.mobilebytelabs.kmpflavors.internal.TestCompilationRegistrar
+import com.mobilebytelabs.kmpflavors.internal.VariantPromotionConfigurator
 import com.mobilebytelabs.kmpflavors.tasks.DiagnoseVariantTask
 import com.mobilebytelabs.kmpflavors.tasks.GenerateBuildConfigTask
 import com.mobilebytelabs.kmpflavors.tasks.GenerateRunConfigurationsTask
@@ -715,6 +716,14 @@ class KmpFlavorPlugin : Plugin<Project> {
             activeVariant = activeVariantResolved,
             nonAndroidTargets = nonAndroidTargets,
             matrixModeEnabled = matrixModeEnabled,
+        )
+
+        // v2.2 Phase 4A — variant promotion tasks. No-op when no promotions declared.
+        VariantPromotionConfigurator.configure(
+            project = project,
+            flavors = flavors,
+            promotions = extension.variantPromotions,
+            logger = logger,
         )
 
         // v2.2 Phase 3A — per-variant Build Scan tagging. No-op when Develocity not applied.
