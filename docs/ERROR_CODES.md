@@ -170,6 +170,66 @@ To grep CI output for a specific code:
 
 ---
 
+## KMPF-V18 — Variant exclude target dependency missing
+
+| | |
+|---|---|
+| **Severity** | WARNING |
+| **Since** | v2.4.0 (Phase 6A) |
+| **Message** | Variant '<variantName>' declared `dependencies { exclude(group="<g>", module="<m>") }` but the target module is not present in the variant's resolved compile classpath. The exclude is a no-op — possibly a typo in the coordinate. |
+| **Fix** | Verify the (group, module) coordinate matches a real dependency in the variant's classpath. Run `./gradlew :module:dependencies --configuration <variant>RuntimeClasspath` to inspect. If the dep was supposed to be there transitively but isn't, the exclude was unnecessary in the first place. |
+| **When fires** | At plugin-apply afterEvaluate phase, after `DependencyConfigurator.applyVariantExcludes` runs. **Currently surfaces as an INFO log; will promote to WARNING finding in a future v2.4.x once configuration-time classpath introspection is cheap enough**. |
+
+---
+
+## KMPF-V19 — Sonatype Snapshots configured but namespace not enabled
+
+| | |
+|---|---|
+| **Severity** | ERROR (publish-time) |
+| **Since** | v2.4.0 (Phase 6A — surfaced as a workflow failure mode, not a plugin-emitted code) |
+| **Message** | `publish-snapshot.yml` workflow returned `403 Forbidden` from `central.sonatype.com/repository/maven-snapshots/`. The Sonatype Central Portal namespace is not snapshot-enabled. |
+| **Fix** | Namespace owner enables snapshots: sign in to https://central.sonatype.com → Namespaces → `io.github.mobilebytelabs` → Settings → toggle "Publish SNAPSHOTs" on. Already enabled for `io.github.mobilebytelabs` as of 2026-05-15. |
+| **When fires** | Workflow `publish-snapshot` step "Publish to Maven Central Portal (snapshot repo)" returns 403. Not a plugin runtime code — included in this catalog for symmetry. |
+
+---
+
+## KMPF-V20 — Variant cache namespacing requested without matrix mode
+
+| | |
+|---|---|
+| **Severity** | INFO |
+| **Since** | v2.4.0 (Phase 6A) |
+| **Message** | `kmpFlavors.variantCacheNamespacing=true` but `buildMatrix=false`. Matrix mode is a prerequisite — without per-variant compilations, there's nothing to namespace. |
+| **Fix** | Set `kmpFlavors.buildMatrix.set(true)` to enable per-variant cache scoping. If matrix mode isn't wanted, leave `variantCacheNamespacing` at its default `false`. |
+| **When fires** | At plugin-apply time, when `VariantBuildCacheKeyConfigurator.configure()` runs. Currently surfaces as an INFO log line; promoted from log-only to a structured code in v2.4.0 (Phase 6A). |
+
+---
+
+## KMPF-V21 — Legacy `activeFlavor` DSL referenced post-deprecation
+
+| | |
+|---|---|
+| **Severity** | ERROR |
+| **Since** | v2.5.0 (Phase 4 — v1.x shim removal; cannot ship before 2026-11-14 per RFC §3 Q15 deprecation contract) |
+| **Message** | `kmpFlavors.activeFlavor` was the v1.x DSL surface. The 6-month deprecation window from v2.0 GA (2026-05-14) expired on 2026-11-14; the shim has been removed. |
+| **Fix** | Migrate to the v2.x DSL: `kmpFlavors { flavors { register("free") { isDefault.set(true) } } }`. See `docs/MIGRATION_v1_to_v2.md`. |
+| **When fires** | Reserved for v2.5.0. The constant is registered in v2.4.0 so consumers can grep for KMPF-V21 references early. The actual runtime emission happens after the v1.x shim is removed; on v2.4.x, this code is never emitted. |
+
+---
+
+## KMPF-V22 — Variant exclude declared with empty coordinates
+
+| | |
+|---|---|
+| **Severity** | WARNING |
+| **Since** | v2.4.0 (Phase 5 — variant-conditional dep excludes) |
+| **Message** | Variant '<variantName>' registered `exclude(group="", module="")`. Both coordinates empty — the exclude rule matches nothing. |
+| **Fix** | Pass at least one coordinate: `exclude(group = "com.example")` (matches any module in that group), `exclude(module = "premium-sdk")` (matches any group with that module name), or both for the precise coordinate. |
+| **When fires** | At plugin-apply afterEvaluate phase when `DependencyConfigurator.applyVariantExcludes` walks each variant's `exclude(...)` registrations. Currently logged as a Gradle warning; structured code reserved for future v2.4.x promotion. |
+
+---
+
 ## Backwards compatibility
 
 A shipped code never changes meaning. If validation logic evolves, new codes are added with the next minor version (e.g., `KMPF-V09`). Consumers can pin their CI checks to specific codes safely.

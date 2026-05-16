@@ -76,6 +76,13 @@ internal object KmpFlavorPluginValidator {
     const val CODE_CMP_KGP_VERSION_INCOMPATIBLE: String = "KMPF-V16"
     const val CODE_KGP_GRADLE_VERSION_INCOMPATIBLE: String = "KMPF-V17"
 
+    /** v2.4 Phase 6A — V18+ adoption-driven codes. */
+    const val CODE_VARIANT_EXCLUDE_TARGET_MISSING: String = "KMPF-V18"
+    const val CODE_SONATYPE_SNAPSHOTS_NOT_ENABLED: String = "KMPF-V19"
+    const val CODE_VARIANT_CACHE_NAMESPACING_NO_MATRIX: String = "KMPF-V20"
+    const val CODE_LEGACY_ACTIVEFLAVOR_DSL: String = "KMPF-V21"
+    const val CODE_VARIANT_EXCLUDE_EMPTY_COORDINATES: String = "KMPF-V22"
+
     /**
      * Supported Kotlin literal types for `buildConfigField`. Other types
      * (custom classes, generics, nullable wrappers) require runtime

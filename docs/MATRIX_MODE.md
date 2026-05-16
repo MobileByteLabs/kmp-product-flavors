@@ -197,5 +197,10 @@ See `docs/ERROR_CODES.md` (W5 deliverable). Quick reference:
 | KMPF-V15 | WARNING | Apple Silicon under Rosetta — recommend native arm64 JDK |
 | KMPF-V16 | WARNING | Compose Multiplatform × KGP version skew |
 | KMPF-V17 | WARNING | KGP × Gradle version skew |
+| KMPF-V18 | WARNING | Variant exclude target dep missing (v2.4 Phase 6A — reserved; surfaces as INFO log today) |
+| KMPF-V19 | ERROR (publish-time) | Sonatype Snapshots namespace not enabled (workflow 403) |
+| KMPF-V20 | INFO | `variantCacheNamespacing=true` but `buildMatrix=false` (matrix mode is a prerequisite) |
+| KMPF-V21 | ERROR | Legacy `activeFlavor` DSL referenced post-2026-11-14 (v2.5+ shim removal; reserved code in v2.4) |
+| KMPF-V22 | WARNING | Variant exclude declared with both `group` and `module` empty |
 
-More codes (V02, V03, V06, V07) ship in future revisions as the validator is extended.
+V02, V03, V06, V07 are shipped (full entries in `docs/ERROR_CODES.md`). The table above is a quick reference; the full catalog lives in `docs/ERROR_CODES.md`.

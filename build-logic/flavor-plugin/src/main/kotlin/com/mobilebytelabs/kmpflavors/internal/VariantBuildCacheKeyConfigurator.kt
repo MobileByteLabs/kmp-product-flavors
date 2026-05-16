@@ -81,10 +81,14 @@ internal object VariantBuildCacheKeyConfigurator {
         // since we need per-variant compilations to namespace; consumers who haven't
         // opted into matrix mode get a documented no-op.
         if (!extension.buildMatrix.getOrElse(false)) {
+            // v2.4 Phase 6A — KMPF-V20. Surfaces as INFO (not WARNING) because consumer may
+            // have set the flag forward-looking without yet flipping buildMatrix on. Documented
+            // in docs/ERROR_CODES.md.
             project.logger.info(
-                "[KMP Flavors] Phase 2 — variantCacheNamespacing=true but buildMatrix=false; " +
-                    "matrix mode is a prerequisite. Set kmpFlavors.buildMatrix=true to enable " +
-                    "per-variant cache scoping.",
+                "[KMP Flavors] KMPF-V20 — variantCacheNamespacing=true but buildMatrix=false. " +
+                    "Matrix mode is a prerequisite — without per-variant compilations, there's " +
+                    "nothing to namespace. Set kmpFlavors.buildMatrix.set(true) to enable, or " +
+                    "leave variantCacheNamespacing at its default false.",
             )
             return
         }
