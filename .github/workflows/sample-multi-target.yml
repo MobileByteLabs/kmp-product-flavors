@@ -113,10 +113,11 @@ jobs:
         run: |
           ./gradlew :samples:multi-target-multi-variant:tasks --group="kmpFlavors variants" \
             --no-daemon --no-configuration-cache > tasks.txt
-          # 9 variants × 5 non-iOS-Android targets → 45 zip*Kotlin* tasks
-          # (iOS bundling lives on macOS-only runner; we only check JS/WasmJs/Desktop here).
+          # 9 variants × 5 non-iOS-Android targets — Desktop uses jar*
+          # naming (JVM publishable), JS/WasmJs/iOS use zip*. iOS bundling
+          # lives on macOS-only runner; we only check JS/WasmJs/Desktop here.
           for needle in \
-            'zipFreeDebugKotlinDesktop' \
+            'jarFreeDebugKotlinDesktop' \
             'zipPaidStagingKotlinJs' \
             'zipEnterpriseReleaseKotlinWasmJs'; do
             if ! grep -qF "$needle" tasks.txt; then
