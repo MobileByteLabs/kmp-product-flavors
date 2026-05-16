@@ -87,3 +87,112 @@ jobs:
         with:
           name: test-reports-kgp-${{ matrix.kgp-version }}
           path: build-logic/flavor-plugin/build/reports/tests/test/
+
+  # Stability plan Phase 2 — multi-target sample under the same KGP × CMP matrix.
+  # The TestKit job above covers fixture-projects (1 flavor, 1 target). This job
+  # covers the real multi-target stress test (3 flavors × 3 buildTypes × 6
+  # non-Android targets = 54-compilation matrix; this job exercises the 27-
+  # compilation Linux slice per KGP combo) against `samples/multi-target-multi-variant/`
+  # wired in stability PRs #80/#84/#87. Apple targets stay on the per-PR
+  # `sample-multi-target.yml` workflow on macos-latest — that workflow exercises
+  # the full 6 targets but only on the project's primary KGP.
+  sample-build-matrix:
+    name: Sample (multi-target) × KGP ${{ matrix.kgp-version }} / CMP ${{ matrix.compose-multiplatform }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        kgp-version: ['2.1.0', '2.2.21', '2.3.0']
+        compose-multiplatform: ['1.6.11', '1.7.3', '1.10.3']
+        exclude:
+          - kgp-version: '2.1.0'
+            compose-multiplatform: '1.7.3'
+          - kgp-version: '2.1.0'
+            compose-multiplatform: '1.10.3'
+          - kgp-version: '2.2.21'
+            compose-multiplatform: '1.6.11'
+          - kgp-version: '2.2.21'
+            compose-multiplatform: '1.10.3'
+          - kgp-version: '2.3.0'
+            compose-multiplatform: '1.6.11'
+          - kgp-version: '2.3.0'
+            compose-multiplatform: '1.7.3'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Skip when manual dispatch targets a different row
+        if: github.event_name == 'workflow_dispatch' && inputs.kgp-version != '' && inputs.kgp-version != matrix.kgp-version
+        run: |
+          echo "::notice::Manual dispatch targets KGP ${{ inputs.kgp-version }}; skipping row ${{ matrix.kgp-version }}."
+          exit 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '21'
+
+      - name: Setup Gradle 9.0
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.0'
+
+      - name: Pin Kotlin version in libs.versions.toml to the matrix row
+        run: |
+          set -euo pipefail
+          # Atomic swap of the single-line `kotlin = "X.Y.Z"` entry. POSIX-portable
+          # regex; works on both BSD sed (macOS) + GNU sed (Linux runners here).
+          sed -i.bak -E 's/^kotlin = ".*"$/kotlin = "${{ matrix.kgp-version }}"/' gradle/libs.versions.toml
+          if grep -qE '^kotlin = "${{ matrix.kgp-version }}"$' gradle/libs.versions.toml; then
+            echo "✓ pinned kotlin = ${{ matrix.kgp-version }}"
+          else
+            echo "::error::kotlin pin swap failed — current libs.versions.toml top-20 lines:"
+            head -20 gradle/libs.versions.toml
+            exit 1
+          fi
+          rm -f gradle/libs.versions.toml.bak
+
+      - name: Build active variant — Desktop + JS + WasmJs
+        run: |
+          ./gradlew \
+            :samples:multi-target-multi-variant:compileKotlinDesktop \
+            :samples:multi-target-multi-variant:compileKotlinJs \
+            :samples:multi-target-multi-variant:compileKotlinWasmJs \
+            --no-daemon --no-configuration-cache --warning-mode=summary
+
+      - name: Build full matrix — assembleAll{Desktop,Js,WasmJs}Variants (27 inactive compilations)
+        run: |
+          # Locks in matrix-mode codegen under each KGP version. If a KGP minor
+          # regresses per-variant compilation registration, this fails fast on
+          # the duplicate `const val` Kotlin compiler error.
+          ./gradlew \
+            :samples:multi-target-multi-variant:assembleAllDesktopVariants \
+            :samples:multi-target-multi-variant:assembleAllJsVariants \
+            :samples:multi-target-multi-variant:assembleAllWasmJsVariants \
+            --no-daemon --no-configuration-cache --warning-mode=summary
+
+      - name: Validate BuildKonfig codegen for default freeDebug variant
+        run: |
+          set -euo pipefail
+          GEN=samples/multi-target-multi-variant/build/generated/kmpFlavors/commonMain/kotlin/com/example/multitarget/BuildKonfig.kt
+          test -f "$GEN" || { echo "::error::BuildKonfig.kt missing"; exit 1; }
+          for needle in \
+            'VARIANT_NAME: String = "freeDebug"' \
+            'IS_FREE: Boolean = true' \
+            'MAX_ITEMS: Int = 10' \
+            'TIER_NAME: String = "free"'; do
+            if ! grep -qF "$needle" "$GEN"; then
+              echo "::error::Default BuildKonfig missing under KGP ${{ matrix.kgp-version }}: $needle"
+              cat "$GEN"
+              exit 1
+            fi
+          done
+          echo "✓ default freeDebug BuildKonfig green under KGP ${{ matrix.kgp-version }} / CMP ${{ matrix.compose-multiplatform }}"
+
+      - name: Upload build reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sample-reports-kgp-${{ matrix.kgp-version }}-cmp-${{ matrix.compose-multiplatform }}
+          path: samples/multi-target-multi-variant/build/reports/
