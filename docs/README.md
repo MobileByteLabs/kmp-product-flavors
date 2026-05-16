@@ -30,6 +30,7 @@ Curated entry point. Find the right doc per topic instead of crawling the full `
 | [`RELEASE.md`](RELEASE.md) | End-to-end release cascade. SemVer-pre-release-aware bumping, pre-release flag auto-detection, cron auto-merge safety-net. |
 | [`ROLLBACK.md`](ROLLBACK.md) | Plugin version rollback procedure. |
 | [`ERROR_CODES.md`](ERROR_CODES.md) | Complete `KMPF-V<NN>` catalogue with severity + fix steps. |
+| [`v2.4-BETA-TESTING.md`](v2.4-BETA-TESTING.md) | One-page guide for piloting `2.4.0-beta` on a real consumer project. Required path to `v2.4.0` GA. |
 
 ## Migration
 

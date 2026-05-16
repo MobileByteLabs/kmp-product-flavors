@@ -1,0 +1,157 @@
+name: v2.4 Beta Stability Report
+description: Report your experience running kmp-product-flavors 2.4.0-beta against a real consumer project. Required for v2.4 GA promotion.
+title: "[v2.4-beta]: "
+labels: ["v2.4-beta", "stability-report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for piloting `kmp-product-flavors` 2.4.0-beta on your project. This structured report is one of the gates for graduating to `v2.4.0` GA — we need **≥2 external adopter reports of "clean ≥1 week"** before the GA tag goes out.
+
+        See [`docs/v2.4-BETA-TESTING.md`](https://github.com/MobileByteLabs/kmp-product-flavors/blob/development/docs/v2.4-BETA-TESTING.md) for the one-page guide on how to test, what to look for, and where this report fits in the v2.4 release cascade.
+
+        **Confidentiality**: if your project is closed-source, you can describe the shape (target count, flavor count, build-type count) without naming the project. The structured fields below let us aggregate signals without requiring identifying details.
+
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version under test
+      description: Which `2.4.0-beta.N` (or `-rc.N`) did you pin?
+      placeholder: "2.4.0-beta.0"
+    validations:
+      required: true
+
+  - type: input
+    id: soak-duration
+    attributes:
+      label: Soak duration
+      description: How long have you been running this version in your consumer project? (Required ≥1 week for the report to count toward GA gating.)
+      placeholder: "10 days on daily CI + 3 days on local dev builds"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: outcome
+    attributes:
+      label: Overall outcome
+      description: One-line summary of the soak result.
+      options:
+        - "✅ Clean — no regressions, no DSL friction, no validator surprises"
+        - "🟡 Mostly clean — minor friction documented below; not a blocker for our project"
+        - "🔴 Blocked — regression we couldn't work around; details below"
+    validations:
+      required: true
+
+  - type: input
+    id: kgp-version
+    attributes:
+      label: Kotlin Gradle Plugin version
+      placeholder: "2.2.21"
+    validations:
+      required: true
+
+  - type: input
+    id: cmp-version
+    attributes:
+      label: Compose Multiplatform version (if applied)
+      placeholder: "1.9.0 (or 'not applied')"
+
+  - type: input
+    id: agp-version
+    attributes:
+      label: Android Gradle Plugin version (if Android target present)
+      placeholder: "8.7.x (or 'no Android target')"
+
+  - type: input
+    id: gradle-version
+    attributes:
+      label: Gradle version
+      placeholder: "8.10"
+    validations:
+      required: true
+
+  - type: textarea
+    id: shape
+    attributes:
+      label: Project shape
+      description: How many flavors × build-types × non-Android targets? Single-module vs. multi-module?
+      placeholder: |
+        - Flavors: free / paid / enterprise (3)
+        - Build types: debug / staging / release (3)
+        - Targets: Android, Desktop, iOS X64 / Arm64 / SimArm64, Wasm (6 non-Android)
+        - Modules applying the plugin: 1 (cmp-shared) of 12 total modules
+        - autoEnable: true (default)
+        - buildMatrix: true (auto-fired)
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: features-exercised
+    attributes:
+      label: v2.4 features exercised
+      description: Tick everything your project actively uses.
+      options:
+        - label: "`buildMatrix` (compile every variant on every target)"
+        - label: "`publishMatrix` (per-variant Maven publications)"
+        - label: "Per-variant iOS XCFramework publishing"
+        - label: "Per-variant npm publishing"
+        - label: "`detektPerVariant` / `detektPerVariantPerTarget`"
+        - label: "`variantCacheNamespacing`"
+        - label: "`composeHotReloadPerVariant` (Option A — `switchVariantAndReload`)"
+        - label: "Variant-conditional dependency excludes (`variants.matching { … }.configureEach { dependencies { exclude(...) } }`)"
+        - label: "`createIntermediateBuildTypeSourceSets` (common{BuildType} source sets)"
+        - label: "`promote(from, to)` variant promotion DSL"
+        - label: "`featureFlags { … }` per-variant flag codegen (GrowthBook / Statsig / LaunchDarkly)"
+        - label: "AGP bridge (`bridgeAgpProductFlavors` / `bridgeAgpBuildTypes`)"
+
+  - type: textarea
+    id: friction
+    attributes:
+      label: DSL friction / docs gaps
+      description: Anything in the consumer-facing `kmpFlavors { … }` block that was confusing, surprising, or required reading source code to understand?
+      placeholder: |
+        - Nothing surprising — the QUICKSTART got us to a working build in ~8 min.
+        - OR: "had to figure out that `autoEnable.set(false)` was needed to keep BuildKonfig in commonMain after migration from v1.x"
+        - OR: "the `IS_<FLAVOR>` naming collision wasn't obvious until KMPF-V23 fired at apply time"
+
+  - type: textarea
+    id: validator-codes
+    attributes:
+      label: KMPF-V<NN> codes triggered
+      description: Any structured validator codes that fired during the soak? Include the full message + how you resolved each.
+      placeholder: |
+        - KMPF-V23 fired on `IS_PREMIUM` collision with auto-derived flag. Renamed custom field to `PREMIUM_TIER`. Fix took 30s.
+        - No others triggered.
+
+  - type: textarea
+    id: blockers
+    attributes:
+      label: Blocker details (if outcome is 🔴)
+      description: For 🔴 outcomes — describe the regression, the workaround you tried, and what would unblock you. Include a minimal reproducer if possible.
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Anything else worth flagging — build time impact, CI cost, IDE-side observations, kmp-project-template integration notes, etc.
+
+  - type: checkboxes
+    id: credits
+    attributes:
+      label: GA changelog credit
+      description: We credit beta adopters by name (or org) in the `v2.4.0` GA release notes unless you opt out.
+      options:
+        - label: "OK to credit me / my org in the v2.4.0 GA release notes"
+        - label: "Please anonymize — don't credit by name"
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Checklist
+      options:
+        - label: "I have read [`docs/v2.4-BETA-TESTING.md`](https://github.com/MobileByteLabs/kmp-product-flavors/blob/development/docs/v2.4-BETA-TESTING.md)"
+          required: true
+        - label: "Soak duration is ≥1 week"
+          required: true
+        - label: "I'm willing to follow up if a maintainer asks for clarification on this report"
+          required: true
