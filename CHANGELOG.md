@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **IDE plugin v0.2.0-alpha.1** (separate repo) — gutter icons + variant-aware Refactor → Rename + breakpoint scoping data layer. Published to Marketplace `eap` channel.
 - **KMPF-V23 — `buildConfigField` name-collision validator** — surfaces the duplicate-`const val` regression at plugin-apply time instead of letting consumers hit Kotlin's "Conflicting declarations" at compile time. Reserved-name set is computed from the actual configuration (flavors + buildTypes + `VARIANT_NAME` + `BUILD_TYPE`). Discovered via `samples/multi-target-multi-variant/` — a flavor named `enterprise` + custom field `IS_ENTERPRISE` produced two `const val IS_ENTERPRISE` entries. See `docs/ERROR_CODES.md` for severity, message, and rename conventions.
 
+### Fixed
+
+- **Matrix mode + 6 non-Android targets** — the duplicate-BuildKonfig-codegen regression observed at `samples/multi-target-multi-variant/` creation time (PR #80) is **no longer reproducible** as of stability-plan investigation 2026-05-16. The 54-compilation matrix (3 flavors × 3 buildTypes × 6 non-Android targets: Desktop + JS + WasmJs + iOS X64 + iOS Arm64 + iOS Simulator Arm64) now builds clean via `./gradlew :samples:multi-target-multi-variant:assembleAllVariants` with `autoEnable=true` (default). The `autoEnable.set(false)` workaround has been removed from the sample. The `.github/workflows/sample-multi-target.yml` workflow now exercises `assembleAll{Desktop,Js,WasmJs}Variants` on Linux runners + `assembleAll{IosX64,IosArm64,IosSimulatorArm64}Variants` on macOS runners (27 inactive-variant compilations per slice) — locks in the green path so any future regression fails CI fast.
+
 ### Stable API surface (locked for 2.x cycle)
 
 The following properties + DSL methods are committed to the v2.x SemVer contract. Breaking changes require a major-version bump.
