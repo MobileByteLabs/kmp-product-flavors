@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **v2.4 Phase 2 path-(b) — Cache namespacing impl** — graduates v2.3 stub to actual impl. Injects `kmpFlavorVariant` as `@Input` on every `compileKotlin*` task in matrix mode. Active-variant tasks namespace as "active". Prerequisite: `buildMatrix=true`. Default `false` until telemetry justifies the flip.
 - **v2.4 Phase 3 — `switchVariantAndReload` task** — Option B best-effort workaround. `./gradlew switchVariantAndReload --to=<variant>` persists the new variant + prints the exact follow-up command. **Marked with `CMP-API-WAITING` markers** in 3 source locations + tracked by issue #75 — replace with daemon-restart-free impl when CMP exposes a public hot-reload reset API.
 - **IDE plugin v0.2.0-alpha.1** (separate repo) — gutter icons + variant-aware Refactor → Rename + breakpoint scoping data layer. Published to Marketplace `eap` channel.
+- **KMPF-V23 — `buildConfigField` name-collision validator** — surfaces the duplicate-`const val` regression at plugin-apply time instead of letting consumers hit Kotlin's "Conflicting declarations" at compile time. Reserved-name set is computed from the actual configuration (flavors + buildTypes + `VARIANT_NAME` + `BUILD_TYPE`). Discovered via `samples/multi-target-multi-variant/` — a flavor named `enterprise` + custom field `IS_ENTERPRISE` produced two `const val IS_ENTERPRISE` entries. See `docs/ERROR_CODES.md` for severity, message, and rename conventions.
 
 ### Stable API surface (locked for 2.x cycle)
 

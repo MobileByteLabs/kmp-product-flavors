@@ -15,6 +15,7 @@
 package com.mobilebytelabs.kmpflavors
 
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator
+import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator.CODE_BUILD_CONFIG_FIELD_AUTO_DERIVED_COLLISION
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator.CODE_DIMENSION_HAS_NO_FLAVORS
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator.CODE_FLAVOR_BUILD_TYPE_COLLISION
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator.CODE_FLAVOR_MISSING_DIMENSION
@@ -308,5 +309,126 @@ class KmpFlavorPluginValidatorTest {
         )
 
         assertTrue(findings.none { it.matches(CODE_INVALID_BUILD_CONFIG_FIELD_TYPE) })
+    }
+
+    @Test
+    fun `KMPF-V23 fires when a custom field collides with an auto-derived flavor flag`() {
+        // Real-world regression from samples/multi-target-multi-variant — flavor
+        // 'enterprise' + custom buildConfigField "IS_ENTERPRISE" produces duplicate
+        // const val. The validator surfaces this before codegen.
+        val enterprise = flavor("enterprise").also {
+            it.buildConfigField("Boolean", "IS_ENTERPRISE", "true")
+        }
+        val findings = KmpFlavorPluginValidator.validate(
+            flavors = listOf(flavor("free"), flavor("paid"), enterprise),
+            buildTypes = emptyList(),
+            resolvedVariants = listOf(variant("free"), variant("paid"), variant("enterprise")),
+            matrixModeEnabled = false,
+            detectedTargetCount = 1,
+        )
+
+        val v23 = findings.find { it.matches(CODE_BUILD_CONFIG_FIELD_AUTO_DERIVED_COLLISION) }
+        assertNotNull(v23, "Expected KMPF-V23 finding; got $findings")
+        assertEquals(KmpFlavorValidationSeverity.ERROR, v23!!.severity)
+        assertTrue(v23.message.contains("IS_ENTERPRISE"), "message must echo the colliding field name")
+        assertTrue(v23.message.contains("enterprise"), "message must reference the source flavor")
+        assertTrue(v23.fix.contains("TIER_ENTERPRISE"), "fix must suggest a concrete rename")
+    }
+
+    @Test
+    fun `KMPF-V23 fires when a custom field collides with an auto-derived buildType flag`() {
+        val paid = flavor("paid").also {
+            // Flavor declares IS_RELEASE while a 'release' build type is also registered.
+            it.buildConfigField("Boolean", "IS_RELEASE", "false")
+        }
+        val findings = KmpFlavorPluginValidator.validate(
+            flavors = listOf(flavor("free"), paid),
+            buildTypes = listOf(buildType("debug"), buildType("release")),
+            resolvedVariants = listOf(variant("freeDebug"), variant("paidRelease")),
+            matrixModeEnabled = false,
+            detectedTargetCount = 1,
+        )
+
+        val v23 = findings.find { it.matches(CODE_BUILD_CONFIG_FIELD_AUTO_DERIVED_COLLISION) }
+        assertNotNull(v23, "Expected KMPF-V23 finding; got $findings")
+        assertEquals(KmpFlavorValidationSeverity.ERROR, v23!!.severity)
+        assertTrue(v23.message.contains("IS_RELEASE"), "message must echo the colliding field name")
+        assertTrue(v23.message.contains("release"), "message must reference the source build type")
+    }
+
+    @Test
+    fun `KMPF-V23 fires when a custom field uses the always-reserved VARIANT_NAME constant`() {
+        val free = flavor("free").also {
+            it.buildConfigField("String", "VARIANT_NAME", "\"override\"")
+        }
+        val findings = KmpFlavorPluginValidator.validate(
+            flavors = listOf(free, flavor("paid")),
+            buildTypes = emptyList(),
+            resolvedVariants = listOf(variant("free"), variant("paid")),
+            matrixModeEnabled = false,
+            detectedTargetCount = 1,
+        )
+
+        val v23 = findings.find { it.matches(CODE_BUILD_CONFIG_FIELD_AUTO_DERIVED_COLLISION) }
+        assertNotNull(v23, "Expected KMPF-V23 finding; got $findings")
+        assertTrue(v23!!.message.contains("VARIANT_NAME"))
+        assertTrue(v23.fix.contains("APP_VARIANT_NAME"), "fix must suggest APP_VARIANT_NAME rename")
+    }
+
+    @Test
+    fun `KMPF-V23 does not fire when a custom IS_ name does not match any registered flavor or buildType`() {
+        // IS_DEBUG without a 'debug' build type is fine — no auto-derived IS_DEBUG
+        // is generated, so no collision happens.
+        val free = flavor("free").also {
+            it.buildConfigField("Boolean", "IS_DEBUG", "true")
+        }
+        val findings = KmpFlavorPluginValidator.validate(
+            flavors = listOf(free, flavor("paid")),
+            buildTypes = emptyList(),
+            resolvedVariants = listOf(variant("free"), variant("paid")),
+            matrixModeEnabled = false,
+            detectedTargetCount = 1,
+        )
+
+        assertTrue(findings.none { it.matches(CODE_BUILD_CONFIG_FIELD_AUTO_DERIVED_COLLISION) })
+    }
+
+    @Test
+    fun `KMPF-V23 does not fire for well-prefixed custom fields like MAX_ITEMS TIER_NAME PREMIUM_TIER`() {
+        val free = flavor("free").also {
+            it.buildConfigField("Int", "MAX_ITEMS", "10")
+            it.buildConfigField("String", "TIER_NAME", "\"free\"")
+            it.buildConfigField("Boolean", "PREMIUM_TIER", "false")
+        }
+        val findings = KmpFlavorPluginValidator.validate(
+            flavors = listOf(free, flavor("paid")),
+            buildTypes = listOf(buildType("debug"), buildType("release")),
+            resolvedVariants = listOf(variant("freeDebug"), variant("paidRelease")),
+            matrixModeEnabled = false,
+            detectedTargetCount = 1,
+        )
+
+        assertTrue(findings.none { it.matches(CODE_BUILD_CONFIG_FIELD_AUTO_DERIVED_COLLISION) })
+    }
+
+    @Test
+    fun `KMPF-V23 fires on a buildType-scoped custom field that collides with a flavor flag`() {
+        val debug = buildType("debug").also {
+            // Build-type-scoped custom field that happens to match the auto-derived
+            // IS_FREE flag from the registered 'free' flavor.
+            it.buildConfigField("Boolean", "IS_FREE", "false")
+        }
+        val findings = KmpFlavorPluginValidator.validate(
+            flavors = listOf(flavor("free"), flavor("paid")),
+            buildTypes = listOf(debug),
+            resolvedVariants = listOf(variant("freeDebug"), variant("paidDebug")),
+            matrixModeEnabled = false,
+            detectedTargetCount = 1,
+        )
+
+        val v23 = findings.find { it.matches(CODE_BUILD_CONFIG_FIELD_AUTO_DERIVED_COLLISION) }
+        assertNotNull(v23, "Expected KMPF-V23 finding; got $findings")
+        assertTrue(v23!!.message.contains("buildType 'debug'"), "message must identify the buildType source")
+        assertTrue(v23.message.contains("IS_FREE"))
     }
 }
