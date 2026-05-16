@@ -116,8 +116,10 @@ jobs:
           # 9 variants × 5 non-iOS-Android targets — Desktop uses jar*
           # naming (JVM publishable), JS/WasmJs/iOS use zip*. iOS bundling
           # lives on macOS-only runner; we only check JS/WasmJs/Desktop here.
+          # Active variant (freeDebug) is covered by the standard `jar` task,
+          # so probe an INACTIVE variant to verify matrix-mode registration.
           for needle in \
-            'jarFreeDebugKotlinDesktop' \
+            'jarPaidDebugKotlinDesktop' \
             'zipPaidStagingKotlinJs' \
             'zipEnterpriseReleaseKotlinWasmJs'; do
             if ! grep -qF "$needle" tasks.txt; then
