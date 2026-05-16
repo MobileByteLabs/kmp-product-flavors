@@ -26,15 +26,14 @@ group = "io.github.mobilebytelabs.samples"
 version = "2.4.0-alpha.0"
 
 kmpFlavors {
-    // STABILITY-PLAN-TODO: matrix mode on 6 non-Android targets triggers
-    // duplicate BuildKonfig codegen — active-variant codegen writes to
-    // commonMain AND per-variant compilations write to their per-variant
-    // dirs, leading to "Conflicting declarations" Kotlin compile error.
-    // Tracked for stability-plan Phase 1 fix. Until that's resolved, this
-    // sample sets autoEnable.set(false) to preserve v1.x semantics +
-    // exercise the multi-target shape without the duplicate-codegen
-    // regression.
-    autoEnable.set(false)
+    // Note: this sample originally set `autoEnable.set(false)` as a workaround
+    // for a matrix-mode duplicate-BuildKonfig-codegen regression observed at
+    // sample-creation time (PR #80). Verified resolved (no longer reproducible)
+    // as of 2026-05-16 in the stability-plan investigation — the 54-compilation
+    // matrix (3 flavors × 3 buildTypes × 6 non-Android targets) now builds
+    // clean via `assembleAllVariants` with `autoEnable=true` (default). The
+    // workaround has been removed; the CI workflow at
+    // .github/workflows/sample-multi-target.yml locks in the green path.
 
     // Single-point opt-in via the DSL (`gradle.properties` form also works).
     buildMatrix.set(true)

@@ -130,6 +130,22 @@ jobs:
           done
           echo "✓ Matrix-mode tasks registered for non-iOS targets"
 
+      - name: Full matrix on Linux targets — assembleAll{Desktop,Js,WasmJs}Variants
+        run: |
+          # Locks in the previously-regressed "duplicate BuildKonfig codegen on
+          # matrix mode + 6 targets" path. PR #80 sample initially shipped with
+          # autoEnable.set(false) as a workaround; resolved + workaround dropped
+          # in 2026-05-16 stability-plan investigation. This step exercises the
+          # 27-compilation Linux slice (9 variants × 3 targets) — if the
+          # regression ever returns, this fails fast with the duplicate
+          # `const val` Kotlin error.
+          ./gradlew \
+            :samples:multi-target-multi-variant:assembleAllDesktopVariants \
+            :samples:multi-target-multi-variant:assembleAllJsVariants \
+            :samples:multi-target-multi-variant:assembleAllWasmJsVariants \
+            --no-daemon --no-configuration-cache
+          echo "✓ 27 inactive-variant compilations green on Linux targets"
+
   apple-targets:
     name: Apple targets (iOS X64 + Arm64 + Simulator Arm64)
     runs-on: macos-latest
@@ -186,3 +202,16 @@ jobs:
             fi
           done
           echo "✓ iOS-side paidStaging BuildKonfig regenerated correctly"
+
+      - name: Full matrix on Apple targets — assembleAllIos{X64,Arm64,SimulatorArm64}Variants
+        run: |
+          # Locks in matrix mode on iOS targets — the original duplicate-codegen
+          # regression that prompted samples/multi-target-multi-variant/'s
+          # autoEnable.set(false) workaround. Resolved + workaround dropped in
+          # 2026-05-16 stability-plan investigation. 27-compilation Apple slice.
+          ./gradlew \
+            :samples:multi-target-multi-variant:assembleAllIosX64Variants \
+            :samples:multi-target-multi-variant:assembleAllIosArm64Variants \
+            :samples:multi-target-multi-variant:assembleAllIosSimulatorArm64Variants \
+            --no-daemon --no-configuration-cache
+          echo "✓ 27 inactive-variant compilations green on Apple targets"
