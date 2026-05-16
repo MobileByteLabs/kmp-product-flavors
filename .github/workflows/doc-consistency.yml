@@ -59,3 +59,7 @@ jobs:
             exit 1
           fi
           echo "✓ no stale version refs"
+
+      # G18 — every KmpFlavorExtension property documented in REFERENCE.md
+      - name: KmpFlavorExtension ↔ REFERENCE.md property coverage
+        run: bash .github/scripts/check-reference-coverage.sh
