@@ -489,6 +489,7 @@ Quick reference; full catalogue + fix steps in [`ERROR_CODES.md`](ERROR_CODES.md
 | `KMPF-V20` | INFO | `variantCacheNamespacing=true` but `buildMatrix=false` |
 | `KMPF-V21` | ERROR | Legacy `activeFlavor` DSL post-2026-11-14 (reserved for v2.5+) |
 | `KMPF-V22` | WARNING | Variant `exclude(group="", module="")` (both empty) |
+| `KMPF-V23` | ERROR | Custom `buildConfigField` name collides with auto-derived constant (`IS_<FLAVOR>` / `IS_<BUILDTYPE>` / `VARIANT_NAME` / `BUILD_TYPE`) |
 
 ---
 

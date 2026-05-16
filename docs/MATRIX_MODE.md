@@ -202,5 +202,6 @@ See `docs/ERROR_CODES.md` (W5 deliverable). Quick reference:
 | KMPF-V20 | INFO | `variantCacheNamespacing=true` but `buildMatrix=false` (matrix mode is a prerequisite) |
 | KMPF-V21 | ERROR | Legacy `activeFlavor` DSL referenced post-2026-11-14 (v2.5+ shim removal; reserved code in v2.4) |
 | KMPF-V22 | WARNING | Variant exclude declared with both `group` and `module` empty |
+| KMPF-V23 | ERROR | Custom `buildConfigField` name collides with auto-derived `BuildKonfig` constant (`VARIANT_NAME`, `BUILD_TYPE`, `IS_<FLAVOR>`, `IS_<BUILDTYPE>`) |
 
 V02, V03, V06, V07 are shipped (full entries in `docs/ERROR_CODES.md`). The table above is a quick reference; the full catalog lives in `docs/ERROR_CODES.md`.

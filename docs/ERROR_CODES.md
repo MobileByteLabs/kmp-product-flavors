@@ -230,6 +230,18 @@ To grep CI output for a specific code:
 
 ---
 
+## KMPF-V23 — Custom `buildConfigField` name collides with auto-derived `BuildKonfig` constant
+
+| | |
+|---|---|
+| **Severity** | ERROR |
+| **Since** | v2.4.0 (stability-phase Phase 1 follow-up) |
+| **Message** | `<flavor or buildType> '<sourceName>'` declares `buildConfigField '<fieldName>'`, which collides with `<one of: an auto-generated constant emitted by every BuildKonfig / an auto-generated constant emitted when buildTypes are registered / the auto-derived flavor flag for flavor '<X>' / the auto-derived build-type flag for build type '<X>'>`. BuildKonfig codegen would emit two `const val <fieldName>` entries and the Kotlin compiler would fail with "Conflicting declarations". |
+| **Fix** | Rename the custom field to avoid the reserved namespace. Avoid the `IS_*` prefix for custom flags (the plugin reserves it for auto-derived flavor/build-type flags) and the literal names `VARIANT_NAME` / `BUILD_TYPE`. Convention: prefix custom flags with the tier semantic — e.g. `MAX_*`, `TIER_*`, `PREMIUM_*`, `FEATURE_*`. The validator suggests a concrete rename: `IS_<X>` → `TIER_<X>`, `VARIANT_NAME` → `APP_VARIANT_NAME`, `BUILD_TYPE` → `APP_BUILD_TYPE`. |
+| **When fires** | At plugin-apply time. Reserved-name set is computed from THIS configuration — only actually-registered flavors/buildTypes contribute auto-derived constants (a literal `IS_DEBUG` field on a project that doesn't declare a `debug` build type is fine). Surfaces the collision BEFORE codegen so the consumer doesn't hit Kotlin's "Conflicting declarations" at compile time. Discovered via the `samples/multi-target-multi-variant/` stability sample. |
+
+---
+
 ## Backwards compatibility
 
 A shipped code never changes meaning. If validation logic evolves, new codes are added with the next minor version (e.g., `KMPF-V09`). Consumers can pin their CI checks to specific codes safely.

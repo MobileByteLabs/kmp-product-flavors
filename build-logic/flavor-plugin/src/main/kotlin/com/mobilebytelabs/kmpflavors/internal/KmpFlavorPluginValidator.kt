@@ -60,6 +60,7 @@ internal data class KmpFlavorValidationFinding(val code: String, val severity: K
  * | KMPF-V06 | WARNING | Unknown active variant (`-PkmpFlavor=ghost` when ghost isn't a flavor) — soft-fall (project-wide property) |
  * | KMPF-V07 | ERROR | `buildConfigField` has an invalid Kotlin literal type |
  * | KMPF-V08 | ERROR | Matrix mode opted in but no flavors are registered |
+ * | KMPF-V23 | ERROR | Custom `buildConfigField` name collides with an auto-derived BuildKonfig constant |
  */
 internal object KmpFlavorPluginValidator {
 
@@ -82,6 +83,21 @@ internal object KmpFlavorPluginValidator {
     const val CODE_VARIANT_CACHE_NAMESPACING_NO_MATRIX: String = "KMPF-V20"
     const val CODE_LEGACY_ACTIVEFLAVOR_DSL: String = "KMPF-V21"
     const val CODE_VARIANT_EXCLUDE_EMPTY_COORDINATES: String = "KMPF-V22"
+
+    /**
+     * v2.4 stability-phase Phase 1 follow-up — custom `buildConfigField` name
+     * collides with an auto-derived `BuildKonfig` constant. Detected before
+     * codegen so consumers don't hit Kotlin "Conflicting declarations" at
+     * compile time. See `samples/multi-target-multi-variant/` STABILITY-PLAN-TODO.
+     */
+    const val CODE_BUILD_CONFIG_FIELD_AUTO_DERIVED_COLLISION: String = "KMPF-V23"
+
+    /**
+     * Auto-generated `BuildKonfig` constants the codegen ALWAYS emits regardless
+     * of whether build types are enabled. A custom `buildConfigField` matching
+     * one of these names produces a duplicate `const val` at compile time.
+     */
+    private val ALWAYS_RESERVED_BUILD_CONFIG_NAMES: Set<String> = setOf("VARIANT_NAME", "BUILD_TYPE")
 
     /**
      * Supported Kotlin literal types for `buildConfigField`. Other types
@@ -179,6 +195,65 @@ internal object KmpFlavorPluginValidator {
                             "`buildConfigField(\"String\", \"${field.name}\", \"\\\"<value>\\\"\")`.",
                     )
                 }
+            }
+        }
+
+        // KMPF-V23: a custom `buildConfigField` name collides with an auto-derived
+        // BuildKonfig constant (`VARIANT_NAME`, `BUILD_TYPE`, `IS_<FLAVOR>`, `IS_<BUILDTYPE>`).
+        // Without this check the codegen produces two `const val <NAME>` entries and the
+        // Kotlin compiler fails with "Conflicting declarations". Surfaced before codegen.
+        //
+        // Reserved-name set is computed from THIS configuration — only actually-registered
+        // flavors/buildTypes contribute auto-derived constants. A literal `IS_DEBUG` field
+        // on a project that doesn't declare a `debug` buildType is fine.
+        val reservedNames: Set<String> = buildSet {
+            addAll(ALWAYS_RESERVED_BUILD_CONFIG_NAMES)
+            flavors.forEach { add("IS_${it.name.uppercase()}") }
+            buildTypes.forEach { add("IS_${it.name.uppercase()}") }
+        }
+        // Sequence over flavor-level AND buildType-level custom fields. Pair each field
+        // with its source name (flavor or buildType) so the message points at the right
+        // DSL block.
+        val customFields: List<Triple<String, String, com.mobilebytelabs.kmpflavors.BuildConfigField>> =
+            flavors.flatMap { flavor ->
+                flavor.buildConfigFields.get().values.map { Triple("flavor", flavor.name, it) }
+            } +
+                buildTypes.flatMap { buildType ->
+                    buildType.buildConfigFields.get().values.map { Triple("buildType", buildType.name, it) }
+                }
+        customFields.forEach { (sourceKind, sourceName, field) ->
+            if (field.name in reservedNames) {
+                val derivation = when {
+                    field.name == "VARIANT_NAME" ->
+                        "an auto-generated constant emitted by every BuildKonfig"
+
+                    field.name == "BUILD_TYPE" ->
+                        "an auto-generated constant emitted when buildTypes are registered"
+
+                    flavors.any { "IS_${it.name.uppercase()}" == field.name } ->
+                        "the auto-derived flavor flag for flavor '" +
+                            flavors.first { "IS_${it.name.uppercase()}" == field.name }.name + "'"
+
+                    else ->
+                        "the auto-derived build-type flag for build type '" +
+                            buildTypes.first { "IS_${it.name.uppercase()}" == field.name }.name + "'"
+                }
+                findings += KmpFlavorValidationFinding(
+                    code = CODE_BUILD_CONFIG_FIELD_AUTO_DERIVED_COLLISION,
+                    severity = KmpFlavorValidationSeverity.ERROR,
+                    message = "$sourceKind '$sourceName' declares `buildConfigField` " +
+                        "'${field.name}', which collides with $derivation. " +
+                        "BuildKonfig codegen would emit two `const val ${field.name}` " +
+                        "entries and the Kotlin compiler would fail with " +
+                        "\"Conflicting declarations\".",
+                    fix = "Rename the custom field to avoid the reserved namespace. " +
+                        "Avoid the `IS_*` prefix for custom flags (the plugin reserves it " +
+                        "for auto-derived flavor/build-type flags) and the literal names " +
+                        "`VARIANT_NAME` / `BUILD_TYPE`. Convention: prefix custom flags " +
+                        "with the tier semantic — e.g. `MAX_*`, `TIER_*`, `PREMIUM_*`, " +
+                        "`FEATURE_*`. Example: rename '${field.name}' → " +
+                        "'${suggestRename(field.name)}'.",
+                )
             }
         }
 
@@ -335,6 +410,22 @@ internal object KmpFlavorPluginValidator {
         }
 
         return findings
+    }
+
+    /**
+     * Suggest a non-colliding rename for KMPF-V23 collisions. Best-effort —
+     * the result is informational and the consumer makes the final naming call.
+     *
+     * - `IS_<NAME>` → `TIER_<NAME>` (custom flags should sit outside the `IS_*`
+     *   namespace the plugin reserves for auto-derived flavor/build-type flags).
+     * - `VARIANT_NAME` → `APP_VARIANT_NAME`.
+     * - `BUILD_TYPE` → `APP_BUILD_TYPE`.
+     */
+    private fun suggestRename(reservedName: String): String = when {
+        reservedName == "VARIANT_NAME" -> "APP_VARIANT_NAME"
+        reservedName == "BUILD_TYPE" -> "APP_BUILD_TYPE"
+        reservedName.startsWith("IS_") -> "TIER_" + reservedName.removePrefix("IS_")
+        else -> "APP_$reservedName"
     }
 
     /**
