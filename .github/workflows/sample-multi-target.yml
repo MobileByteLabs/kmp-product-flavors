@@ -1,0 +1,188 @@
+# Multi-target multi-variant sample CI
+#
+# Exercises the stability-plan Phase 1 sample (3 flavors × 3 buildTypes × 6
+# non-Android targets = 54-compilation matrix). The sample sets
+# autoEnable.set(false) as a workaround for the matrix-mode duplicate-codegen
+# regression (KMPF-V23 backlog) — this CI locks in the workaround path so
+# regressions there are caught immediately.
+#
+# Linux runner: Desktop + JS + WasmJs (cheap, ~3 min).
+# macOS runner: iOS X64 + iOS Arm64 + iOS Simulator Arm64 (~7 min).
+# Both run the override-variant path (-PkmpFlavor=<NN>) on top of the default.
+
+name: Multi-target sample
+
+on:
+  pull_request:
+    branches: [development, main]
+    paths:
+      - 'build-logic/flavor-plugin/**'
+      - 'samples/multi-target-multi-variant/**'
+      - 'settings.gradle.kts'
+      - '.github/workflows/sample-multi-target.yml'
+  push:
+    branches: [development, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sample-multi-target-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux-targets:
+    name: Linux targets (Desktop + JS + WasmJs)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: true
+
+      - name: Default variant — Desktop + JS + WasmJs
+        run: |
+          ./gradlew \
+            :samples:multi-target-multi-variant:compileKotlinDesktop \
+            :samples:multi-target-multi-variant:compileKotlinJs \
+            :samples:multi-target-multi-variant:compileKotlinWasmJs \
+            --no-daemon --no-configuration-cache
+
+      - name: Validate default BuildKonfig (freeDebug)
+        run: |
+          set -euo pipefail
+          GEN=samples/multi-target-multi-variant/build/generated/kmpFlavors/commonMain/kotlin/com/example/multitarget/BuildKonfig.kt
+          test -f "$GEN" || { echo "::error::BuildKonfig.kt missing at $GEN"; exit 1; }
+          for needle in \
+            'VARIANT_NAME: String = "freeDebug"' \
+            'IS_FREE: Boolean = true' \
+            'IS_PAID: Boolean = false' \
+            'IS_ENTERPRISE: Boolean = false' \
+            'BUILD_TYPE: String = "debug"' \
+            'IS_DEBUG: Boolean = true' \
+            'IS_STAGING: Boolean = false' \
+            'IS_RELEASE: Boolean = false' \
+            'MAX_ITEMS: Int = 10' \
+            'TIER_NAME: String = "free"'; do
+            if ! grep -qF "$needle" "$GEN"; then
+              echo "::error::Default BuildKonfig missing line: $needle"
+              cat "$GEN"
+              exit 1
+            fi
+          done
+          echo "✓ Default freeDebug BuildKonfig contains all expected constants"
+
+      - name: Override variant — enterpriseRelease (regenerate + recompile Desktop)
+        run: |
+          ./gradlew \
+            :samples:multi-target-multi-variant:compileKotlinDesktop \
+            -PkmpFlavor=enterpriseRelease \
+            --rerun-tasks --no-daemon --no-configuration-cache
+
+      - name: Validate override BuildKonfig (enterpriseRelease)
+        run: |
+          set -euo pipefail
+          GEN=samples/multi-target-multi-variant/build/generated/kmpFlavors/commonMain/kotlin/com/example/multitarget/BuildKonfig.kt
+          for needle in \
+            'VARIANT_NAME: String = "enterpriseRelease"' \
+            'IS_ENTERPRISE: Boolean = true' \
+            'IS_FREE: Boolean = false' \
+            'IS_PAID: Boolean = false' \
+            'BUILD_TYPE: String = "release"' \
+            'IS_RELEASE: Boolean = true' \
+            'IS_DEBUG: Boolean = false' \
+            'MAX_ITEMS: Int = 100000' \
+            'TIER_NAME: String = "enterprise"'; do
+            if ! grep -qF "$needle" "$GEN"; then
+              echo "::error::Override BuildKonfig missing line: $needle"
+              cat "$GEN"
+              exit 1
+            fi
+          done
+          echo "✓ Override enterpriseRelease BuildKonfig regenerated correctly"
+
+      - name: Probe matrix-mode task wiring
+        run: |
+          ./gradlew :samples:multi-target-multi-variant:tasks --group="kmpFlavors variants" \
+            --no-daemon --no-configuration-cache > tasks.txt
+          # 9 variants × 5 non-iOS-Android targets — Desktop uses jar*
+          # naming (JVM publishable), JS/WasmJs/iOS use zip*. iOS bundling
+          # lives on macOS-only runner; we only check JS/WasmJs/Desktop here.
+          # Active variant (freeDebug) is covered by the standard `jar` task,
+          # so probe an INACTIVE variant to verify matrix-mode registration.
+          for needle in \
+            'jarPaidDebugKotlinDesktop' \
+            'zipPaidStagingKotlinJs' \
+            'zipEnterpriseReleaseKotlinWasmJs'; do
+            if ! grep -qF "$needle" tasks.txt; then
+              echo "::error::Expected matrix-mode task '$needle' is not registered"
+              cat tasks.txt
+              exit 1
+            fi
+          done
+          echo "✓ Matrix-mode tasks registered for non-iOS targets"
+
+  apple-targets:
+    name: Apple targets (iOS X64 + Arm64 + Simulator Arm64)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: true
+
+      - name: Default variant — iOS X64 + Arm64 + Simulator Arm64
+        run: |
+          ./gradlew \
+            :samples:multi-target-multi-variant:compileKotlinIosX64 \
+            :samples:multi-target-multi-variant:compileKotlinIosArm64 \
+            :samples:multi-target-multi-variant:compileKotlinIosSimulatorArm64 \
+            --no-daemon --no-configuration-cache
+
+      - name: Validate iOS-side BuildKonfig present
+        run: |
+          set -euo pipefail
+          GEN=samples/multi-target-multi-variant/build/generated/kmpFlavors/commonMain/kotlin/com/example/multitarget/BuildKonfig.kt
+          test -f "$GEN" || { echo "::error::BuildKonfig.kt missing at $GEN"; exit 1; }
+          grep -qF 'VARIANT_NAME: String = "freeDebug"' "$GEN" || { echo "::error::iOS-side default variant not freeDebug"; exit 1; }
+          echo "✓ iOS-side default freeDebug BuildKonfig generated"
+
+      - name: Override variant — paidStaging (iOS Simulator Arm64 only)
+        run: |
+          ./gradlew \
+            :samples:multi-target-multi-variant:compileKotlinIosSimulatorArm64 \
+            -PkmpFlavor=paidStaging \
+            --rerun-tasks --no-daemon --no-configuration-cache
+
+      - name: Validate iOS-side override BuildKonfig
+        run: |
+          set -euo pipefail
+          GEN=samples/multi-target-multi-variant/build/generated/kmpFlavors/commonMain/kotlin/com/example/multitarget/BuildKonfig.kt
+          for needle in \
+            'VARIANT_NAME: String = "paidStaging"' \
+            'IS_PAID: Boolean = true' \
+            'BUILD_TYPE: String = "staging"' \
+            'IS_STAGING: Boolean = true'; do
+            if ! grep -qF "$needle" "$GEN"; then
+              echo "::error::iOS-side override missing line: $needle"
+              cat "$GEN"
+              exit 1
+            fi
+          done
+          echo "✓ iOS-side paidStaging BuildKonfig regenerated correctly"
