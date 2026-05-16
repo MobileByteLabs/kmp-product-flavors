@@ -16,6 +16,7 @@
 
 package com.mobilebytelabs.kmpflavors
 
+import com.mobilebytelabs.kmpflavors.annotations.KmpFlavorsExperimental
 import org.gradle.api.Action
 import org.gradle.api.Named
 import org.gradle.api.model.ObjectFactory
@@ -73,6 +74,7 @@ abstract class KmpFlavorVariant @Inject constructor(private val variantName: Str
      * `DependencyConfigurator` after per-variant compilation classpaths
      * are wired.
      */
+    @KmpFlavorsExperimental("Survey-gate-cleared via fix-all session, not consumer demand; DSL shape may evolve")
     val dependencies: VariantDependenciesScope = objects.newInstance(VariantDependenciesScope::class.java)
 
     /**

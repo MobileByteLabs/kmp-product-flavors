@@ -16,6 +16,7 @@
 
 package com.mobilebytelabs.kmpflavors
 
+import com.mobilebytelabs.kmpflavors.annotations.KmpFlavorsExperimental
 import org.gradle.api.Action
 import org.gradle.api.NamedDomainObjectContainer
 import org.gradle.api.model.ObjectFactory
@@ -354,6 +355,7 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
      * Convention: `false` (opt-in — narrows the v2.1 scope; consumers who don't
      * want N×M tasks stay on the per-variant default).
      */
+    @KmpFlavorsExperimental("Needs Phase 1 sample smoke (multi-target Detekt scope) before Stable promotion")
     abstract val detektPerVariantPerTarget: Property<Boolean>
 
     /**
@@ -381,6 +383,7 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
      *
      * Convention: `false` (opt-in stub).
      */
+    @KmpFlavorsExperimental("Needs real cache-hit telemetry on 8+ variant modules to justify default-flip")
     abstract val variantCacheNamespacing: Property<Boolean>
 
     /**
@@ -398,6 +401,7 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
      *
      * Convention: `false` (opt-in).
      */
+    @KmpFlavorsExperimental("RFC §10 closer; KGP cross-tree dep warnings cosmetic but persistent")
     abstract val createIntermediateBuildTypeSourceSets: Property<Boolean>
 
     /**
@@ -433,6 +437,7 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
      *
      * Convention: `false` (opt-in — consumer-side npm tarball production is the v2.1 default).
      */
+    @KmpFlavorsExperimental("Minimal real-world npm publish testing; needs adopter signal")
     abstract val npmPublishMatrix: Property<Boolean>
 
     /**
@@ -458,6 +463,7 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
      * Convention: `false` (opt-in — Option B's CLI helper + IDE plugin variant
      * switcher remain the v2.3 default UX).
      */
+    @KmpFlavorsExperimental("Option A only; Option B graduation gated on CMP reset API (issue #75)")
     abstract val composeHotReloadPerVariant: Property<Boolean>
 
     /**
@@ -527,6 +533,7 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
      * Resolve via `./gradlew :module:promoteFreeDevToFreeStaging` (add `-Pdry-run=true`
      * for preview).
      */
+    @KmpFlavorsExperimental("Consumer demand signal unclear; DSL shape may evolve")
     fun promote(from: String, to: String, action: Action<VariantPromotionScope> = Action {}): VariantPromotion {
         val promotion = VariantPromotion(from = from, to = to)
         action.execute(VariantPromotionScope(promotion))
@@ -571,6 +578,7 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
      *
      * No-op when none of the platform sub-configs have `defaultPayload` set.
      */
+    @KmpFlavorsExperimental("SDK integration patterns may evolve as adopters wire it against real GrowthBook / Statsig / LaunchDarkly deployments")
     val featureFlags: FeatureFlagsConfig = objects.newInstance(FeatureFlagsConfig::class.java)
 
     /**

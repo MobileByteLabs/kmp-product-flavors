@@ -25,6 +25,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **v2.4 Phase 3 — `switchVariantAndReload` task** — Option B best-effort workaround. `./gradlew switchVariantAndReload --to=<variant>` persists the new variant + prints the exact follow-up command. **Marked with `CMP-API-WAITING` markers** in 3 source locations + tracked by issue #75 — replace with daemon-restart-free impl when CMP exposes a public hot-reload reset API.
 - **IDE plugin v0.2.0-alpha.1** (separate repo) — gutter icons + variant-aware Refactor → Rename + breakpoint scoping data layer. Published to Marketplace `eap` channel.
 
+### Stable API surface (locked for 2.x cycle)
+
+The following properties + DSL methods are committed to the v2.x SemVer contract. Breaking changes require a major-version bump.
+
+- Core DSL: `flavors { register(…) }`, `buildTypes { register(…) }`, `flavorDimensions { register(…) }`, `variantFilter { … }`, `variants` (Q19-B public API).
+- Top-level extension: `buildMatrix`, `publishMatrix`, `autoEnable`, `enableBuildTypes`, `generateBuildConfig`, `buildConfigPackage`, `buildConfigClassName`, `bridgeAgpProductFlavors`, `bridgeAgpBuildTypes`, `publishMatrixSbom`, `detektPerVariant`, `excludeGeneratedFromFormatters`, `dependencyGuardPerVariant`, `publishMatrixLegacyIosClassifiers`.
+- Tasks: `compile{Variant}Kotlin{Target}`, `assembleAll{Target}Variants`, `assembleAllVariants`, `listFlavors`, `listActiveVariant`, `validateFlavors`, `generateRunConfigurations`, `publish{Variant}PublicationToMavenLocal`, `detekt{Variant}`.
+
+### Experimental API surface (`@KmpFlavorsExperimental` annotation)
+
+Source-annotated with `@KmpFlavorsExperimental(reason = "…")` — the reason string surfaces in IDE hover hints + KDoc. May change or be removed in v2.x point releases.
+
+- `detektPerVariantPerTarget` — "Needs Phase 1 sample smoke (multi-target Detekt scope) before Stable promotion".
+- `variantCacheNamespacing` — "Needs real cache-hit telemetry on 8+ variant modules to justify default-flip".
+- `createIntermediateBuildTypeSourceSets` — "RFC §10 closer; KGP cross-tree dep warnings cosmetic but persistent".
+- `npmPublishMatrix` — "Minimal real-world npm publish testing; needs adopter signal".
+- `composeHotReloadPerVariant` — "Option A only; Option B graduation gated on CMP reset API (issue #75)".
+- `promote(from, to, action)` — "Consumer demand signal unclear; DSL shape may evolve".
+- `featureFlags { … }` — "SDK integration patterns may evolve as adopters wire it against real GrowthBook / Statsig / LaunchDarkly deployments".
+- `KmpFlavorVariant.dependencies` — "Survey-gate-cleared via fix-all session, not consumer demand; DSL shape may evolve".
+
+### Workaround API surface (`CMP-API-WAITING` markers)
+
+Bridges a gap until an upstream API ships. Tagged in source with the comment marker `CMP-API-WAITING` + cross-linked to a tracking issue.
+
+- `switchVariantAndReload --to=<variant>` task — workaround until CMP exposes the public hot-reload reset API (tracked at issue #75).
+
 ### Documentation
 
 - **`docs/RELEASE.md`** — end-to-end release flow documentation.
