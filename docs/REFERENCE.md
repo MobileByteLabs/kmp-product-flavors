@@ -238,6 +238,55 @@ Default: `true`. When `true`, ships v2.1's Zip-shaped iOS MavenPublications alon
 
 ---
 
+### 🟢 `codegenHost`
+
+```kotlin
+abstract val codegenHost: Property<Boolean>
+```
+
+Default: unset (first-come-first-served auto-claim).
+
+Explicit override for multi-module codegen. When more than one module applies the plugin under the same `buildConfigPackage` + `buildConfigClassName`, the plugin elects exactly one module as the codegen host — otherwise downstream builds hit duplicate-class errors at DEX merge.
+
+- `set(true)`: this module always wins the host claim regardless of configuration order.
+- `set(false)`: this module never generates the class (consumes the host's output transitively).
+- Unset: first-come-first-served. Non-deterministic across builds — prefer explicit `set(true)` in a designated host module (e.g. `cmp-shared`).
+
+---
+
+### 🟢 `createIntermediateSourceSets`
+
+```kotlin
+abstract val createIntermediateSourceSets: Property<Boolean>
+```
+
+Default: `true`.
+
+Creates platform-family intermediate source sets that share code between related targets:
+
+- `webMain` — shared between `js` and `wasmJs`.
+- `nativeMain` — shared between iOS, macOS, Linux, Windows (every Kotlin/Native target).
+
+Flip to `false` to opt into bare per-target source sets (rare — most consumers benefit from these intermediate sets).
+
+Distinct from `createIntermediateBuildTypeSourceSets` (which creates `common{BuildType}` source sets across flavors of the same build type).
+
+---
+
+### 🟠 `activeFlavor` (v1.x compat shim, removed 2026-11-14)
+
+```kotlin
+abstract val activeFlavor: Property<String>
+```
+
+**Status**: Workaround / CMP-API-WAITING. **Deprecation cutoff**: 2026-11-14 per RFC §3 Q15. After that date the v1.x compat shim is removed and assigning `activeFlavor.set(...)` triggers `KMPF-V21` ERROR + `GradleException`.
+
+The v1.x DSL — set the active variant by name. Replaced in v2.x by `register("name") { isDefault.set(true) }` inside `flavors { … }`. See [`MIGRATION_v1_to_v2.md`](MIGRATION_v1_to_v2.md) for the migration path.
+
+For active-variant override at the CLI, use `-PkmpFlavor=<variant>` instead — that path is Stable and survives the cutoff.
+
+---
+
 ## Experimental surfaces
 
 ### 🟡 `detektPerVariantPerTarget`
