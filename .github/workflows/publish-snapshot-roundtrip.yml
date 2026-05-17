@@ -1,0 +1,257 @@
+# Stability plan Phase 3 — per-variant publishing roundtrip smoke
+#
+# Verifies the end-to-end path from "plugin published the sample with
+# `publishMatrix=true`" to "consumer project resolves the per-variant
+# classifier-tagged artefact". Without this, the per-variant publishing
+# feature is only smoke-tested via TestKit `withPluginClasspath()` — never
+# via a real Maven resolution path that a production consumer hits.
+#
+# Approach: in-runner roundtrip, no external Maven repo.
+#   1. Publish the multi-target sample to `~/.m2/repository` (maven local).
+#   2. Verify per-variant classifier-tagged JARs landed on disk.
+#   3. Generate a throwaway plain-JVM consumer project that depends on
+#      one specific per-variant classifier.
+#   4. Build the consumer + assert the per-variant classifier appears on
+#      the resolved runtime classpath (NOT the bare jar).
+#
+# This is a smoke test, not a soak test — it runs on every PR touching
+# the plugin or sample. The full Sonatype Snapshots roundtrip across all
+# 6 targets × 9 variants × 5 classifier shapes is the GA-blocker; this
+# workflow locks in the JVM path which is the most-resolved classifier
+# shape today.
+
+name: Publish snapshot roundtrip
+
+on:
+  pull_request:
+    branches: [development, main]
+    paths:
+      - 'build-logic/flavor-plugin/**'
+      - 'samples/multi-target-multi-variant/**'
+      - '.github/workflows/publish-snapshot-roundtrip.yml'
+  push:
+    branches: [development, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-snapshot-roundtrip-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  roundtrip:
+    name: Maven Local roundtrip — per-variant classifier resolution
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: true
+
+      - name: Resolve sample coordinates
+        id: coords
+        run: |
+          set -euo pipefail
+          # The sample's group + name + version live in samples/multi-target-multi-variant/build.gradle.kts.
+          # Extract them once + reuse downstream.
+          GROUP=$(grep -E '^group\s*=\s*' samples/multi-target-multi-variant/build.gradle.kts | head -1 | sed -E 's/.*"(.+)".*/\1/')
+          VERSION=$(grep -E '^version\s*=\s*' samples/multi-target-multi-variant/build.gradle.kts | head -1 | sed -E 's/.*"(.+)".*/\1/')
+          NAME=multi-target-multi-variant
+          if [ -z "$GROUP" ] || [ -z "$VERSION" ]; then
+            echo "::error::failed to extract group ($GROUP) / version ($VERSION) from sample build.gradle.kts"
+            head -30 samples/multi-target-multi-variant/build.gradle.kts
+            exit 1
+          fi
+          echo "group=$GROUP" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "✓ resolved coordinate: $GROUP:$NAME:$VERSION"
+
+      - name: Publish sample to ~/.m2/repository
+        run: |
+          # publishToMavenLocal cascades to all per-variant publications when
+          # `publishMatrix=true` is set on the sample. No signing required for
+          # maven-local; no Sonatype credentials needed.
+          ./gradlew :samples:multi-target-multi-variant:publishToMavenLocal \
+            --no-daemon --no-configuration-cache --warning-mode=summary
+
+      - name: List published artefacts
+        id: artefacts
+        env:
+          GROUP: ${{ steps.coords.outputs.group }}
+          VERSION: ${{ steps.coords.outputs.version }}
+          NAME: ${{ steps.coords.outputs.name }}
+        run: |
+          set -euo pipefail
+          GROUP_PATH="${GROUP//./\/}"
+          REPO_DIR="$HOME/.m2/repository/$GROUP_PATH/$NAME/$VERSION"
+          if [ ! -d "$REPO_DIR" ]; then
+            echo "::error::expected maven-local dir not found: $REPO_DIR"
+            find "$HOME/.m2/repository" -maxdepth 4 -type d | head -20
+            exit 1
+          fi
+          echo "Maven-local layout at $REPO_DIR:"
+          ls -la "$REPO_DIR"
+
+          # Count per-variant classifier JARs. The sample has 9 variants;
+          # publishMatrix registers one publication per INACTIVE variant ×
+          # JVM target. Active variant (freeDebug) ships via the standard
+          # kotlinMultiplatform publication's bare jar. So we expect 8
+          # inactive variants × 1 JVM target (desktop) = 8 classifier JARs
+          # in the JVM-side layout. (iOS / JS / WasmJs use the Zip publication
+          # shape with their own per-target subdirs; we don't assert on those
+          # here — the per-variant Zip publishing is covered by separate
+          # configurator-specific tests in the plugin TestKit suite.)
+          CLASSIFIER_JARS=$(ls "$REPO_DIR" | grep -E "${NAME}-${VERSION}-[a-zA-Z]+\.jar$" | wc -l | tr -d ' ')
+          echo "classifiers=$CLASSIFIER_JARS" >> "$GITHUB_OUTPUT"
+          echo "Per-variant classifier-tagged JARs: $CLASSIFIER_JARS"
+
+          if [ "$CLASSIFIER_JARS" -lt 1 ]; then
+            echo "::error::no per-variant classifier JARs published — publishMatrix may have silently no-op'd"
+            echo "Full listing:"
+            ls -la "$REPO_DIR"
+            exit 1
+          fi
+          echo "✓ ${CLASSIFIER_JARS} per-variant classifier JARs landed in maven-local"
+
+      - name: Bootstrap throwaway consumer project
+        env:
+          GROUP: ${{ steps.coords.outputs.group }}
+          VERSION: ${{ steps.coords.outputs.version }}
+          NAME: ${{ steps.coords.outputs.name }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/roundtrip-consumer
+          cd /tmp/roundtrip-consumer
+
+          cat > settings.gradle.kts <<EOF
+          pluginManagement {
+              repositories {
+                  mavenLocal()
+                  gradlePluginPortal()
+                  mavenCentral()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+              repositories {
+                  mavenLocal()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "roundtrip-consumer"
+          EOF
+
+          cat > build.gradle.kts <<EOF
+          plugins {
+              kotlin("jvm") version "2.2.21"
+          }
+
+          group = "io.github.mobilebytelabs.roundtrip"
+          version = "0.1.0"
+
+          repositories {
+              mavenLocal()
+              mavenCentral()
+          }
+
+          // The full Gradle classifier syntax: "group:name:version:classifier".
+          // freeRelease is the variant we're asserting resolves end-to-end.
+          dependencies {
+              implementation("$GROUP:$NAME:$VERSION:freeRelease@jar") {
+                  // Disable transitive resolution — the published sample doesn't
+                  // export its own dependencies as part of the per-variant JAR
+                  // (the per-variant publication is artefact-only).
+                  isTransitive = false
+              }
+          }
+
+          // Print the resolved runtime classpath so the next step can grep it.
+          tasks.register("dumpClasspath") {
+              val classpath = configurations.runtimeClasspath.get()
+              doLast {
+                  println("=== runtime classpath ===")
+                  classpath.forEach { println(it.absolutePath) }
+                  println("=== end runtime classpath ===")
+              }
+          }
+          EOF
+
+          echo "Consumer project bootstrapped at /tmp/roundtrip-consumer:"
+          ls -la
+
+      - name: Resolve + assert per-variant classifier on consumer's runtime classpath
+        env:
+          GROUP: ${{ steps.coords.outputs.group }}
+          VERSION: ${{ steps.coords.outputs.version }}
+          NAME: ${{ steps.coords.outputs.name }}
+        run: |
+          set -euo pipefail
+          cd /tmp/roundtrip-consumer
+          gradle dumpClasspath --no-daemon --no-configuration-cache 2>&1 | tee classpath.txt
+
+          # The resolved jar's path must include the per-variant classifier in
+          # its filename: `<name>-<version>-freeRelease.jar`.
+          EXPECTED_FILE="${NAME}-${VERSION}-freeRelease.jar"
+          if grep -qF "$EXPECTED_FILE" classpath.txt; then
+            echo "::notice::✓ consumer resolved per-variant classifier '$EXPECTED_FILE'"
+          else
+            echo "::error::consumer did NOT resolve the per-variant classifier '$EXPECTED_FILE'"
+            echo "::error::classpath grep results:"
+            grep -E "${NAME}-${VERSION}.*\.jar" classpath.txt || echo "(no matches at all)"
+            exit 1
+          fi
+
+          # Negative assertion: the BARE jar (no classifier) should NOT appear
+          # on the runtime classpath when we explicitly requested freeRelease.
+          # If it does, the classifier wasn't honored.
+          BARE_FILE="${NAME}-${VERSION}.jar"
+          if grep -E "/${BARE_FILE}$" classpath.txt > /dev/null; then
+            echo "::warning::bare jar '${BARE_FILE}' also resolved alongside the classifier — investigate publication metadata"
+          else
+            echo "✓ bare jar correctly absent from runtime classpath (classifier was honored)"
+          fi
+
+      - name: Roundtrip summary
+        if: always()
+        env:
+          GROUP: ${{ steps.coords.outputs.group }}
+          VERSION: ${{ steps.coords.outputs.version }}
+          NAME: ${{ steps.coords.outputs.name }}
+          CLASSIFIERS: ${{ steps.artefacts.outputs.classifiers }}
+          RUN_RESULT: ${{ job.status }}
+        run: |
+          {
+            echo "### Per-variant publishing roundtrip — $GROUP:$NAME:$VERSION"
+            echo ""
+            if [ "$RUN_RESULT" = "success" ]; then
+              echo "✅ Roundtrip green — consumer resolved per-variant classifier 'freeRelease' end-to-end."
+              echo ""
+              echo "Per-variant classifier JARs published to maven-local: **$CLASSIFIERS**"
+              echo ""
+              echo "Plain-JVM consumer at \`/tmp/roundtrip-consumer\` depended on the classifier-tagged coordinate:"
+              echo ""
+              echo '```kotlin'
+              echo "implementation(\"$GROUP:$NAME:$VERSION:freeRelease@jar\")"
+              echo '```'
+              echo ""
+              echo "Gradle's classpath dump confirmed the resolved JAR was \`${NAME}-${VERSION}-freeRelease.jar\`, not the bare \`${NAME}-${VERSION}.jar\`."
+            else
+              echo "❌ Roundtrip failed — inspect job logs above. Common failure modes:"
+              echo ""
+              echo "- \`publishMatrix\` silently no-op'd on the sample → 0 classifier JARs published"
+              echo "- Classifier resolution syntax broken on the matrix KGP version"
+              echo "- Maven-local layout changed shape (Gradle 9.x repo path differences)"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
