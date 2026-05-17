@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.4.0] - in development (alpha.0 published 2026-05-16)
+## [2.4.0] - in RC cycle (rc.0 cut 2026-05-17; alpha.0 published 2026-05-16)
+
+> **RC entry point.** Phase 4 external-adopter signal explicitly waived 2026-05-17; outreach funnel ([Discussion #92](https://github.com/MobileByteLabs/kmp-product-flavors/discussions/92), `docs/v2.4-BETA-TESTING.md`, `v2.4-beta-stability-report.yml`) remains live but adopter signal continues post-GA via v2.4.x patch cadence. The `2.4.0-rc.0` artifact bundles every Added / Fixed / Stable / Experimental / Workaround item listed below; GA tag (`v2.4.0`) follows after the RC soak window with zero open `2.4-blocker` issues.
+
 
 > v2.3 + early-v2.4 cycle additions. **8 of 9 v2.3 phases + 4 of 5 v2.4 phases shipped 2026-05-15/16** in a single sweep per the "fix-all" session direction.
 
