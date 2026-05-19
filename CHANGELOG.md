@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.2] - 2026-05-19 — Matrix-mode `expect`/`actual` regression fix
+
+### Fixed
+
+- **Matrix mode + `expect`/`actual` in commonMain** ([#99](https://github.com/MobileByteLabs/kmp-product-flavors/issues/99)) — inactive-variant compilations now resolve `actual` declarations from the target's `<target>Main` source set (e.g. `desktopMain`, `iosMain`). Pre-fix, `CompilationRegistrar.register()` wired the variant's `defaultSourceSet` to per-flavor parents only (`commonFree`, `commonProd`), leaving `expect` declarations in `commonMain` unable to resolve to their `actual` in `<target>Main` for the inactive-variant compilation — KMP failed with "Expected <name> has no actual declaration in module <commonMain> for <Target>" on every inactive-variant `compileKotlin*` task on non-Android targets.
+
+  The fix replays the target main's `kotlin.srcDirs` into the variant's `defaultSourceSet` rather than using `dependsOn(targetMain.defaultSourceSet)` (KGP forbids `dependsOn` on default source sets). Mirrored in `TestCompilationRegistrar` for the test compilation.
+
+  Real-world reproducer: `openMF/kmp-project-template` `core:database` module (`expect val platformModule: Module` in commonMain + actuals in `desktopMain` / `iosMain`). Every consumer using matrix mode + `expect`/`actual` in commonMain was affected — most realistic KMP libraries with DI factories, parcelize bridges, secure-settings, etc.
+
+  New regression test: `MatrixModeExpectActualTest` covers both main + test compilation paths.
+
+## [2.4.1] - 2026-05-18 — Scheduled cron patch (no substantive changes)
+
 ## [2.4.0] - 2026-05-17 — GA
 
 > **GA cut.** Promoted from `2.4.0-rc.0` via proactive validation per [`docs/GA_READINESS_REPORT.md`](docs/GA_READINESS_REPORT.md) rather than reactive 1-week soak. Every `[2.4.0]` claim below cross-referenced with a test, workflow, or artifact — see the audit matrix in the report. Adopter signal live via `openMF/kmp-project-template:dev` pinned to `2.4.0-rc.0` (PR #152). Phase 4 outreach funnel ([Discussion #92](https://github.com/MobileByteLabs/kmp-product-flavors/discussions/92), `docs/v2.4-BETA-TESTING.md`, `v2.4-beta-stability-report.yml`) continues post-GA via the v2.4.x patch cadence.

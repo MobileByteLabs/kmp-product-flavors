@@ -122,6 +122,20 @@ internal object TestCompilationRegistrar {
             val parents = parentTestSourceSetsFor(variantName)
             parents.forEach { parent -> testCompilation.defaultSourceSet.dependsOn(parent) }
 
+            // ISSUE #99 FIX (test counterpart) — include the target's `<target>Test`
+            // source folders directly into the variant test compilation's
+            // defaultSourceSet so platform `actual` test-fixture declarations
+            // resolve. Mirrors the main-compilation fix in `CompilationRegistrar`
+            // — and for the same KGP reason (can't `dependsOn` a default source
+            // set; replay srcDirs instead).
+            val targetTest = container.findByName(KotlinCompilation.TEST_COMPILATION_NAME)
+            val targetTestSrcDirs: Set<java.io.File> = if (targetTest != null && targetTest !== testCompilation) {
+                targetTest.defaultSourceSet.kotlin.srcDirs.toSet()
+            } else {
+                emptySet()
+            }
+            targetTestSrcDirs.forEach { srcDir -> testCompilation.defaultSourceSet.kotlin.srcDir(srcDir) }
+
             // Variant-specific test srcDir (e.g., `src/freeDevTest/kotlin`) — used
             // for test code that only exists for one specific variant, not per-flavor.
             val srcDirs = variantSpecificTestSrcDirsFor(variantName)
