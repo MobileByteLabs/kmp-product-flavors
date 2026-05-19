@@ -21,6 +21,7 @@ import org.gradle.api.logging.Logger
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
 import org.jetbrains.kotlin.gradle.plugin.KotlinTarget
+import java.io.File
 
 /**
  * Registers one [KotlinCompilation] per variant on a single [KotlinTarget].
@@ -123,6 +124,36 @@ internal object CompilationRegistrar {
             val parents = parentSourceSetsFor(variantName)
             parents.forEach { parent -> variant.defaultSourceSet.dependsOn(parent) }
 
+            // ISSUE #99 FIX — include the target's `<target>Main` source folders
+            // (e.g. `src/desktopMain/kotlin/`) directly into the variant's
+            // defaultSourceSet so platform `actual` declarations resolve.
+            //
+            // Without this, `expect` declarations in `commonMain` have no path
+            // to their `actual` in `<target>Main` from the inactive-variant
+            // compilation's perspective — KMP fails with "Expected ... has no
+            // actual declaration in module <commonMain> for <Target>".
+            //
+            // We can't use `dependsOn(targetMain.defaultSourceSet)` here because
+            // KGP forbids non-default source sets from declaring a `dependsOn`
+            // on a defaultSourceSet ("Invalid Dependency on Default Compilation
+            // Source Set" warning). Instead we replay the target main's source
+            // folders into the variant's defaultSourceSet — the actual files
+            // belong to the variant compilation directly. This is safe because
+            // those same files also compile via the active variant's standard
+            // `main` compilation, and the two compilation outputs are kept in
+            // separate JARs (no class duplication on classpath).
+            //
+            // Caller (KmpFlavorPlugin) already restricts this registrar to
+            // non-Android targets — Android's variant source sets are handled
+            // natively by AGP.
+            val targetMain = container.findByName(KotlinCompilation.MAIN_COMPILATION_NAME)
+            val targetMainSrcDirs: Set<File> = if (targetMain != null && targetMain !== variant) {
+                targetMain.defaultSourceSet.kotlin.srcDirs.toSet()
+            } else {
+                emptySet()
+            }
+            targetMainSrcDirs.forEach { srcDir -> variant.defaultSourceSet.kotlin.srcDir(srcDir) }
+
             // Wire variant-specific source dirs directly into the variant
             // defaultSourceSet (rare path — used for code that only exists
             // for one specific variant, not per-flavor).
@@ -133,7 +164,8 @@ internal object CompilationRegistrar {
                 logger?.info(
                     "[KMP Flavors] Registered variant compilation: " +
                         "${variantName}Kotlin${target.name.replaceFirstChar { it.uppercase() }} " +
-                        "(parents=${parents.size}, srcDirs=${srcDirs.size})",
+                        "(parents=${parents.size}, srcDirs=${srcDirs.size}, " +
+                        "targetMain=${targetMain?.defaultSourceSet?.name ?: "absent"})",
                 )
             }
         }
