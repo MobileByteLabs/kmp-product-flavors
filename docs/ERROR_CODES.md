@@ -242,6 +242,66 @@ To grep CI output for a specific code:
 
 ---
 
+## KMPF-V24 — Mutex: `dimensions {}` AND legacy flat DSL used together
+
+| | |
+|---|---|
+| **Severity** | ERROR |
+| **Since** | v2.5.0 (Phase 1 — multi-dim DSL ergonomic sugar + AGP cross-product bridge) |
+| **Message** | `kmpFlavors {}` cannot mix the v2.5 `dimensions { }` sugar with the legacy `flavorDimensions { } + flavors { }` blocks. Pick one style per project: either `dimensions { dimension("tier") { flavor("free") } }` OR `flavorDimensions { register("tier") } + flavors { register("free") { dimension.set("tier") } }`. |
+| **Fix** | Pick one DSL style per project. See [`docs/MIGRATION_v2.4_TO_v2.5.md`](MIGRATION_v2.4_TO_v2.5.md) (opens with "You do not need to migrate." — flat DSL is fully supported in v2.5+) for the migration cookbook. |
+| **When fires** | At plugin-apply time. The validator's `validate()` function receives `dimensionsDslUsed` + `legacyFlatDslUsed` flags wired from `KmpFlavorExtension`; when both are true, V24 fires. Strict-additive contract preserved — v2.4 consumers using only the flat DSL never see V24. |
+
+---
+
+## KMPF-V25 — Duplicate dimension name OR AGP-side conflict on re-apply
+
+| | |
+|---|---|
+| **Severity** | ERROR |
+| **Since** | v2.5.0 (Phase 1 — AGP cross-product bridge) |
+| **Message** | Dimension '<dimName>' is declared more than once. Each dimension must have a unique name — duplicate declarations produce ambiguous flavor↔dimension mappings. (Also fires from the AGP bridge cross-product path when an existing AGP flavor with the same name has a CONFLICTING `dimension =` assignment — cross-vault hand-edit case.) |
+| **Fix** | Rename one of the duplicate declarations OR remove it. If you intended two SEPARATE axes of variation, give them distinct names (e.g. "tier" + "tierVariant"). For AGP-side conflicts: ensure no hand-written `android { productFlavors {} }` conflicts with KMP-driven flavors. |
+| **When fires** | (1) Validator emit-site — fires when `dimensions.groupBy { it.name }.filter { size > 1 }` is non-empty. (2) AgpBridge emit-site (warn-only log) — fires when `propagateFlavorsCrossProduct` detects existing AGP flavors that don't cover the KMP-side declarations. |
+
+---
+
+## KMPF-V26 — Secret resolution failure / schema-fallback
+
+| | |
+|---|---|
+| **Severity** | ERROR (resolution-fail at task-execution time) OR WARNING (schema v2.0 fallback at configuration time) |
+| **Since** | v2.5.0 (Phase 3 — BuildKonfig codegen expansion) |
+| **Message** | `kmpFlavors.buildKonfig { secret(...) }` is declared for `<secretIds>`, but the consumer's `secrets-manifest.yaml` is `schema_version='<X.Y>'`. Schema v2.1+ is required for flavor-aware secret resolution. The plugin will emit placeholder values (e.g. `<unresolved:schema-v2.0>`) instead of hardcoded secrets (SV15 compliance per `RULE-SECRETS-VAULT-001`). |
+| **Fix** | Upgrade `secrets-manifest.yaml` to `schema_version: "2.1"` and add `needs[].flavor_selector` blocks for the declared secret IDs. See [`docs/SECRETS_INTEGRATION.md`](SECRETS_INTEGRATION.md) for the consumer contract. |
+| **When fires** | WARN path: validator's `validateBuildKonfigDsl` emits at configuration time when `buildKonfig { secret(id) }` is declared AND the consumer's manifest is schema < v2.1. ERROR path: `BuildKonfigSecretResolver.resolveForVariant` returns `SecretResolution.Unavailable` and downstream task action emits the structured ERROR (real value flow ships in v2.5.x patch — see SECRETS_INTEGRATION.md). |
+
+---
+
+## KMPF-V27 — Custom type emit failure
+
+| | |
+|---|---|
+| **Severity** | ERROR |
+| **Since** | v2.5.0 (Phase 3 — BuildKonfig codegen expansion) |
+| **Message** | `kmpFlavors.buildKonfig { customField<T>("<name>", ...) }` declared with type '<typeDesc>', which the codegen cannot emit. Supported: primitives (Boolean/Int/Long/Float/Double/String), sealed classes, and flat `List<T>` where T is a primitive or sealed class. |
+| **Fix** | Convert to a sealed class with explicit subclass objects, OR stringify the value via a primitive customField. Nested generics (`Map<K, V>`, `List<List<T>>`) and open classes are out of scope for v2.5. |
+| **When fires** | Validator emit-site (`validateBuildKonfigDsl`) — fires at configuration time when caller reports unsupported types via the `customFieldUnsupportedTypes` parameter. Codegen-side detection (during `GenerateBuildConfigTask.generate()`) is reserved for v2.5.x — the v2.5 task uses the DSL's `typeDescriptor: String` directly, so type-inference failures are surfaced as Kotlin compile errors on consumer source. |
+
+---
+
+## KMPF-V28 — `perTarget` references a target not in `kotlin.targets`
+
+| | |
+|---|---|
+| **Severity** | ERROR |
+| **Since** | v2.5.0 (Phase 3 — BuildKonfig codegen expansion) |
+| **Message** | `kmpFlavors.buildKonfig { perTarget("<targetName>") { } }` references a target that isn't declared in this project's `kotlin { ... }` block. Available targets: '<list>'. |
+| **Fix** | Use a target name actually declared in `kotlin { ... }` (e.g. 'iosMain', 'androidMain', 'desktopMain', 'wasmJsMain'), OR add the missing target to the `kotlin { ... }` block. |
+| **When fires** | Validator emit-site (`validateBuildKonfigDsl`) — fires at configuration time when `perTargetNamesDeclared - kotlinTargetNames` is non-empty. The check uses both `kotlin.targets.map { it.name }` (target names) AND `kotlin.sourceSets.map { it.name }` (source-set names like `iosMain`) so consumers can name either. |
+
+---
+
 ## Backwards compatibility
 
-A shipped code never changes meaning. If validation logic evolves, new codes are added with the next minor version (e.g., `KMPF-V09`). Consumers can pin their CI checks to specific codes safely.
+A shipped code never changes meaning. If validation logic evolves, new codes are added with the next minor version (v2.5 used the next sequential range `V24-V28`; `V09-V13` remain reserved-but-unused per the original v2.0 catalog plan). Consumers can pin their CI checks to specific codes safely.

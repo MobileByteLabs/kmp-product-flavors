@@ -16,11 +16,16 @@ package com.mobilebytelabs.kmpflavors
 
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator.CODE_BUILD_CONFIG_FIELD_AUTO_DERIVED_COLLISION
+import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator.CODE_CUSTOM_TYPE_EMIT_FAIL
+import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator.CODE_DIMENSIONS_VS_FLAT_MUTEX
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator.CODE_DIMENSION_HAS_NO_FLAVORS
+import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator.CODE_DIMENSION_NAME_CLASH
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator.CODE_FLAVOR_BUILD_TYPE_COLLISION
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator.CODE_FLAVOR_MISSING_DIMENSION
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator.CODE_INVALID_BUILD_CONFIG_FIELD_TYPE
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator.CODE_MATRIX_MODE_WITHOUT_FLAVORS
+import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator.CODE_PERTARGET_ON_NON_KMP
+import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator.CODE_SECRET_RESOLUTION_FAIL
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator.CODE_UNKNOWN_ACTIVE_VARIANT
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator.CODE_VARIANT_FILTER_EXCLUDED_ALL
 import com.mobilebytelabs.kmpflavors.internal.KmpFlavorPluginValidator.CODE_ZERO_KMP_TARGETS
@@ -430,5 +435,253 @@ class KmpFlavorPluginValidatorTest {
         assertNotNull(v23, "Expected KMPF-V23 finding; got $findings")
         assertTrue(v23!!.message.contains("buildType 'debug'"), "message must identify the buildType source")
         assertTrue(v23.message.contains("IS_FREE"))
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // v2.5 Phase 1 — KMPF-V24 (dimensions {} vs flat DSL mutex) + KMPF-V25
+    // (duplicate dimension names / AGP-side dimension conflict). See
+    // plan-layer/.../v25-multidim-targets-buildkonfig/01-dsl-bridge.md
+    // (AC 2 + AC 7 validator portion).
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `KMPF-V24 fires when both dimensions DSL and flat DSL are used`() {
+        val findings = KmpFlavorPluginValidator.validate(
+            flavors = listOf(flavor("free").apply { dimension.set("tier") }),
+            buildTypes = emptyList(),
+            resolvedVariants = listOf(variant("free", listOf("free"))),
+            matrixModeEnabled = false,
+            detectedTargetCount = 1,
+            dimensions = listOf(dim("tier")),
+            dimensionsDslUsed = true,
+            legacyFlatDslUsed = true,
+        )
+
+        val v24 = findings.find { it.matches(CODE_DIMENSIONS_VS_FLAT_MUTEX) }
+        assertNotNull(v24, "Expected KMPF-V24 finding; got $findings")
+        assertEquals(KmpFlavorValidationSeverity.ERROR, v24!!.severity)
+        assertTrue(v24.message.contains("dimensions"), "message must mention dimensions block")
+        assertTrue(v24.message.contains("flavorDimensions"), "message must mention legacy flat DSL")
+        assertTrue(v24.fix.contains("MIGRATION_v2.4_TO_v2.5"), "fix must link to migration cookbook")
+    }
+
+    @Test
+    fun `KMPF-V24 does not fire when only dimensions DSL is used`() {
+        val findings = KmpFlavorPluginValidator.validate(
+            flavors = listOf(flavor("free").apply { dimension.set("tier") }),
+            buildTypes = emptyList(),
+            resolvedVariants = listOf(variant("free", listOf("free"))),
+            matrixModeEnabled = false,
+            detectedTargetCount = 1,
+            dimensions = listOf(dim("tier")),
+            dimensionsDslUsed = true,
+            legacyFlatDslUsed = false,
+        )
+        assertTrue(findings.none { it.matches(CODE_DIMENSIONS_VS_FLAT_MUTEX) })
+    }
+
+    @Test
+    fun `KMPF-V24 does not fire when only flat DSL is used (v2-4 backward compat)`() {
+        // Strict-additive contract: v2.4 consumers using only the flat DSL never see V24.
+        val findings = KmpFlavorPluginValidator.validate(
+            flavors = listOf(flavor("free").apply { dimension.set("tier") }),
+            buildTypes = emptyList(),
+            resolvedVariants = listOf(variant("free", listOf("free"))),
+            matrixModeEnabled = false,
+            detectedTargetCount = 1,
+            dimensions = listOf(dim("tier")),
+            dimensionsDslUsed = false,
+            legacyFlatDslUsed = true,
+        )
+        assertTrue(findings.none { it.matches(CODE_DIMENSIONS_VS_FLAT_MUTEX) })
+    }
+
+    @Test
+    fun `KMPF-V24 default parameters preserve v2-4 call sites (no mutex check fires)`() {
+        // The two new parameters default to false — existing v2.4 call sites that
+        // don't pass them must continue to behave identically.
+        val findings = KmpFlavorPluginValidator.validate(
+            flavors = listOf(flavor("free").apply { dimension.set("tier") }),
+            buildTypes = emptyList(),
+            resolvedVariants = listOf(variant("free", listOf("free"))),
+            matrixModeEnabled = false,
+            detectedTargetCount = 1,
+            dimensions = listOf(dim("tier")),
+        )
+        assertTrue(findings.none { it.matches(CODE_DIMENSIONS_VS_FLAT_MUTEX) })
+    }
+
+    @Test
+    fun `KMPF-V25 fires when two dimensions share a name`() {
+        val findings = KmpFlavorPluginValidator.validate(
+            flavors = listOf(flavor("free").apply { dimension.set("tier") }),
+            buildTypes = emptyList(),
+            resolvedVariants = listOf(variant("free", listOf("free"))),
+            matrixModeEnabled = false,
+            detectedTargetCount = 1,
+            dimensions = listOf(dim("tier"), dim("tier")),
+        )
+        val v25 = findings.find { it.matches(CODE_DIMENSION_NAME_CLASH) }
+        assertNotNull(v25, "Expected KMPF-V25 finding; got $findings")
+        assertEquals(KmpFlavorValidationSeverity.ERROR, v25!!.severity)
+        assertTrue(v25.message.contains("'tier'"), "message must name the duplicated dimension")
+        assertTrue(v25.fix.isNotBlank())
+    }
+
+    @Test
+    fun `KMPF-V25 does not fire when all dimension names are distinct`() {
+        val findings = KmpFlavorPluginValidator.validate(
+            flavors = listOf(
+                flavor("free").apply { dimension.set("tier") },
+                flavor("dev").apply { dimension.set("env") },
+            ),
+            buildTypes = emptyList(),
+            resolvedVariants = listOf(variant("freeDev", listOf("free", "dev"))),
+            matrixModeEnabled = false,
+            detectedTargetCount = 1,
+            dimensions = listOf(dim("tier"), dim("env")),
+        )
+        assertTrue(findings.none { it.matches(CODE_DIMENSION_NAME_CLASH) })
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // v2.5 Phase 3 — KMPF-V26 (secret-resolution failure / schema-fallback) +
+    // KMPF-V27 (custom type emit failure) + KMPF-V28 (perTarget on non-KMP
+    // target). All emitted via the new validateBuildKonfigDsl() method per
+    // the same separation pattern as validatePlatformAndVersionCompatibility.
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `KMPF-V26 fires as WARNING when secrets-manifest schema is v2-0 and secrets are declared`() {
+        val findings = KmpFlavorPluginValidator.validateBuildKonfigDsl(
+            buildKonfigSecretIds = listOf("api-key", "auth-token"),
+            secretsManifestSchemaVersion = "2.0",
+            customFieldUnsupportedTypes = emptyList(),
+            perTargetNamesDeclared = emptySet(),
+            kotlinTargetNames = setOf("desktop"),
+        )
+
+        val v26 = findings.find { it.matches(CODE_SECRET_RESOLUTION_FAIL) }
+        assertNotNull(v26, "Expected KMPF-V26 finding; got $findings")
+        assertEquals(KmpFlavorValidationSeverity.WARNING, v26!!.severity, "v2.0 graceful-degrade per D10")
+        assertTrue(v26.message.contains("2.0"))
+        assertTrue(v26.message.contains("api-key"))
+        assertTrue(v26.message.contains("placeholder"), "must mention placeholder semantics (SV15)")
+        assertTrue(v26.fix.contains("SECRETS_INTEGRATION.md"), "fix must link to consumer-contract doc")
+    }
+
+    @Test
+    fun `KMPF-V26 does not fire when secrets-manifest schema is v2-1 (compatible)`() {
+        val findings = KmpFlavorPluginValidator.validateBuildKonfigDsl(
+            buildKonfigSecretIds = listOf("api-key"),
+            secretsManifestSchemaVersion = "2.1",
+        )
+        assertTrue(findings.none { it.matches(CODE_SECRET_RESOLUTION_FAIL) })
+    }
+
+    @Test
+    fun `KMPF-V26 does not fire when no secrets are declared (even with old schema)`() {
+        // No secrets means no schema requirement.
+        val findings = KmpFlavorPluginValidator.validateBuildKonfigDsl(
+            buildKonfigSecretIds = emptyList(),
+            secretsManifestSchemaVersion = "2.0",
+        )
+        assertTrue(findings.none { it.matches(CODE_SECRET_RESOLUTION_FAIL) })
+    }
+
+    @Test
+    fun `KMPF-V26 does not fire when schema-version is null (manifest missing)`() {
+        // Missing manifest is a separate failure mode (handled at task-execution time
+        // by FrameworkSchemaCheckTask). validateBuildKonfigDsl returns no finding when
+        // the schema-version is unknown — caller decides the appropriate signal.
+        val findings = KmpFlavorPluginValidator.validateBuildKonfigDsl(
+            buildKonfigSecretIds = listOf("api-key"),
+            secretsManifestSchemaVersion = null,
+        )
+        assertTrue(findings.none { it.matches(CODE_SECRET_RESOLUTION_FAIL) })
+    }
+
+    @Test
+    fun `KMPF-V27 fires for each customField with an unsupported type`() {
+        val findings = KmpFlavorPluginValidator.validateBuildKonfigDsl(
+            customFieldUnsupportedTypes = listOf(
+                "complexConfig" to "Map<String, List<Pair<Int, Boolean>>>",
+                "openClassField" to "com.example.MyOpenClass",
+            ),
+        )
+
+        val v27Findings = findings.filter { it.matches(CODE_CUSTOM_TYPE_EMIT_FAIL) }
+        assertEquals(2, v27Findings.size, "Expected one V27 per unsupported customField")
+        assertTrue(v27Findings.all { it.severity == KmpFlavorValidationSeverity.ERROR })
+        assertTrue(v27Findings.any { it.message.contains("complexConfig") })
+        assertTrue(v27Findings.any { it.message.contains("openClassField") })
+        // Fix message mentions the supported alternatives.
+        assertTrue(v27Findings.first().fix.contains("sealed class"))
+    }
+
+    @Test
+    fun `KMPF-V27 does not fire when all customFields use supported types`() {
+        val findings = KmpFlavorPluginValidator.validateBuildKonfigDsl(
+            customFieldUnsupportedTypes = emptyList(),
+        )
+        assertTrue(findings.none { it.matches(CODE_CUSTOM_TYPE_EMIT_FAIL) })
+    }
+
+    @Test
+    fun `KMPF-V28 fires when perTarget references a target not in kotlin-targets`() {
+        val findings = KmpFlavorPluginValidator.validateBuildKonfigDsl(
+            perTargetNamesDeclared = setOf("iosMain", "notATarget", "anotherGhost"),
+            kotlinTargetNames = setOf("iosArm64", "iosX64", "desktop", "iosMain"),
+        )
+
+        val v28Findings = findings.filter { it.matches(CODE_PERTARGET_ON_NON_KMP) }
+        // 2 invalid targets → 2 V28 findings (iosMain is valid → not flagged).
+        // Size check is the load-bearing assertion that iosMain wasn't flagged.
+        assertEquals(2, v28Findings.size, "Expected V28 for each invalid target name")
+        assertTrue(v28Findings.all { it.severity == KmpFlavorValidationSeverity.ERROR })
+        assertTrue(v28Findings.any { it.message.contains("perTarget(\"notATarget\")") })
+        assertTrue(v28Findings.any { it.message.contains("perTarget(\"anotherGhost\")") })
+        // Verify iosMain wasn't flagged AS the offending target (the message DOES list it
+        // in the "Available targets:" suffix — that's expected).
+        assertTrue(v28Findings.none { it.message.contains("perTarget(\"iosMain\")") })
+    }
+
+    @Test
+    fun `KMPF-V28 does not fire when all perTarget references are valid`() {
+        val findings = KmpFlavorPluginValidator.validateBuildKonfigDsl(
+            perTargetNamesDeclared = setOf("iosMain", "desktopMain"),
+            kotlinTargetNames = setOf("iosArm64", "iosX64", "iosMain", "desktopMain", "desktop"),
+        )
+        assertTrue(findings.none { it.matches(CODE_PERTARGET_ON_NON_KMP) })
+    }
+
+    @Test
+    fun `validateBuildKonfigDsl returns empty when all inputs are defaults`() {
+        // Default invocation (no buildKonfig{} block declared at all) returns no findings.
+        val findings = KmpFlavorPluginValidator.validateBuildKonfigDsl()
+        assertTrue(findings.isEmpty())
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // v2.5 Phase 4 — AC 22: KMPF-V21 preservation regression discipline.
+    //
+    // KMPF-V21 marks the v1.x `activeFlavor` DSL deprecation. The constant
+    // exists in the validator catalog but is NOT emitted from validate() —
+    // it's reserved for the future migration when v1.x consumers attempt to
+    // use the legacy DSL. Phase 4 of v25-multidim-targets-buildkonfig
+    // explicitly preserves the constant unchanged (deadline 2026-11-14 hasn't
+    // been reached when v2.5 ships); removal happens in a subsequent release.
+    //
+    // This test pins the constant value + severity contract so that the
+    // v2.5 expansion (V24-V28 additions) doesn't accidentally rewrite or
+    // remove V21.
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `v2-5 AC 22 - KMPF-V21 constant is preserved unchanged (deadline 2026-11-14)`() {
+        // Regression discipline: the V21 code string MUST stay "KMPF-V21" exactly.
+        // Downstream tooling (CI grep, IDE quick-fix integrations, error-aggregation
+        // dashboards) depends on the string being stable across minor versions.
+        assertEquals("KMPF-V21", KmpFlavorPluginValidator.CODE_LEGACY_ACTIVEFLAVOR_DSL)
     }
 }

@@ -36,6 +36,12 @@ rootProject.name = "kmp-product-flavors"
 include(":samples:basic-flavors")
 include(":samples:matrix-mode")
 include(":samples:multi-target-multi-variant")
+// v2.5 — canonical 3-dimension sample exercising the new `dimensions {}` ergonomic DSL +
+// `variantFilter` discipline for arbitrary-N dimensions. See samples/multi-dim-3d/README.md.
+include(":samples:multi-dim-3d")
+// v2.5 — canonical buildKonfig {} DSL sample exercising secret/enum/customField/perTarget.
+// See samples/buildkonfig-rich/README.md (TBD) + docs/SECRETS_INTEGRATION.md.
+include(":samples:buildkonfig-rich")
 
 // Note: samples/kmp-project-template is a standalone project with its own build
 // Build it separately: cd samples/kmp-project-template && ./gradlew build

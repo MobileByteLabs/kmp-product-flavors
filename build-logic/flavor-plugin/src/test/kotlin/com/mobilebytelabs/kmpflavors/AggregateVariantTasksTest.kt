@@ -131,4 +131,138 @@ class AggregateVariantTasksTest {
             "Expected assembleAllVariants under 'kmpFlavors variants' group:\n${result.output}",
         )
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // v2.5 — AC 12: aggregate tasks auto-register for the new target families
+    // (wasmJs / watchOS / tvOS / linuxX64 / mingwX64).
+    //
+    // The aggregate-task naming logic in AggregateTasksRegistrar.kt is
+    // `assembleAll${target.targetCap}Variants` — a pure function over the
+    // detected target list. Since PlatformDetector has registered all 9 new
+    // targets since v1.1.0, the aggregate names are derived automatically.
+    //
+    // This test pins the contract via a TestKit project that declares
+    // linuxX64() (no native toolchain needed for configuration-time task
+    // listing) and asserts the expected aggregate task is registered.
+    //
+    // watchOS / tvOS aggregate task registration is verified end-to-end in
+    // samples/multi-target-multi-variant via sample-target-coverage.yml CI.
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `v2-5 AC 12 - linuxX64 target registers assembleAllLinuxX64Variants aggregate`() {
+        // Override the default setup() with a build script that declares linuxX64().
+        // KGP configures native targets at config time without requiring the toolchain;
+        // compilation needs the toolchain, but `tasks --all` doesn't.
+        File(testProjectDir, "build.gradle.kts").writeText(
+            """
+            plugins {
+                kotlin("multiplatform") version "2.2.21"
+                id("io.github.mobilebytelabs.kmp-product-flavors")
+            }
+            kmpFlavors {
+                buildMatrix.set(true)
+                generateBuildConfig.set(false)
+                flavors {
+                    register("free") { isDefault.set(true) }
+                    register("paid")
+                }
+            }
+            kotlin {
+                jvm("desktop")
+                linuxX64()
+            }
+            """.trimIndent(),
+        )
+
+        val result = GradleRunner.create()
+            .withProjectDir(testProjectDir)
+            .withArguments("tasks", "--all", "--group=kmpFlavors variants")
+            .withPluginClasspath()
+            .build()
+
+        assertTrue(
+            result.output.contains("assembleAllLinuxX64Variants"),
+            "Expected assembleAllLinuxX64Variants under 'kmpFlavors variants' group:\n${result.output}",
+        )
+        assertTrue(
+            result.output.contains("assembleAllDesktopVariants"),
+            "Expected assembleAllDesktopVariants to coexist with linuxX64 aggregate:\n${result.output}",
+        )
+    }
+
+    @Test
+    fun `v2-5 AC 12 - mingwX64 target registers assembleAllMingwX64Variants aggregate`() {
+        // Same pattern as linuxX64 — mingwX64 is the Windows-native sibling.
+        // Native target configuration doesn't require the toolchain.
+        File(testProjectDir, "build.gradle.kts").writeText(
+            """
+            plugins {
+                kotlin("multiplatform") version "2.2.21"
+                id("io.github.mobilebytelabs.kmp-product-flavors")
+            }
+            kmpFlavors {
+                buildMatrix.set(true)
+                generateBuildConfig.set(false)
+                flavors {
+                    register("free") { isDefault.set(true) }
+                    register("paid")
+                }
+            }
+            kotlin {
+                jvm("desktop")
+                mingwX64()
+            }
+            """.trimIndent(),
+        )
+
+        val result = GradleRunner.create()
+            .withProjectDir(testProjectDir)
+            .withArguments("tasks", "--all", "--group=kmpFlavors variants")
+            .withPluginClasspath()
+            .build()
+
+        assertTrue(
+            result.output.contains("assembleAllMingwX64Variants"),
+            "Expected assembleAllMingwX64Variants under 'kmpFlavors variants' group:\n${result.output}",
+        )
+    }
+
+    @Test
+    fun `v2-5 AC 12 - wasmJs target registers assembleAllWasmJsVariants aggregate`() {
+        // wasmJs is detected as a 'web' target family; aggregate name follows the same
+        // pattern as iOS/Desktop targets. Test pins the wasmJs path through the registrar.
+        File(testProjectDir, "build.gradle.kts").writeText(
+            """
+            plugins {
+                kotlin("multiplatform") version "2.2.21"
+                id("io.github.mobilebytelabs.kmp-product-flavors")
+            }
+            kmpFlavors {
+                buildMatrix.set(true)
+                generateBuildConfig.set(false)
+                flavors {
+                    register("free") { isDefault.set(true) }
+                    register("paid")
+                }
+            }
+            kotlin {
+                jvm("desktop")
+                @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
+                wasmJs { browser() }
+            }
+            """.trimIndent(),
+        )
+
+        val result = GradleRunner.create()
+            .withProjectDir(testProjectDir)
+            .withArguments("tasks", "--all", "--group=kmpFlavors variants")
+            .withPluginClasspath()
+            .build()
+
+        assertTrue(
+            result.output.contains("assembleAllWasmJsVariants"),
+            "Expected assembleAllWasmJsVariants under 'kmpFlavors variants' group:\n${result.output}",
+        )
+    }
 }

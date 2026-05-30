@@ -30,7 +30,7 @@ A Gradle plugin that brings Android-style product flavors to **every Kotlin Mult
 ```kotlin
 plugins {
     kotlin("multiplatform")
-    id("io.github.mobilebytelabs.kmp-product-flavors") version "2.4.0-alpha.1"
+    id("io.github.mobilebytelabs.kmp-product-flavors") version "2.5.0-alpha.1"
 }
 
 kmpFlavors {
@@ -44,6 +44,15 @@ kmpFlavors {
     }
 }
 ```
+
+> **v2.5 highlights** — optional `dimensions { dimension("tier") { flavor("free") } }`
+> ergonomic DSL block, expanded sample/CI coverage for 9 KMP targets (watchOS×4, tvOS×3,
+> linuxX64, mingwX64, wasmJs), and `buildKonfig { secret(); enum(); customField(); perTarget {} }`
+> for vault-integrated secrets, dimension enums, custom-type fields, and per-target conditional
+> codegen. **v2.5 does not raise the v2.4 version floor** (Gradle 8.0+ / KGP 2.0.21+ / AGP 8.0+ /
+> JDK 17+ / CMP 1.7.0+ — UNCHANGED). See [`docs/COMPATIBILITY_MATRIX.md`](docs/COMPATIBILITY_MATRIX.md)
+> + [`docs/MIGRATION_v2.4_TO_v2.5.md`](docs/MIGRATION_v2.4_TO_v2.5.md) (opens with
+> "You do not need to migrate.").
 
 That's a 4-variant matrix (`freeDebug`, `freeRelease`, `paidDebug`, `paidRelease`) on every KMP target you declare. Source-set conventions are `src/commonFree/kotlin/`, `src/commonPaid/kotlin/`, etc. Switch active variant via `-PkmpFlavor=paidRelease`.
 
