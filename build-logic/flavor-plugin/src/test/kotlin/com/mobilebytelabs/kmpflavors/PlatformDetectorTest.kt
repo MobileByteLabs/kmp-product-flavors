@@ -243,6 +243,143 @@ class PlatformDetectorTest {
         assertTrue(platforms.isEmpty())
     }
 
+    // ─────────────────────────────────────────────────────────────────────
+    // v2.5 — per-arch detection discipline (AC 8 of v25-multidim-targets-buildkonfig)
+    //
+    // The 9 KMP targets the v2.5 epic promises to "fully cover" in samples must
+    // EACH have an individual smoke-detection test, not just family-grouped
+    // assertions. This locks the contract that target naming changes don't
+    // silently drop a target from the matrix.
+    //
+    // PlatformDetector already supports all 9 (registered in v1.1.0 phases G1-G4) —
+    // this section is regression discipline only.
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `v2-5 AC 8 - wasmJs detection (web parent)`() {
+        val platforms = PlatformDetector.detect(createMockKotlin("wasmJs"), logger)
+        val wasmJs = platforms.find { it.prefix == "wasmJs" }
+        assertNotNull(wasmJs, "wasmJs MUST be detected")
+        assertEquals("wasmJsMain", wasmJs?.mainSourceSet)
+        assertEquals("web", wasmJs?.parent)
+        assertNotNull(
+            platforms.find { it.prefix == "web" && it.isIntermediate },
+            "wasmJs MUST trigger webMain intermediate",
+        )
+    }
+
+    @Test
+    fun `v2-5 AC 8 - watchosX64 detection (native parent)`() {
+        val platforms = PlatformDetector.detect(createMockKotlin("watchosX64"), logger)
+        val watchos = platforms.find { it.prefix == "watchos" }
+        assertNotNull(watchos, "watchosX64 MUST be detected via watchos family")
+        assertEquals("watchosMain", watchos?.mainSourceSet)
+        assertEquals("native", watchos?.parent)
+        assertNotNull(
+            platforms.find { it.prefix == "native" && it.isIntermediate },
+            "watchosX64 MUST trigger nativeMain intermediate",
+        )
+    }
+
+    @Test
+    fun `v2-5 AC 8 - watchosArm64 detection (native parent)`() {
+        val platforms = PlatformDetector.detect(createMockKotlin("watchosArm64"), logger)
+        val watchos = platforms.find { it.prefix == "watchos" }
+        assertNotNull(watchos, "watchosArm64 MUST be detected via watchos family")
+        assertEquals("native", watchos?.parent)
+    }
+
+    @Test
+    fun `v2-5 AC 8 - watchosSimulatorArm64 detection (native parent)`() {
+        val platforms = PlatformDetector.detect(createMockKotlin("watchosSimulatorArm64"), logger)
+        val watchos = platforms.find { it.prefix == "watchos" }
+        assertNotNull(watchos, "watchosSimulatorArm64 MUST be detected via watchos family")
+        assertEquals("native", watchos?.parent)
+    }
+
+    @Test
+    fun `v2-5 AC 8 - watchosDeviceArm64 detection (native parent)`() {
+        val platforms = PlatformDetector.detect(createMockKotlin("watchosDeviceArm64"), logger)
+        val watchos = platforms.find { it.prefix == "watchos" }
+        assertNotNull(watchos, "watchosDeviceArm64 MUST be detected via watchos family")
+        assertEquals("native", watchos?.parent)
+    }
+
+    @Test
+    fun `v2-5 AC 8 - tvosX64 detection (native parent)`() {
+        val platforms = PlatformDetector.detect(createMockKotlin("tvosX64"), logger)
+        val tvos = platforms.find { it.prefix == "tvos" }
+        assertNotNull(tvos, "tvosX64 MUST be detected via tvos family")
+        assertEquals("tvosMain", tvos?.mainSourceSet)
+        assertEquals("native", tvos?.parent)
+        assertNotNull(
+            platforms.find { it.prefix == "native" && it.isIntermediate },
+            "tvosX64 MUST trigger nativeMain intermediate",
+        )
+    }
+
+    @Test
+    fun `v2-5 AC 8 - tvosArm64 detection (native parent)`() {
+        val platforms = PlatformDetector.detect(createMockKotlin("tvosArm64"), logger)
+        val tvos = platforms.find { it.prefix == "tvos" }
+        assertNotNull(tvos, "tvosArm64 MUST be detected via tvos family")
+        assertEquals("native", tvos?.parent)
+    }
+
+    @Test
+    fun `v2-5 AC 8 - tvosSimulatorArm64 detection (native parent)`() {
+        val platforms = PlatformDetector.detect(createMockKotlin("tvosSimulatorArm64"), logger)
+        val tvos = platforms.find { it.prefix == "tvos" }
+        assertNotNull(tvos, "tvosSimulatorArm64 MUST be detected via tvos family")
+        assertEquals("native", tvos?.parent)
+    }
+
+    @Test
+    fun `v2-5 AC 8 - linuxX64 detection (native parent)`() {
+        val platforms = PlatformDetector.detect(createMockKotlin("linuxX64"), logger)
+        val linux = platforms.find { it.prefix == "linux" }
+        assertNotNull(linux, "linuxX64 MUST be detected via linux family")
+        assertEquals("linuxMain", linux?.mainSourceSet)
+        assertEquals("native", linux?.parent)
+        assertNotNull(
+            platforms.find { it.prefix == "native" && it.isIntermediate },
+            "linuxX64 MUST trigger nativeMain intermediate",
+        )
+    }
+
+    @Test
+    fun `v2-5 AC 8 - mingwX64 detection (native parent)`() {
+        val platforms = PlatformDetector.detect(createMockKotlin("mingwX64"), logger)
+        val mingw = platforms.find { it.prefix == "mingw" }
+        assertNotNull(mingw, "mingwX64 MUST be detected via mingw family")
+        assertEquals("mingwMain", mingw?.mainSourceSet)
+        assertEquals("native", mingw?.parent)
+        assertNotNull(
+            platforms.find { it.prefix == "native" && it.isIntermediate },
+            "mingwX64 MUST trigger nativeMain intermediate",
+        )
+    }
+
+    @Test
+    fun `v2-5 AC 8 - all 9 new targets in single project produce expected family count`() {
+        // End-to-end smoke: declare all 9 v2.5 new targets at once and assert the
+        // family-grouping math: 1 wasmJs + 1 watchos + 1 tvos + 1 linux + 1 mingw
+        // = 5 leaf platforms + 2 intermediates (native + web) = 7 platforms total.
+        val platforms = PlatformDetector.detect(
+            createMockKotlin(
+                "wasmJs",
+                "watchosX64", "watchosArm64", "watchosSimulatorArm64", "watchosDeviceArm64",
+                "tvosX64", "tvosArm64", "tvosSimulatorArm64",
+                "linuxX64", "mingwX64",
+            ),
+            logger,
+        )
+        // 5 leaf families: wasmJs, watchos, tvos, linux, mingw
+        assertEquals(5, platforms.count { !it.isIntermediate })
+        // 2 intermediates: native (4 native families) + web (1 web family)
+        assertEquals(2, platforms.count { it.isIntermediate })
+    }
+
     // Helper to create mock KotlinMultiplatformExtension
 
     private fun createMockKotlin(vararg targetNames: String): KotlinMultiplatformExtension {

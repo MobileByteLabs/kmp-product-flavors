@@ -111,4 +111,81 @@ class ConfigCacheCompatibilityTest {
             "Warm run must reuse the configuration cache entry. Got:\n${warm.output}",
         )
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // v2.5 Phase 4 — AC 26: configuration-cache compatibility for all new
+    // Gradle tasks added in v2.5 (FrameworkSchemaCheckTask, expanded
+    // GenerateBuildConfigTask with v2.5 BuildKonfig DSL inputs).
+    //
+    // The new task inputs all use serializable types (CustomFieldDeclaration,
+    // PerTargetFieldDeclaration, DimensionEnumSpec, plain String lists). No
+    // raw `project` references in @Input getters. This test pins the contract
+    // by exercising a project that uses the v2.5 buildKonfig {} block with all
+    // four DSL features.
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `v2-5 AC 26 - buildKonfig DSL round-trip survives configuration cache`() {
+        // Override the default setup with a build script that exercises the v2.5
+        // buildKonfig {} block + dimensions {} sugar.
+        File(testProjectDir, "build.gradle.kts").writeText(
+            """
+            plugins {
+                kotlin("multiplatform") version "2.2.21"
+                id("io.github.mobilebytelabs.kmp-product-flavors")
+            }
+            kmpFlavors {
+                buildMatrix.set(true)
+                generateBuildConfig.set(true)
+                buildConfigPackage.set("com.example.cc25")
+                buildConfigClassName.set("BuildKonfig")
+                dimensions {
+                    dimension("tier") {
+                        flavor("free") { isDefault.set(true) }
+                        flavor("paid")
+                    }
+                }
+                buildKonfig {
+                    enum("tier")
+                    customField("scopes", "List<String>", "listOf(\"read\", \"write\")")
+                    perTarget("desktopMain") {
+                        field("DESKTOP_HOME", "String", "\"/tmp\"")
+                    }
+                }
+            }
+            kotlin { jvm("desktop") }
+            """.trimIndent(),
+        )
+
+        val runner = GradleRunner.create()
+            .withProjectDir(testProjectDir)
+            .withPluginClasspath()
+
+        // Cold run — populate the cache.
+        val cold = runner
+            .withArguments(
+                "generatePaidBuildConfig",
+                "--configuration-cache",
+                "--rerun-tasks",
+            )
+            .build()
+        assertTrue(
+            cold.output.contains("Configuration cache entry stored"),
+            "v2.5 buildKonfig {} cold run must store a configuration cache entry. Got:\n${cold.output}",
+        )
+
+        // Warm run — reuse the cache.
+        val warm = runner
+            .withArguments(
+                "generatePaidBuildConfig",
+                "--configuration-cache",
+                "--rerun-tasks",
+            )
+            .build()
+        assertTrue(
+            warm.output.contains("Configuration cache entry reused") ||
+                warm.output.contains("Reusing configuration cache"),
+            "v2.5 buildKonfig {} warm run must reuse the configuration cache entry. Got:\n${warm.output}",
+        )
+    }
 }

@@ -61,6 +61,11 @@ internal data class KmpFlavorValidationFinding(val code: String, val severity: K
  * | KMPF-V07 | ERROR | `buildConfigField` has an invalid Kotlin literal type |
  * | KMPF-V08 | ERROR | Matrix mode opted in but no flavors are registered |
  * | KMPF-V23 | ERROR | Custom `buildConfigField` name collides with an auto-derived BuildKonfig constant |
+ * | KMPF-V24 | ERROR | Mutex — `dimensions { }` block AND legacy `flavorDimensions { } / flavors { }` blocks BOTH used in same kmpFlavors{} |
+ * | KMPF-V25 | ERROR | Two `dimension(name)` declarations share the same name |
+ * | KMPF-V26 | ERROR/WARNING | Vault-integrated `buildKonfig { secret(id) }` failed to resolve OR `secrets-manifest.yaml` schema < v2.1 (graceful-degrade WARN) |
+ * | KMPF-V27 | ERROR | `buildKonfig { customField<T>(name, value) }` type T cannot be emitted by codegen |
+ * | KMPF-V28 | ERROR | `buildKonfig { perTarget(name) { } }` references a target name not present in `kotlin.targets` |
  */
 internal object KmpFlavorPluginValidator {
 
@@ -93,6 +98,54 @@ internal object KmpFlavorPluginValidator {
     const val CODE_BUILD_CONFIG_FIELD_AUTO_DERIVED_COLLISION: String = "KMPF-V23"
 
     /**
+     * v2.5 Phase 1 — `dimensions { }` ergonomic DSL block (v2.5+) is mutually
+     * exclusive with the legacy flat `flavorDimensions { } + flavors { }` pair
+     * (v2.4-). Mixing both in the same `kmpFlavors {}` block is a configuration
+     * error because the same identifier (e.g. "free") could be registered twice
+     * with conflicting properties. Strict-additive contract preserved: existing
+     * v2.4 projects using only the flat DSL never see V24; only opt-in to
+     * `dimensions {}` triggers the mutex check.
+     */
+    const val CODE_DIMENSIONS_VS_FLAT_MUTEX: String = "KMPF-V24"
+
+    /**
+     * v2.5 Phase 1 — duplicate dimension names. Two `dimension(name) { }`
+     * declarations sharing the same name produce ambiguous flavor↔dimension
+     * mappings. Also fires for AGP-side conflict detection when the bridge
+     * re-applies and finds an existing AGP flavor with a different `dimension =`
+     * assignment than what KMP wants to register (cross-vault hand-edit case).
+     */
+    const val CODE_DIMENSION_NAME_CLASH: String = "KMPF-V25"
+
+    /**
+     * v2.5 Phase 3 — vault-integrated `buildKonfig { secret(id) }` resolution.
+     *
+     * Dual severity: ERROR when the manifest declares the secret but lookup fails
+     * (e.g. no `flavor_selector` entry for the active variant); WARNING when the
+     * consumer's `secrets-manifest.yaml` is schema v2.0 (no `flavor_selector` field
+     * at all). The WARN path emits placeholder values instead of hardcoded secrets
+     * (SV15 compliance — see RULE-SECRETS-VAULT-001).
+     */
+    const val CODE_SECRET_RESOLUTION_FAIL: String = "KMPF-V26"
+
+    /**
+     * v2.5 Phase 3 — `buildKonfig { customField<T>(name, value) }` type T cannot
+     * be emitted by the codegen. Fires when T is neither a primitive (already
+     * covered by V07), nor a sealed class, nor a flat `List<T>`. Nested generics
+     * (`Map<K, V>`, `List<List<T>>`) and open classes are explicitly out of scope
+     * for v2.5 — use a sealed class or a primitive.
+     */
+    const val CODE_CUSTOM_TYPE_EMIT_FAIL: String = "KMPF-V27"
+
+    /**
+     * v2.5 Phase 3 — `buildKonfig { perTarget(name) { } }` references a target
+     * name not present in `kotlin.targets`. The plugin can't filter the per-target
+     * field if the target doesn't exist; clearer to fail at configuration time
+     * than to silently drop the field at codegen time.
+     */
+    const val CODE_PERTARGET_ON_NON_KMP: String = "KMPF-V28"
+
+    /**
      * Auto-generated `BuildKonfig` constants the codegen ALWAYS emits regardless
      * of whether build types are enabled. A custom `buildConfigField` matching
      * one of these names produces a duplicate `const val` at compile time.
@@ -122,8 +175,51 @@ internal object KmpFlavorPluginValidator {
         detectedTargetCount: Int,
         dimensions: List<FlavorDimension> = emptyList(),
         requestedVariantName: String? = null,
+        // v2.5 — mutex detection between `dimensions {}` sugar (v2.5+) and
+        // the legacy flat `flavorDimensions {}/flavors {}` pair (v2.4-).
+        // Default false preserves the v2.4 call surface — existing call-sites
+        // (KmpFlavorPlugin.kt and tests) don't change unless they opt into
+        // the new tracking.
+        dimensionsDslUsed: Boolean = false,
+        legacyFlatDslUsed: Boolean = false,
     ): List<KmpFlavorValidationFinding> {
         val findings = mutableListOf<KmpFlavorValidationFinding>()
+
+        // KMPF-V24: mutex — both v2.5 dimensions {} sugar AND legacy flat DSL used.
+        // Fires at configuration time, before any variant resolution. Surfaces a
+        // single, actionable error pointing at the migration cookbook.
+        if (dimensionsDslUsed && legacyFlatDslUsed) {
+            findings += KmpFlavorValidationFinding(
+                code = CODE_DIMENSIONS_VS_FLAT_MUTEX,
+                severity = KmpFlavorValidationSeverity.ERROR,
+                message = "kmpFlavors {} cannot mix the v2.5 `dimensions { }` sugar with the " +
+                    "legacy `flavorDimensions { } + flavors { }` blocks. Pick one style per " +
+                    "project: either `dimensions { dimension(\"tier\") { flavor(\"free\") } }` " +
+                    "OR `flavorDimensions { register(\"tier\") } + flavors { register(\"free\") { dimension.set(\"tier\") } }`.",
+                fix = "See docs/MIGRATION_v2.4_TO_v2.5.md for the migration cookbook (opens with " +
+                    "\"You do not need to migrate.\" — flat DSL is fully supported in v2.5+).",
+            )
+        }
+
+        // KMPF-V25: duplicate dimension names. Two `dimension(\"tier\") { ... }` blocks
+        // (or `flavorDimensions { register(\"tier\"); register(\"tier\") }`) produce
+        // ambiguous flavor-to-dimension resolution.
+        val duplicateDimNames = dimensions
+            .groupBy { it.name }
+            .filterValues { it.size > 1 }
+            .keys
+        duplicateDimNames.forEach { dupName ->
+            findings += KmpFlavorValidationFinding(
+                code = CODE_DIMENSION_NAME_CLASH,
+                severity = KmpFlavorValidationSeverity.ERROR,
+                message = "Dimension '$dupName' is declared more than once. Each dimension " +
+                    "must have a unique name — duplicate declarations produce ambiguous " +
+                    "flavor↔dimension mappings.",
+                fix = "Rename one of the '$dupName' declarations OR remove the duplicate. " +
+                    "If you intended two SEPARATE axes of variation, give them distinct names " +
+                    "(e.g. \"tier\" + \"tierVariant\").",
+            )
+        }
 
         // KMPF-V01: flavor + build-type name collision (variant names become ambiguous)
         val buildTypeNames = buildTypes.map { it.name }.toSet()
@@ -320,6 +416,107 @@ internal object KmpFlavorPluginValidator {
                     "`-PkmpFlavor` to let the plugin resolve from `isDefault` flags. If the " +
                     "property is intentional for a sibling project in a multi-project build, " +
                     "this warning is informational and can be ignored for this project.",
+            )
+        }
+
+        return findings
+    }
+
+    /**
+     * v2.5 Phase 3 — validate the `kmpFlavors.buildKonfig {}` DSL block.
+     *
+     * Decoupled from [validate] because the BuildKonfig DSL inputs are
+     * structurally different (target names, custom-field types, secret IDs)
+     * from the core flavor/dimension validations. Same separation pattern as
+     * [validatePlatformAndVersionCompatibility].
+     *
+     * Three sub-checks:
+     *
+     * - **KMPF-V26** — `secrets-manifest.yaml` schema version is < v2.1 but
+     *   `buildKonfig { secret(id) }` is declared. WARN — plugin emits placeholder
+     *   values instead of hardcoded secrets (SV15 compliance per
+     *   RULE-SECRETS-VAULT-001). ERROR variant fires from
+     *   [BuildKonfigSecretResolver] at task-execution time when the manifest
+     *   schema is v2.1+ but lookup fails.
+     *
+     * - **KMPF-V27** — `customField<T>` declared with an unsupported type
+     *   (anything except primitive, sealed class, or flat `List<T>`).
+     *
+     * - **KMPF-V28** — `perTarget(name) { }` references a target name that
+     *   isn't in `kotlin.targets`.
+     *
+     * @param buildKonfigSecretIds Secret IDs declared via `buildKonfig { secret(id) }`.
+     *   Empty list = nothing to validate, returns immediately.
+     * @param secretsManifestSchemaVersion The `schema_version` field from the consumer's
+     *   `secrets-manifest.yaml`, or null if the manifest is missing. Used only when
+     *   `buildKonfigSecretIds` is non-empty.
+     * @param customFieldUnsupportedTypes Pairs of (customField name, type description)
+     *   for fields the codegen can't emit. Caller computes the set.
+     * @param perTargetNamesDeclared Target names declared via `perTarget(name) { }`.
+     * @param kotlinTargetNames Names of all `kotlin.targets` actually configured on the
+     *   project (e.g. `{"iosArm64", "desktop", "wasmJs", ...}`). Used to spot
+     *   perTarget declarations that point at non-existent targets.
+     */
+    fun validateBuildKonfigDsl(
+        buildKonfigSecretIds: List<String> = emptyList(),
+        secretsManifestSchemaVersion: String? = null,
+        customFieldUnsupportedTypes: List<Pair<String, String>> = emptyList(),
+        perTargetNamesDeclared: Set<String> = emptySet(),
+        kotlinTargetNames: Set<String> = emptySet(),
+    ): List<KmpFlavorValidationFinding> {
+        val findings = mutableListOf<KmpFlavorValidationFinding>()
+
+        // KMPF-V26 (WARN path) — schema-fallback when consumer's manifest is v2.0.
+        // The ERROR path (resolution-fail at task-execution time) is emitted from
+        // BuildKonfigSecretResolver directly with the same code constant.
+        if (buildKonfigSecretIds.isNotEmpty() &&
+            secretsManifestSchemaVersion != null &&
+            versionLessThan(secretsManifestSchemaVersion, "2.1")
+        ) {
+            findings += KmpFlavorValidationFinding(
+                code = CODE_SECRET_RESOLUTION_FAIL,
+                severity = KmpFlavorValidationSeverity.WARNING,
+                message = "kmpFlavors.buildKonfig { secret(...) } is declared for " +
+                    "${buildKonfigSecretIds.joinToString { "'$it'" }}, but the consumer's " +
+                    "secrets-manifest.yaml is schema_version='$secretsManifestSchemaVersion'. " +
+                    "Schema v2.1+ is required for flavor-aware secret resolution. " +
+                    "The plugin will emit placeholder values (e.g. " +
+                    "`<unresolved:schema-v2.0>`) instead of hardcoded secrets " +
+                    "(SV15 compliance per RULE-SECRETS-VAULT-001).",
+                fix = "Upgrade secrets-manifest.yaml to schema_version: \"2.1\" and add " +
+                    "needs[].flavor_selector blocks for the declared secret IDs. See " +
+                    "docs/SECRETS_INTEGRATION.md for the consumer contract.",
+            )
+        }
+
+        // KMPF-V27 — customField type cannot be emitted by codegen.
+        customFieldUnsupportedTypes.forEach { (name, typeDesc) ->
+            findings += KmpFlavorValidationFinding(
+                code = CODE_CUSTOM_TYPE_EMIT_FAIL,
+                severity = KmpFlavorValidationSeverity.ERROR,
+                message = "kmpFlavors.buildKonfig { customField<T>(\"$name\", ...) } " +
+                    "declared with type '$typeDesc', which the codegen cannot emit. " +
+                    "Supported: primitives (Boolean/Int/Long/Float/Double/String), " +
+                    "sealed classes, and flat List<T> where T is a primitive or sealed class.",
+                fix = "Convert to a sealed class with explicit subclass objects, OR " +
+                    "stringify the value via a primitive customField. Nested generics " +
+                    "(Map<K, V>, List<List<T>>) and open classes are out of scope for v2.5.",
+            )
+        }
+
+        // KMPF-V28 — perTarget references a target name not present in kotlin.targets.
+        val invalidPerTargets = perTargetNamesDeclared - kotlinTargetNames
+        invalidPerTargets.forEach { targetName ->
+            findings += KmpFlavorValidationFinding(
+                code = CODE_PERTARGET_ON_NON_KMP,
+                severity = KmpFlavorValidationSeverity.ERROR,
+                message = "kmpFlavors.buildKonfig { perTarget(\"$targetName\") { } } " +
+                    "references a target that isn't declared in this project's " +
+                    "`kotlin { ... }` block. Available targets: " +
+                    "${kotlinTargetNames.sorted().joinToString { "'$it'" }}.",
+                fix = "Use a target name actually declared in `kotlin { ... }` " +
+                    "(e.g. 'iosMain', 'androidMain', 'desktopMain', 'wasmJsMain'), " +
+                    "OR add the missing target to the `kotlin { ... }` block.",
             )
         }
 

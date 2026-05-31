@@ -480,16 +480,128 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
 
     /**
      * Configure flavor dimensions using a DSL block.
+     *
+     * Setting this block marks the legacy flat DSL as used (see [legacyFlatDslUsed]) —
+     * mutually exclusive with [dimensions] at validation time (`KMPF-V24`).
      */
     fun flavorDimensions(action: Action<NamedDomainObjectContainer<FlavorDimension>>) {
+        markLegacyFlatDslUsed()
         action.execute(flavorDimensions)
     }
 
     /**
      * Configure flavors using a DSL block.
+     *
+     * Setting this block marks the legacy flat DSL as used (see [legacyFlatDslUsed]) —
+     * mutually exclusive with [dimensions] at validation time (`KMPF-V24`).
      */
     fun flavors(action: Action<NamedDomainObjectContainer<FlavorConfig>>) {
+        markLegacyFlatDslUsed()
         action.execute(flavors)
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // v2.5 — `dimensions { dimension("tier") { flavor("free") } }` ergonomic
+    // DSL sugar. See DimensionsDsl.kt for full behavior + KMPF-V24 mutex.
+    // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * v2.5 — mutex tracking flag. Flipped to `true` the first time
+     * [dimensions] is called. Read by `KmpFlavorPlugin.kt` and threaded into
+     * [KmpFlavorPluginValidator.validate] for `KMPF-V24` enforcement.
+     */
+    @get:org.gradle.api.tasks.Internal
+    var dimensionsDslUsed: Boolean = false
+        internal set
+
+    /**
+     * v2.5 — mutex tracking flag for the legacy flat DSL. Flipped to `true`
+     * the first time [flavorDimensions] or [flavors] is called. Pair with
+     * [dimensionsDslUsed] — both `true` simultaneously fires `KMPF-V24`.
+     */
+    @get:org.gradle.api.tasks.Internal
+    var legacyFlatDslUsed: Boolean = false
+        internal set
+
+    internal fun markDimensionsDslUsed() {
+        dimensionsDslUsed = true
+    }
+
+    internal fun markLegacyFlatDslUsed() {
+        legacyFlatDslUsed = true
+    }
+
+    /**
+     * v2.5 ergonomic sugar for declaring flavor dimensions + their member flavors in one
+     * tree-shaped block. Equivalent to `flavorDimensions { } + flavors { }` pair under the
+     * hood — populates the same containers. Mutually exclusive with the legacy flat DSL
+     * (mixing both in the same `kmpFlavors {}` fires `KMPF-V24` ERROR).
+     *
+     * Example:
+     * ```kotlin
+     * kmpFlavors {
+     *     dimensions {
+     *         dimension("tier") {
+     *             flavor("free")
+     *             flavor("paid")
+     *         }
+     *         dimension("env") {
+     *             flavor("dev")
+     *             flavor("prod")
+     *         }
+     *     }
+     * }
+     * ```
+     *
+     * See [DimensionsDsl] for the full pattern + migration guidance.
+     */
+    fun dimensions(action: Action<DimensionsDsl>) {
+        // Lazy-construct: avoid allocating the DSL object when consumers stick with the
+        // flat DSL. DimensionsDsl has an `internal` constructor so consumers can't bypass
+        // the markDimensionsDslUsed() side effect by constructing it themselves.
+        val dsl = DimensionsDsl(this)
+        action.execute(dsl)
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // v2.5 — `buildKonfig { secret(); enum(); customField(); perTarget {} }`
+    // codegen-expansion DSL block. See BuildKonfigDsl.kt for the four entry
+    // points + their codegen semantics.
+    // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * v2.5 — accumulated BuildKonfig DSL state across all `buildKonfig {}`
+     * invocations in the same `kmpFlavors {}` block. Multiple `buildKonfig {}`
+     * blocks merge — secrets concat, enums concat, customFields concat,
+     * perTarget blocks merge by target name.
+     *
+     * Read by `KmpFlavorPlugin.kt` (validator dispatch + task registration) and
+     * `BuildKonfigSecretResolver.kt` (vault lookup).
+     */
+    @get:org.gradle.api.tasks.Internal
+    val buildKonfigDsl: BuildKonfigDsl = BuildKonfigDsl()
+
+    /**
+     * v2.5 ergonomic block for vault-integrated secrets, dimension enums,
+     * custom-type fields, and per-target conditional codegen. See [BuildKonfigDsl]
+     * for the full pattern + KMPF-V26/V27/V28 validation contract.
+     *
+     * Example:
+     * ```kotlin
+     * kmpFlavors {
+     *     buildKonfig {
+     *         secret("API_KEY")
+     *         enum("tier")
+     *         customField("scopes", "List<String>", "listOf(\"read\", \"write\")")
+     *         perTarget("iosMain") {
+     *             field("BUNDLE_ID_SUFFIX", "String", "\".dev\"")
+     *         }
+     *     }
+     * }
+     * ```
+     */
+    fun buildKonfig(action: Action<BuildKonfigDsl>) {
+        action.execute(buildKonfigDsl)
     }
 
     /**

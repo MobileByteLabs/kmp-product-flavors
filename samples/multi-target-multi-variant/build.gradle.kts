@@ -1,9 +1,14 @@
 /*
  * Copyright 2026 MobileByteLabs
  *
- * Stability plan Phase 1 sample — exercises EVERY alpha-tagged surface in
- * v2.3 + v2.4 against a realistic 3 flavors × 3 buildTypes × 6 non-Android
- * targets = 54-compilation matrix.
+ * v2.4 baseline: stability-plan Phase 1 sample — exercised EVERY alpha-tagged
+ * surface against 3 flavors × 3 buildTypes × 6 non-Android targets = 54
+ * compilations.
+ *
+ * v2.5 expansion: matrix grows to 3 flavors × 3 buildTypes × 12 non-Android
+ * targets = 108 compilations after enabling watchOS×3 + tvOS×3 + linuxX64 +
+ * mingwX64 below. CI sharding in .github/workflows/sample-target-coverage.yml
+ * splits the matrix per-OS-runner so each runner sees a tractable subset.
  *
  * Compared to samples/matrix-mode/ (2 flavors × 2 buildTypes × 1 target),
  * this sample is the actual stress test the plugin needs before GA.
@@ -14,6 +19,13 @@
  *   ./gradlew :samples:multi-target-multi-variant:detektFreeDebugDesktop
  *   ./gradlew :samples:multi-target-multi-variant:switchVariantAndReload --to=paidStaging
  *   ./gradlew :samples:multi-target-multi-variant:publishToMavenLocal
+ *
+ * Per-OS aggregate tasks (v2.5):
+ *   macOS:    assembleAllIos{X64,Arm64,SimulatorArm64}Variants
+ *             assembleAllWatchos{X64,Arm64,SimulatorArm64}Variants
+ *             assembleAllTvos{X64,Arm64,SimulatorArm64}Variants
+ *   Linux:    assembleAll{Desktop,Js,WasmJs,LinuxX64}Variants
+ *   Windows:  assembleAllMingwX64Variants
  */
 
 plugins {
@@ -108,7 +120,7 @@ kmpFlavors {
 }
 
 kotlin {
-    // 6 non-Android targets — the stress test the plugin needs.
+    // v2.4 baseline: 6 non-Android targets (54-compilation matrix).
     jvm("desktop")
     iosX64()
     iosArm64()
@@ -116,6 +128,19 @@ kotlin {
     js(IR) { browser() }
     @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
     wasmJs { browser() }
+
+    // v2.5 expansion: 6 additional non-Android targets (108-compilation matrix total).
+    // PlatformDetector has supported all of these since v1.1.0; v2.5 closes the
+    // sample-coverage gap and validates per-variant Compose resources + aggregate
+    // task generation for each. See docs/SUPPORTED_TARGETS.md.
+    watchosX64()
+    watchosArm64()
+    watchosSimulatorArm64()
+    tvosX64()
+    tvosArm64()
+    tvosSimulatorArm64()
+    linuxX64()
+    mingwX64()
 
     sourceSets {
         // commonMain reads BuildKonfig set by the active-variant codegen +

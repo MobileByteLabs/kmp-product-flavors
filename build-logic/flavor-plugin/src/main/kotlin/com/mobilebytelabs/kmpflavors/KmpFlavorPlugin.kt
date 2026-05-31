@@ -335,6 +335,10 @@ class KmpFlavorPlugin : Plugin<Project> {
             detectedTargetCount = nonAndroidTargets.size,
             dimensions = dimensions,
             requestedVariantName = requestedVariantName,
+            // v2.5 — thread the mutex tracking flags through so KMPF-V24 fires when
+            // both DSLs are used in the same kmpFlavors {} block.
+            dimensionsDslUsed = extension.dimensionsDslUsed,
+            legacyFlatDslUsed = extension.legacyFlatDslUsed,
         )
         // v2.2 Phase 0I + 0L — platform + version compatibility findings (V15/V16/V17).
         val iosTargetNames = nonAndroidTargets.map { it.name }.filter { it.startsWith("ios") }.toSet()
@@ -351,7 +355,48 @@ class KmpFlavorPlugin : Plugin<Project> {
         } else {
             emptyList()
         }
-        val combinedFindings = validationFindings + platformFindings
+        // v2.5 Phase 3 — validate the buildKonfig {} DSL block (V26/V27/V28).
+        // Returns empty list when no buildKonfig {} declared (default zero state).
+        val buildKonfigDsl = extension.buildKonfigDsl
+        val manifestSchemaVersion = if (buildKonfigDsl.secrets.isNotEmpty()) {
+            com.mobilebytelabs.kmpflavors.internal.BuildKonfigSecretResolver(project.projectDir)
+                .manifestSchemaVersion()
+        } else {
+            null
+        }
+        // v2.5 Phase 4 follow-up — KMP intermediate source sets (`iosMain`, `nativeMain`,
+        // `webMain`, etc.) are NOT in kotlin.sourceSets at config-time when V28 is
+        // evaluated; they're created on-demand by KGP's hierarchy template. Derive the
+        // family intermediates from declared target names so consumers can reach for
+        // idiomatic perTarget("iosMain") without false-positive V28 errors.
+        val familyIntermediates = mutableSetOf(
+            "commonMain", "commonTest",
+            "nativeMain", "nativeTest",
+            "webMain", "webTest",
+            "appleMain", "appleTest",
+            "androidMain", "androidTest",
+        )
+        kotlin.targets.forEach { target ->
+            // ios* → iosMain (e.g. iosArm64 → ios). Strip first uppercase + tail.
+            val prefix = target.name.takeWhile { !it.isUpperCase() }
+            if (prefix.isNotBlank()) {
+                familyIntermediates.add("${prefix}Main")
+                familyIntermediates.add("${prefix}Test")
+            }
+        }
+        val buildKonfigFindings = KmpFlavorPluginValidator.validateBuildKonfigDsl(
+            buildKonfigSecretIds = buildKonfigDsl.secrets.toList(),
+            secretsManifestSchemaVersion = manifestSchemaVersion,
+            // customField type validation is best-effort at config time — DSL strings
+            // don't reflect type information. V27 mainly fires from codegen path in
+            // v2.5.x. Empty here means "no type-level findings detected at config time".
+            customFieldUnsupportedTypes = emptyList(),
+            perTargetNamesDeclared = buildKonfigDsl.perTargetBlocks.keys.toSet(),
+            kotlinTargetNames = kotlin.targets.map { it.name }.toSet() +
+                kotlin.sourceSets.map { it.name }.toSet() +
+                familyIntermediates,
+        )
+        val combinedFindings = validationFindings + platformFindings + buildKonfigFindings
         val errors = combinedFindings.filter { it.severity == KmpFlavorValidationSeverity.ERROR }
         val warnings = combinedFindings.filter { it.severity == KmpFlavorValidationSeverity.WARNING }
         warnings.forEach { warning ->
@@ -601,6 +646,30 @@ class KmpFlavorPlugin : Plugin<Project> {
                 kotlin = kotlin,
                 shouldGenerate = shouldGenerateCodegen(project, extension),
             )
+
+            // v2.5 Phase 3 — register FrameworkSchemaCheckTask when buildKonfig { secret(...) }
+            // is declared. Provides an artifact + WARN log for KMPF-V26 (graceful-degrade
+            // when secrets-manifest.yaml is schema v2.0). Bound as a dependency of every
+            // generate*BuildConfig task so it runs before codegen.
+            val bkSecrets = extension.buildKonfigDsl.secrets.toList()
+            if (bkSecrets.isNotEmpty()) {
+                val schemaCheck = project.tasks.register(
+                    "checkSecretsManifestSchema",
+                    com.mobilebytelabs.kmpflavors.tasks.FrameworkSchemaCheckTask::class.java,
+                ) {
+                    val manifest = project.file("secrets-manifest.yaml")
+                    if (manifest.exists()) {
+                        this.secretsManifestFile.set(manifest)
+                    }
+                    this.declaredSecretIds.set(bkSecrets)
+                    this.outputMarker.set(
+                        project.layout.buildDirectory.file("generated/kmpFlavors/secrets-schema-check.txt"),
+                    )
+                }
+                project.tasks
+                    .matching { it.name.startsWith("generate") && it.name.endsWith("BuildConfig") }
+                    .configureEach { dependsOn(schemaCheck) }
+            }
         }
 
         // Q19-B — populate the public `kmpFlavors.variants` container with one

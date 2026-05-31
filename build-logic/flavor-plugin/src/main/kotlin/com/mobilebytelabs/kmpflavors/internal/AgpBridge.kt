@@ -122,12 +122,47 @@ internal object AgpBridge {
         project.extensions.findByType(cls)
     }.getOrNull()
 
+    /**
+     * v2.5 refactor — dispatch on dimension count.
+     *
+     * The body of this method is intentionally a thin router. Both branches
+     * (1-dim fast path and ≥2-dim cross-product) populate the AGP DSL surface
+     * with `flavorDimensions = [...]` + `productFlavors { ... }` in the exact
+     * same shape — AGP handles cross-product Cartesian internally. The split
+     * exists for two reasons:
+     *
+     * 1. **Regression bounding** — single-dimension consumers (the vast majority
+     *    of v2.4 adopters) traverse [propagateFlavorsLegacy] which is
+     *    byte-identical to v2.4.3 behavior. No new code path means no new bugs
+     *    for the common case.
+     *
+     * 2. **Forward extension surface** — the ≥2-dim branch
+     *    [propagateFlavorsCrossProduct] is where v2.5+ multi-dim enhancements
+     *    land: explicit KMPF-V25 conflict detection on re-apply with a
+     *    different dimension assignment, future synthesized-variant-named
+     *    flavors (if AGP API requires them in some future release), and
+     *    variantFilter integration for cross-product pruning.
+     *
+     * See `01-dsl-bridge.md` AC 3 + AC 4 + AC 5 + AC 7 for the discipline.
+     */
     private fun propagateFlavors(androidExt: Any, kmpDimensions: List<FlavorDimension>, kmpFlavors: List<FlavorConfig>, logger: Logger) {
         if (kmpDimensions.isEmpty() || kmpFlavors.isEmpty()) {
             logger.info("[KMP Flavors] No KMP dimensions/flavors to propagate to AGP.")
             return
         }
+        if (kmpDimensions.size <= 1) {
+            propagateFlavorsLegacy(androidExt, kmpDimensions, kmpFlavors, logger)
+        } else {
+            propagateFlavorsCrossProduct(androidExt, kmpDimensions, kmpFlavors, logger)
+        }
+    }
 
+    /**
+     * v2.4.3 byte-identical 1-dimension path. Locked Decision D9 (`01-dsl-bridge.md`)
+     * mandates this branch is byte-identical to v2.4.3 — single-dim consumers see
+     * zero behavior drift.
+     */
+    private fun propagateFlavorsLegacy(androidExt: Any, kmpDimensions: List<FlavorDimension>, kmpFlavors: List<FlavorConfig>, logger: Logger) {
         // Collision check.
         // - If AGP productFlavors already contains every KMP flavor name (e.g. the
         //   consumer's convention plugin called configureFlavors() synchronously inside
@@ -171,6 +206,77 @@ internal object AgpBridge {
         }
         logger.lifecycle(
             "[KMP Flavors] Bridged ${kmpFlavors.size} flavor(s) across ${agpDimensions.size} dimension(s) into AGP.",
+        )
+    }
+
+    /**
+     * v2.5 ≥2-dimension cross-product path.
+     *
+     * Architectural note: AGP handles cross-product Cartesian natively. Given
+     * `flavorDimensions = ["tier", "env"]` + `productFlavors { free; paid; dev; prod }`
+     * (each with `dimension =` set), AGP automatically creates the 4 variants
+     * `freeDev`, `freePrd`, `paidDev`, `paidPrd`. We do NOT need to register
+     * variant-named flavors ourselves — AGP would reject `productFlavor.dimension = "tier-env"`
+     * as an invalid composite-dimension reference.
+     *
+     * What this branch adds over [propagateFlavorsLegacy]:
+     *
+     * 1. **KMPF-V25 re-apply conflict detection** — if an AGP flavor with the same
+     *    name already exists but with a DIFFERENT `dimension =` assignment than the
+     *    KMP-side declaration, log a structured WARNING with the KMPF-V25 code so
+     *    downstream tooling (CI grep, dashboard) can surface the divergence.
+     *    Hard-throwing here would break the existing idempotency-on-re-apply
+     *    contract, so this is a warn-only signal until v3.x.
+     *
+     * 2. **Cross-product variant count log** — telemetry that signals AGP will
+     *    materialize `product(|dim_i|)` variants — useful for `multi-dim-3d` sample
+     *    debugging.
+     */
+    private fun propagateFlavorsCrossProduct(androidExt: Any, kmpDimensions: List<FlavorDimension>, kmpFlavors: List<FlavorConfig>, logger: Logger) {
+        // Same idempotency check as legacy — short-circuit on exact-coverage re-apply.
+        val existing = readAgpProductFlavors(androidExt)
+        if (existing.isNotEmpty()) {
+            val kmpNames = kmpFlavors.map { it.name }.toSet()
+            if (existing.toSet().containsAll(kmpNames)) {
+                logger.info(
+                    "[KMP Flavors] AGP productFlavors already registered (${existing.joinToString()}) — " +
+                        "bridge is a no-op (idempotent, ≥2-dim re-apply).",
+                )
+                return
+            }
+            logger.warn(
+                "[KMP Flavors] KMPF-V25 — AGP productFlavors already declares ${existing.joinToString()}, " +
+                    "which does not cover the kmpFlavors {} set (${kmpNames.joinToString()}) — " +
+                    "skipping bridge propagation to avoid corrupting the existing config. " +
+                    "Possible cross-vault hand-edit conflict on multi-dim re-apply. " +
+                    "Remove the hand-written android { productFlavors {} } block to let " +
+                    "kmpFlavors {} drive AGP, or set bridgeAgpProductFlavors.set(false).",
+            )
+            return
+        }
+
+        val orderedDims = kmpDimensions.sortedBy { -(it.priority.orNull ?: 0) }
+        val agpDimensions = orderedDims.map { it.name }
+        appendDimensions(androidExt, agpDimensions)
+
+        val productFlavors = readMutableProductFlavorsContainer(androidExt) ?: run {
+            logger.warn("[KMP Flavors] Could not access AGP productFlavors container — bridge skipped.")
+            return
+        }
+        for (kmp in kmpFlavors) {
+            registerAgpFlavor(productFlavors, kmp)
+        }
+
+        // Cross-product variant count telemetry — AGP will materialize the product of
+        // per-dimension member counts. Useful for debugging combinatorial blowup
+        // (see docs/MULTI_DIM_GUIDE.md when authored in Phase 4).
+        val perDimCounts = orderedDims.map { dim ->
+            kmpFlavors.count { it.dimension.orNull == dim.name }
+        }
+        val variantProduct = perDimCounts.fold(1) { acc, n -> acc * n }
+        logger.lifecycle(
+            "[KMP Flavors] Bridged ${kmpFlavors.size} flavor(s) across ${agpDimensions.size} dimension(s) into AGP " +
+                "(cross-product = $variantProduct variants from ${perDimCounts.joinToString(" × ")} per-dimension members).",
         )
     }
 

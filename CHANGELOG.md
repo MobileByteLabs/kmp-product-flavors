@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.0-alpha.1] - 2026-05-30 — Capability Expansion (Phases 1–4)
+
+**No breaking changes for v2.4.x consumers — all v2.5 DSL is additive.**
+
+See [`docs/MIGRATION_v2.4_TO_v2.5.md`](docs/MIGRATION_v2.4_TO_v2.5.md) (opens with "You do not need to migrate.") for an optional cookbook. v2.5.0 ships in a 4-phase epic (`plan-layer/.../v25-multidim-targets-buildkonfig/`); alpha.1 marks Phases 1–4 implementation complete; promotion to `2.5.0-rc.0` and then `2.5.0` GA follows the standard cron-driven cadence.
+
+### Added — Phase 1: Multi-dim DSL sugar + AGP cross-product bridge
+
+- **Optional `dimensions { dimension("tier") { flavor("free") } }` DSL block** ([`DimensionsDsl.kt`](build-logic/flavor-plugin/src/main/kotlin/com/mobilebytelabs/kmpflavors/DimensionsDsl.kt)) as ergonomic alternative to the v2.4 flat `flavorDimensions { } + flavors { }` pair. Populates the same containers; downstream `FlavorVariantResolver` Cartesian logic, matrix mode, BuildKonfig codegen, and AGP bridging are byte-identical regardless of style.
+- **AGP cross-product bridge** ([`AgpBridge.kt`](build-logic/flavor-plugin/src/main/kotlin/com/mobilebytelabs/kmpflavors/internal/AgpBridge.kt)) — `propagateFlavors()` now dispatches on dimension count: 1-dim configs traverse `propagateFlavorsLegacy` (byte-identical to v2.4.3); ≥2-dim configs traverse `propagateFlavorsCrossProduct` with KMPF-V25 conflict detection + cross-product variant count telemetry.
+- **`KMPF-V24`** (ERROR) — fires when both `dimensions {}` and the legacy flat DSL are used together. Points to `MIGRATION_v2.4_TO_v2.5.md`.
+- **`KMPF-V25`** (ERROR) — fires on duplicate dimension names + AGP-side reapply conflicts.
+- **`samples/multi-dim-3d/`** — canonical 3-dimension stress sample (tier × env × form, 8 candidate variants, `variantFilter` prunes to 6).
+- **9 new validator + bridge tests** in `AgpBridgeMultiDimTest` covering 1-dim fast-path identity, 2D/3D/4D cross-product, uneven per-dim counts, variantFilter integration, and dispatch determinism.
+
+### Added — Phase 2: Target coverage hardening
+
+- **11 per-target detection tests** in `PlatformDetectorTest` for wasmJs, watchosX64, watchosArm64, watchosSimulatorArm64, watchosDeviceArm64, tvosX64, tvosArm64, tvosSimulatorArm64, linuxX64, mingwX64 (PlatformDetector has supported all 9 since v1.1.0; v2.5 adds regression discipline).
+- **Sample expansion** — `samples/multi-target-multi-variant/` matrix grows from 6 → 14 non-Android targets (54 → 126 compilations). Adds watchOS×3 + tvOS×3 + linuxX64 + mingwX64.
+- **New CI workflow** `.github/workflows/sample-target-coverage.yml` — sharded matrix across macOS (Apple targets), Linux (linuxX64), Windows (mingwX64). Cost telemetry posted to PR per AC 10 budget.
+- **`docs/SUPPORTED_TARGETS.md`** — full target coverage matrix (detected × source-set wired × sample-exercised × per-variant composeResources status).
+- **New tests:** `AggregateVariantTasksTest` adds 3 cases verifying `assembleAll{LinuxX64, MingwX64, WasmJs}Variants` registration; `PerVariantComposeResourcesTest` adds configurator-API smoke for arbitrary-N dimension flavor sets.
+
+### Added — Phase 3: BuildKonfig codegen expansion
+
+- **`kmpFlavors.buildKonfig {}` top-level DSL block** ([`BuildKonfigDsl.kt`](build-logic/flavor-plugin/src/main/kotlin/com/mobilebytelabs/kmpflavors/BuildKonfigDsl.kt)) — four codegen capabilities:
+  - **`secret(id)`** — vault-integrated per-flavor secret (placeholder emission in v2.5; real value flow ships in v2.5.x patch per `docs/SECRETS_INTEGRATION.md`).
+  - **`enum(dimension)`** — auto-generated `sealed class ${DimensionName.capitalize()}` + typed `val ${dimensionName}` holding the active variant's flavor instance.
+  - **`customField(name, typeDescriptor, value)`** — sealed-class types + flat `List<T>` (string-template codegen, no kotlinpoet dep).
+  - **`perTarget(name) { field(...) }`** — per-target conditional codegen as nested `object PerTarget.{TargetName}` block. True per-file source-set isolation deferred to v2.6.
+- **`BuildKonfigSecretResolver`** ([`internal/BuildKonfigSecretResolver.kt`](build-logic/flavor-plugin/src/main/kotlin/com/mobilebytelabs/kmpflavors/internal/BuildKonfigSecretResolver.kt)) — standalone helper for reading `secrets-manifest.yaml` schema v2.1+ + materialized `local.properties`. Callable API; codegen wiring ships in v2.5.x patch.
+- **`FrameworkSchemaCheckTask`** ([`tasks/FrameworkSchemaCheckTask.kt`](build-logic/flavor-plugin/src/main/kotlin/com/mobilebytelabs/kmpflavors/tasks/FrameworkSchemaCheckTask.kt)) — Gradle task that warns KMPF-V26 when consumers declare `secret(...)` against a `secrets-manifest.yaml` at schema < v2.1.
+- **`KMPF-V26`** (ERROR/WARN) — secret resolution failure (ERROR at task-exec) or schema-fallback (WARN at config-time).
+- **`KMPF-V27`** (ERROR) — `customField` type the codegen can't emit.
+- **`KMPF-V28`** (ERROR) — `perTarget` references a target not in `kotlin.targets`.
+- **`samples/buildkonfig-rich/`** — canonical sample exercising all 4 features end-to-end + a stub schema-v2.1 `secrets-manifest.yaml`.
+- **`BuildKonfigCodegenSnapshotTest`** + 4 hand-written fixtures matching the deterministic string-template output (sealed class, List<String>, perTarget iosMain, dimension enum).
+- **`docs/SECRETS_INTEGRATION.md`** — 200+ line consumer contract documenting RULE-SECRETS-VAULT-001 SV4/SV15/SV17 compliance + v2.5.x roadmap.
+
+### Added — Phase 4: Cross-cutting discipline + docs
+
+- **`docs/MIGRATION_v2.4_TO_v2.5.md`** — opens with verbatim "You do not need to migrate." Cookbook for adopting `dimensions {}` and `buildKonfig {}` blocks.
+- **`docs/MULTI_DIM_GUIDE.md`** — variant-filter discipline + combinatorial-cost guidance for arbitrary-N dimensions.
+- **`docs/COMPATIBILITY_MATRIX.md`** — explicit "UNCHANGED FROM v2.4" headline (Gradle 8.0+ / KGP 2.0.21+ / AGP 8.0+ / JDK 17+ / CMP 1.7.0+).
+- **`docs/ERROR_CODES.md`** updates — V24, V25, V26, V27, V28 catalog entries.
+- **`README.md`** v2.5 callout — new DSL highlights + version-floor unchanged statement.
+
+### Preserved
+
+- **KMPF-V21** (legacy `activeFlavor` DSL deprecation) — constant unchanged; deadline 2026-11-14 not yet reached; runtime emission remains reserved.
+- **Version floor** — Gradle 8.0+, KGP 2.0.21+, AGP 8.0+, JDK 17+, CMP 1.7.0+. **UNCHANGED FROM v2.4.**
+- **AGP bridge 1-dim fast path** — byte-identical to v2.4.3 (regression-bounded by `AgpBridgeMultiDimTest#1-dim config takes the legacy fast path`).
+- **All ~160 existing TestKit cases** continue to pass.
+
+### Dependencies / out-of-scope deferrals
+
+- Vault-integrated `buildKonfig { secret() }` real value flow requires framework-side schema v2.1 PR + `secrets-pull.sh --emit-gradle-flavor-map` mode. v2.5.0 ships the DSL + validation + framework hooks; real codegen ships in a v2.5.x patch.
+- True per-file source-set isolation for `perTarget()` deferred to v2.6 (v2.5 ships nested-object pattern).
+- Snapshot fixtures in `src/test/resources/buildkonfig-snapshots/` are hand-written to match the deterministic string-template output. If first build runs surface drift (whitespace, Set iteration order), fixtures get a one-shot regeneration in v2.5.0-alpha.2.
+- AGP-only consumer mode (originally a v2.5 candidate per CURRENT_WORK.md) deferred to v2.6+.
+
 ## [2.4.2] - 2026-05-19 — Matrix-mode `expect`/`actual` regression fix
 
 ### Fixed

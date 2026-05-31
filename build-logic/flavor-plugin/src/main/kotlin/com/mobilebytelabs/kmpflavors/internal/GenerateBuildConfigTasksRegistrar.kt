@@ -19,6 +19,7 @@ package com.mobilebytelabs.kmpflavors.internal
 import com.mobilebytelabs.kmpflavors.FlavorConfig
 import com.mobilebytelabs.kmpflavors.FlavorVariant
 import com.mobilebytelabs.kmpflavors.KmpFlavorExtension
+import com.mobilebytelabs.kmpflavors.tasks.DimensionEnumSpec
 import com.mobilebytelabs.kmpflavors.tasks.GenerateBuildConfigTask
 import org.gradle.api.Project
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
@@ -75,6 +76,22 @@ internal object GenerateBuildConfigTasksRegistrar {
             val outputDir = project.layout.buildDirectory
                 .dir("generated/kmpFlavors/${variant.name}/kotlin")
 
+            // v2.5 — derive BuildKonfig DSL inputs from extension.buildKonfigDsl per
+            // this variant's active flavors. Dimension enums get the active-flavor-in-dim
+            // name so the codegen emits `val ${dim} = ${Dim}.${ActiveFlavor}` correctly.
+            val bkDsl = extension.buildKonfigDsl
+            val dimEnumSpecsForVariant = bkDsl.enums.map { dimName ->
+                val flavorsInDim = flavors
+                    .filter { it.dimension.orNull == dimName }
+                    .map { it.name }
+                val active = variant.flavors.firstOrNull { it.dimension.orNull == dimName }?.name
+                DimensionEnumSpec(
+                    dimensionName = dimName,
+                    flavorNames = flavorsInDim,
+                    activeFlavorName = active,
+                )
+            }
+
             val genTask = project.tasks.register(taskName, GenerateBuildConfigTask::class.java) {
                 this.packageName.set(packageNameProvider)
                 this.className.set(classNameProvider)
@@ -84,6 +101,11 @@ internal object GenerateBuildConfigTasksRegistrar {
                 this.allBuildTypeNames.set(allBuildTypeNames)
                 this.activeBuildTypeName.set(variant.buildType?.name ?: "")
                 this.buildConfigFields.set(variant.mergedBuildConfigFields)
+                // v2.5 BuildKonfig DSL inputs.
+                this.dimensionEnumSpecs.set(dimEnumSpecsForVariant)
+                this.customFieldSpecs.set(bkDsl.customFields.toList())
+                this.perTargetFieldSpecs.set(bkDsl.perTargetBlocks.values.flatten())
+                this.buildKonfigSecretIds.set(bkDsl.secrets.toList())
                 this.outputDirectory.set(outputDir)
                 this.group = "kmpFlavors variants"
                 this.description =

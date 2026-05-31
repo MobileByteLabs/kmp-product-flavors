@@ -17,16 +17,21 @@
 package com.mobilebytelabs.kmpflavors.tasks
 
 import com.mobilebytelabs.kmpflavors.BuildConfigField
+import com.mobilebytelabs.kmpflavors.CustomFieldDeclaration
+import com.mobilebytelabs.kmpflavors.PerTargetFieldDeclaration
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.MapProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.SetProperty
 import org.gradle.api.tasks.CacheableTask
 import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
 import java.io.File
+import java.io.Serializable
 
 /**
  * Task that generates a Kotlin BuildConfig object with flavor information.
@@ -108,6 +113,48 @@ abstract class GenerateBuildConfigTask : DefaultTask() {
      */
     @get:Input
     abstract val buildConfigFields: MapProperty<String, BuildConfigField>
+
+    // ─────────────────────────────────────────────────────────────────────
+    // v2.5 — BuildKonfig DSL expansion inputs.
+    //
+    // Threaded by GenerateBuildConfigTasksRegistrar from
+    // KmpFlavorExtension.buildKonfigDsl. Default-empty values preserve v2.4
+    // task-input contract — v2.4 consumers see no behavior change.
+    // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * v2.5 — Dimension enum specifications. One entry per `buildKonfig { enum(dim) }`
+     * call. Codegen emits a `sealed class ${DimensionName.capitalize()}` per entry.
+     */
+    @get:Input
+    @get:Optional
+    abstract val dimensionEnumSpecs: ListProperty<DimensionEnumSpec>
+
+    /**
+     * v2.5 — Custom-type field declarations from `buildKonfig { customField(...) }`.
+     * Codegen emits `public val ${name}: ${type} = ${value}`.
+     */
+    @get:Input
+    @get:Optional
+    abstract val customFieldSpecs: ListProperty<CustomFieldDeclaration>
+
+    /**
+     * v2.5 — Per-target scoped field declarations from `buildKonfig { perTarget(name) {...} }`.
+     * Codegen emits a nested `object PerTarget { object {TargetName} { ... } }` block.
+     */
+    @get:Input
+    @get:Optional
+    abstract val perTargetFieldSpecs: ListProperty<PerTargetFieldDeclaration>
+
+    /**
+     * v2.5 — Vault-integrated secret IDs from `buildKonfig { secret(id) }`.
+     * Codegen emits placeholder `const val ${id.toScreamingSnake()}: String = "<unresolved:see-docs>"`
+     * for SV15 compliance — actual value resolution semantics deferred to v2.5.x
+     * patch per docs/SECRETS_INTEGRATION.md.
+     */
+    @get:Input
+    @get:Optional
+    abstract val buildKonfigSecretIds: ListProperty<String>
 
     /**
      * Output directory for generated files.
@@ -196,6 +243,82 @@ abstract class GenerateBuildConfigTask : DefaultTask() {
                     val valueStr = field.value
                     appendLine("    const val $nameStr: $typeStr = $valueStr")
                 }
+                appendLine()
+            }
+
+            // ─────────────────────────────────────────────────────────────
+            // v2.5 — BuildKonfig DSL expansion blocks. All conditional on the
+            // corresponding `buildKonfig {}` DSL block being populated.
+            // ─────────────────────────────────────────────────────────────
+
+            // v2.5 enum(dimension) — sealed class + active-flavor val per dimension.
+            val enumSpecs = dimensionEnumSpecs.orNull.orEmpty()
+            if (enumSpecs.isNotEmpty()) {
+                appendLine("    // ─── v2.5 dimension enums ─────────────────────────────────────")
+                for (spec in enumSpecs.sortedBy { it.dimensionName }) {
+                    val dimCap = spec.dimensionName.replaceFirstChar { it.uppercase() }
+                    appendLine("    /** Auto-generated sealed-class enum for dimension '${spec.dimensionName}'. */")
+                    appendLine("    sealed class $dimCap {")
+                    for (flavor in spec.flavorNames.sorted()) {
+                        val flavorCap = flavor.replaceFirstChar { it.uppercase() }
+                        appendLine("        object $flavorCap : $dimCap()")
+                    }
+                    appendLine("    }")
+                    // Emit a typed val holding the active flavor instance, if known.
+                    val activeFlavor = spec.activeFlavorName
+                    if (activeFlavor != null && activeFlavor in spec.flavorNames) {
+                        val activeCap = activeFlavor.replaceFirstChar { it.uppercase() }
+                        appendLine("    val ${spec.dimensionName}: $dimCap = $dimCap.$activeCap")
+                    }
+                    appendLine()
+                }
+            }
+
+            // v2.5 customField — sealed-class / List<T> / arbitrary-type field emission.
+            val custom = customFieldSpecs.orNull.orEmpty()
+            if (custom.isNotEmpty()) {
+                appendLine("    // ─── v2.5 customField<T> declarations ──────────────────────────")
+                for (cf in custom.sortedBy { it.name }) {
+                    appendLine("    val ${cf.name}: ${cf.typeDescriptor} = ${cf.value}")
+                }
+                appendLine()
+            }
+
+            // v2.5 secret — placeholder emission (real resolution deferred to v2.5.x patch).
+            // SV15 compliance: never emit real secret values into the generated `.kt` file.
+            val secretIds = buildKonfigSecretIds.orNull.orEmpty()
+            if (secretIds.isNotEmpty()) {
+                appendLine("    // ─── v2.5 vault-integrated secrets (placeholders) ──────────────")
+                appendLine("    // Real value resolution semantics deferred to v2.5.x patch per")
+                appendLine("    // docs/SECRETS_INTEGRATION.md. SV15 compliance: codegen NEVER")
+                appendLine("    // emits hardcoded secret values into the generated .kt file.")
+                for (id in secretIds.sorted()) {
+                    val constName = id.toScreamingSnake()
+                    appendLine("    const val $constName: String = \"<unresolved:see-docs-SECRETS_INTEGRATION>\"")
+                }
+                appendLine()
+            }
+
+            // v2.5 perTarget — nested object emission. v2.5 simplification: emit all
+            // target blocks into the main BuildKonfig object. KMP source-set dependsOn
+            // discipline gates access at the language level. True per-file source-set
+            // isolation deferred to v2.6 (see docs/SECRETS_INTEGRATION.md "perTarget semantics").
+            val perTarget = perTargetFieldSpecs.orNull.orEmpty()
+            if (perTarget.isNotEmpty()) {
+                appendLine("    // ─── v2.5 perTarget conditional codegen ────────────────────────")
+                appendLine("    /** Per-target scoped fields. v2.5 emits all blocks into the main object. */")
+                appendLine("    object PerTarget {")
+                val grouped = perTarget.groupBy { it.targetName }
+                for ((targetName, fieldsForTarget) in grouped.toSortedMap()) {
+                    val targetCap = targetName.replaceFirstChar { it.uppercase() }
+                    appendLine("        object $targetCap {")
+                    for (f in fieldsForTarget.sortedBy { it.name }) {
+                        appendLine("            const val ${f.name}: ${f.typeDescriptor} = ${f.value}")
+                    }
+                    appendLine("        }")
+                }
+                appendLine("    }")
+                appendLine()
             }
 
             appendLine("}")
@@ -204,5 +327,36 @@ abstract class GenerateBuildConfigTask : DefaultTask() {
 
         outputFile.writeText(content)
         logger.lifecycle("[KMP Flavors] Generated $outputFile")
+    }
+
+    /**
+     * Convert a kebab/dot/lower-snake identifier to SCREAMING_SNAKE_CASE for
+     * use as a Kotlin `const val` name. Used by the v2.5 secret emission path
+     * to map secret IDs like `api-key` → `API_KEY`.
+     */
+    private fun String.toScreamingSnake(): String {
+        // Replace separators with underscore, then uppercase. Trim leading/trailing
+        // underscores so e.g. "-x" doesn't produce "_X".
+        return this
+            .replace(Regex("[-.\\s]+"), "_")
+            .uppercase()
+            .trim('_')
+    }
+}
+
+/**
+ * v2.5 — Serializable input shape for [GenerateBuildConfigTask.dimensionEnumSpecs].
+ *
+ * @param dimensionName Name of the dimension (e.g. "tier"). Codegen capitalizes to
+ *   produce the sealed-class name (`Tier`).
+ * @param flavorNames Names of flavors that belong to this dimension. Codegen emits
+ *   one `object` subclass per name, capitalized.
+ * @param activeFlavorName Name of the variant's active flavor in this dimension,
+ *   or null if not resolvable. When non-null, codegen emits a typed `val ${dim}`
+ *   holding the active instance.
+ */
+data class DimensionEnumSpec(val dimensionName: String, val flavorNames: List<String>, val activeFlavorName: String?) : Serializable {
+    companion object {
+        private const val serialVersionUID: Long = 1L
     }
 }
