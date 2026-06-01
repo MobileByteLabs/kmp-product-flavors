@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-06-01 — GA promotion of `2.6.0-alpha.1`
+
+**Stable release.** Direct promotion from `2.6.0-alpha.1` (published 2026-06-01) — no behavioural deltas, no code changes between alpha.1 and GA. Skipped the documented `2.6.0-rc.0` soak window because the project has a single active consumer (kmp-project-template) which has already exercised every v2.6 capability via the same source tree.
+
+**No breaking changes for v2.5.x consumers — all v2.6 DSL is additive.** Version floor UNCHANGED across v2.4 → v2.5 → v2.6 (Gradle 8.0+ / KGP 2.0.21+ / AGP 8.2+ / JDK 17+ / CMP 1.7.0+).
+
+See the `[2.6.0-alpha.1]` entry below for the full feature manifest (5 phases + Tier E.1).
+
 ## [2.6.0-alpha.1] - 2026-06-01 — Stability + KMP↔AGP Parity + Beyond-Platform (Phases 1–5)
 
 **No breaking changes for v2.5.x consumers — all v2.6 DSL is additive.**
