@@ -1,0 +1,9 @@
+package com.example.di
+
+import org.koin.core.module.Module
+import org.koin.dsl.module
+
+actual val analyticsModule: Module = module {
+    single { FreeAnalyticsHelper() }
+    bind<AnalyticsHelper>()
+}

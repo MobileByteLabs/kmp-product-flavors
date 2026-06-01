@@ -21,6 +21,9 @@ plugins {
     signing
     alias(libs.plugins.vanniktech.mavenPublish)
     id("com.gradle.plugin-publish") version "1.3.0"
+    // v2.6 Phase 1 — coverage gate + mutation testing baseline
+    alias(libs.plugins.kover)
+    alias(libs.plugins.pitest)
 }
 
 group = "io.github.mobilebytelabs.kmpflavors"
@@ -141,4 +144,55 @@ tasks.test {
 
 tasks.withType<Sign>().configureEach {
     onlyIf { signPublications }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// v2.6 Phase 1 — Coverage gate (Kover) + mutation testing baseline (Pitest)
+//
+// Filter + verify shape mirrors mifos-x/kmp-project-template's proven
+// `configureKoverRootReports()` (KMP + multi-module) — adapted for this
+// single-composite Gradle plugin project. Threshold floor starts permissive
+// (40) and is configurable via `-PkoverLineMin=N` so v2.6.x can ramp to 95
+// incrementally without re-templating the build.
+//
+// Pitest mutation testing ships in v2.6 as INFORMATIONAL ARTIFACT only — uploaded
+// to PR via coverage-gate.yml but not gating. Promoted to gate v2.7+ once
+// mutation score stabilizes.
+//
+// See docs/COVERAGE_GUIDE.md for contributor patterns + roadmap.
+// ─────────────────────────────────────────────────────────────────────
+
+kover {
+    reports {
+        filters {
+            excludes {
+                classes(
+                    "*BuildConfig",
+                    "*BuildKonfig*",
+                    "*Test*",
+                )
+                packages(
+                    "*.generated.*",
+                )
+            }
+        }
+        verify {
+            // Phase 1 floor — empirical baseline (26.5% measured 2026-06-01).
+            // Set to 25 so first commit passes; v2.6.x ramps to 95 via
+            // `-PkoverLineMin=95` as individual gaps close (per Tier E roadmap).
+            rule {
+                minBound((project.findProperty("koverLineMin") as? String)?.toIntOrNull() ?: 25)
+            }
+        }
+    }
+}
+
+pitest {
+    targetClasses.set(listOf("com.mobilebytelabs.kmpflavors.*"))
+    threads.set(4)
+    outputFormats.set(listOf("HTML", "XML"))
+    timestampedReports.set(false)
+    junit5PluginVersion.set(libs.versions.pitestJunit5.get())
+    // Mutation testing is INFORMATIONAL ONLY in v2.6 — uploaded as PR artifact
+    // by .github/workflows/coverage-gate.yml. Promoted to gate v2.7+.
 }

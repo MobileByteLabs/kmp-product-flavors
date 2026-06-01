@@ -98,6 +98,7 @@ internal object CompilationRegistrar {
         parentSourceSetsFor: (variantName: String) -> List<KotlinSourceSet> = { emptyList() },
         variantSpecificSrcDirsFor: (variantName: String) -> List<String> = { emptyList() },
         logger: Logger? = null,
+        shouldRegisterVariantOnTarget: (variantName: String, targetName: String) -> Boolean = { _, _ -> true },
     ) {
         if (variantNames.isEmpty()) return
 
@@ -109,6 +110,17 @@ internal object CompilationRegistrar {
                 logger?.warn(
                     "[KMP Flavors] Skipping reserved compilation name '$variantName' " +
                         "on target '${target.name}'",
+                )
+                continue
+            }
+
+            // v2.6 Phase 4 — `variantFilter { excludeTargets(...) }` opt-out. Skip
+            // registration when the consumer's filter excluded this (variant, target)
+            // pair. Dead source sets stay on disk (intentional — see SOURCE_SET_DISCIPLINE).
+            if (!shouldRegisterVariantOnTarget(variantName, target.name)) {
+                logger?.info(
+                    "[KMP Flavors] Skipping variant '$variantName' on target '${target.name}' " +
+                        "(excluded via kmpFlavors.variantFilter { excludeTargets(...) }).",
                 )
                 continue
             }

@@ -56,11 +56,19 @@ internal object AggregateTasksRegistrar {
             val aggregateName = "assembleAll${targetCap}Variants"
             perTargetAggregateNames += aggregateName
 
+            // v2.6 Phase 4 — exclude inactive variants whose `excludeTargets(...)` filter
+            // pruned the current target. CompilationRegistrar didn't register the
+            // matching `compile{Variant}Kotlin{Target}` task, so depending on it here
+            // would fail at task-graph resolution.
+            val applicableInactiveVariants = inactiveVariants.filter { variant ->
+                target.name !in variant.excludedTargets
+            }
+
             // Collect compile task names for the active variant (main compilation)
-            // + each inactive variant (per-variant compilation).
+            // + each applicable inactive variant (per-variant compilation).
             val compileTaskNames = mutableListOf<String>()
             compileTaskNames += "compileKotlin$targetCap"
-            inactiveVariants.forEach { v ->
+            applicableInactiveVariants.forEach { v ->
                 val variantCap = v.name.replaceFirstChar { it.uppercase() }
                 compileTaskNames += "compile${variantCap}Kotlin$targetCap"
             }
@@ -69,7 +77,7 @@ internal object AggregateTasksRegistrar {
                 this.group = TASK_GROUP
                 this.description =
                     "Compile every kmpFlavors variant on target '${target.name}' " +
-                    "(${1 + inactiveVariants.size} variant(s))."
+                    "(${1 + applicableInactiveVariants.size} variant(s))."
                 compileTaskNames.forEach { taskName ->
                     dependsOn(project.tasks.named(taskName))
                 }

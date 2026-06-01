@@ -7,6 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.0-alpha.1] - 2026-06-01 — Stability + KMP↔AGP Parity + Beyond-Platform (Phases 1–5)
+
+**No breaking changes for v2.5.x consumers — all v2.6 DSL is additive.**
+
+See [`docs/MIGRATION_v2.5_TO_v2.6.md`](docs/MIGRATION_v2.5_TO_v2.6.md) (opens with "You do not need to migrate.") for the optional cookbook. v2.6.0 ships as a 5-phase epic (`plan-layer/.../v26-stability-parity-beyond-platform/`); alpha.1 marks Phases 1–5 implementation complete; promotion to `2.6.0-rc.0` then `2.6.0` GA follows the standard cron-driven cadence.
+
+### Added — Phase 1: Coverage gate + stability
+
+- **Kover plugin** applied to `build-logic/flavor-plugin/` (mirrors the `mifos-x/kmp-project-template` `configureKoverRootReports()` pattern) with `koverVerify` rule at floor 25% (empirical baseline ~30% at ship; ramps toward 95% per `-PkoverLineMin` overrides as gaps close).
+- **Pitest mutation testing** baseline (1.19.0-rc.1) as informational PR artifact via `.github/workflows/coverage-gate.yml` (`continue-on-error: true` — gating in v2.7+).
+- **AGP matrix CI** workflow `.github/workflows/agp-matrix-compat.yml` validates `finalizeDsl` + `beforeVariants` reflective paths against AGP 8.0.2 / 8.5.2 / 8.10.0 / 9.0.0-rc01 via `sed -i` swap of `agp =` in `libs.versions.toml` (mirrors `multi-kgp-matrix.yml` pattern).
+- **`AgpBridgeMultiDimTest` re-enabled** — `propagateFlavorsLegacy` + `propagateFlavorsCrossProduct` visibility changed from `private` to `internal` (no consumer-facing API impact); tests now call propagators directly with a reflection-shaped `MockAndroidExtension`.
+- **`docs/COVERAGE_GUIDE.md`** + **`docs/SOURCE_SET_DISCIPLINE.md`** (research finding on inactive source-set "Unused" warning; Hypothesis D opt-in flag recommended for Tier E.1 follow-up).
+
+### Added — Phase 2: KMP↔AGP variantFilter parity
+
+- **`AgpBridge.propagateVariantFilterToAgp()`** — reflective `beforeVariants(null, action)` call disables AGP-side variants whose names aren't in `FlavorVariantResolver.resolveAllVariants()`. Closes the v2.5 asymmetry where `./gradlew tasks --all` showed AGP variants the consumer thought they'd excluded via `kmpFlavors.variantFilter { exclude() }`.
+- **Variant-name-matching contract** verified by `AgpBridgeTest` 2D + 3D parity fixtures + graceful WARN fallback when `setEnabled` setter is missing.
+- **`docs/KMP_AGP_PARITY.md`** authored.
+
+### Added — Phase 3: DI (Koin) + Analytics tags codegen
+
+- **`kmpFlavors { di { koin { variantModule(name) { "free" { ... }; "paid" { ... } } } } }`** DSL block — codegens `expect val ${name}Module: Module` + per-flavor `actual val` + `fun flavorDependentModules(): List<Module>` aggregator helper. Plugin remains Koin-agnostic; consumer brings their own `io.insert-koin:koin-core` dep.
+- **`kmpFlavors { analytics { enabled.set(true); customTag(name) { variant -> ... } } }`** DSL block — codegens per-variant `AnalyticsTags.kt` with `VARIANT_NAME` + `BUILD_TYPE` + every declared custom tag plus a reflective `attachTo(target)` helper for Firebase-Crashlytics-shaped targets.
+- **Active + inactive variants both supported** — active routes to each target's `main` compilation source set; inactive routes to per-variant compilation. Snapshot tests + 7 hand-written fixtures committed.
+- **`docs/DI_INTEGRATION.md`** + **`docs/ANALYTICS_INTEGRATION.md`** authored.
+
+### Added — Phase 4: Conditional target sets + Network/Ktor constants
+
+- **`variantFilter { excludeTargets(vararg targets: String) }`** extension — `CompilationRegistrar` + `AggregateTasksRegistrar` honor per-variant target exclusions (CI cost reduction — `free` tier skips watchOS/tvOS). `VariantFilter.availableTargets` surface exposes the project's declared target names so consumers can debug.
+- **`kmpFlavors { buildKonfig { network { baseUrl("free" to "..."); timeout(seconds = 30) } } }`** DSL block — emits `object Network { BASE_URL; TIMEOUT_SECONDS }` inside the active variant's BuildKonfig. URL resolution: codegen picks the first key whose flavor name matches one of the variant's active flavors.
+- **`KMPF-V29`** (baseUrl flavor missing) + **`KMPF-V30`** (no baseUrl for active variant) validator codes — fire at configuration time before codegen.
+- **`samples/conditional-targets/`** sample (4 variants × 7 targets; free tier skips watchOS/tvOS → 20 compilations vs. 28; ~28% CI savings).
+- **`docs/CONDITIONAL_TARGETS.md`** + **`docs/NETWORK_CONFIG.md`** authored.
+
+### Preserved
+
+- **KMPF-V21** (v1.x `activeFlavor` shim) — still ERROR. User chose strict-additive contract → preservation. Removal ships v2.7 with its own migration cookbook.
+- **Version floor** — Gradle 8.0+ / KGP 2.0.21+ / AGP 8.0+ / JDK 17+ / CMP 1.7.0+. **UNCHANGED across v2.4 → v2.5 → v2.6.**
+- **AGP bridge 1-dim fast path** — byte-identical to v2.4.3 (regression-bounded by AGP matrix CI).
+- **All existing TestKit + ProjectBuilder tests** continue to pass under the new coverage gate (279 tests at ship vs. 258 at v2.5 GA).
+
+### Deferred to v2.7
+
+- Ktor client factory codegen (Approach B; v2.6 ships constants-only per D7)
+- `LibraryObservation` integration for analytics tags
+- 100% line / 95% branch coverage (v2.6 ships at floor 25, ramps toward 95)
+- Mutation testing as CI gate (v2.6 informational only)
+- Kodein-DI / Hilt-KMP / dagger integration (Koin first per D8)
+- `excludeTargets` glob pattern support
+- Active-variant inactive-source-set "Unused Kotlin Source Sets" suppression (Hypothesis D opt-in flag — see `SOURCE_SET_DISCIPLINE.md`; deferred to Tier E.1 follow-up plan)
+
+### Dependencies
+
+- No new runtime dependencies on the consumer side. Plugin remains
+  Koin-agnostic / Ktor-agnostic / Crashlytics-agnostic — consumer brings their
+  own dep if they want to use the codegen outputs.
+- Build-side: `kover` 0.9.1 + `pitest` 1.19.0-rc.1 + `pitestJunit5` 1.2.1 added
+  to `gradle/libs.versions.toml` (build-only; not exposed to consumers).
+
 ## [2.5.0-alpha.1] - 2026-05-30 — Capability Expansion (Phases 1–4)
 
 **No breaking changes for v2.4.x consumers — all v2.5 DSL is additive.**

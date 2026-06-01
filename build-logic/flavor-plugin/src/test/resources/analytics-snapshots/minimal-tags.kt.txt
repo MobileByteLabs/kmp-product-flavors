@@ -1,0 +1,16 @@
+package com.example.analytics
+
+/** v2.6 auto-generated cross-platform analytics metadata. */
+object AnalyticsTags {
+    const val VARIANT_NAME: String = "freeDebug"
+    const val BUILD_TYPE: String = "debug"
+
+    /** Reflectively attaches every tag to a Firebase-Crashlytics-shaped target. */
+    fun attachTo(target: Any) {
+        val method = target.javaClass.methods.firstOrNull {
+            it.name == "setCustomKey" && it.parameterCount == 2
+        } ?: return
+        method.invoke(target, "variant_name", VARIANT_NAME)
+        method.invoke(target, "build_type", BUILD_TYPE)
+    }
+}

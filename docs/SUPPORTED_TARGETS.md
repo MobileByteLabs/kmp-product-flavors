@@ -132,3 +132,27 @@ extension surface is:
 That's it. No changes needed to `SourceSetConfigurator`, `CompilationRegistrar`,
 `AggregateTasksRegistrar`, `ComposeResourcesConfigurator`, or `PerVariantNpmPublishConfigurator` — they're all
 generic over the `PlatformGroup` list `PlatformDetector` produces.
+
+---
+
+## Conditional target sets per variant (v2.6+)
+
+Use `kmpFlavors { variantFilter { excludeTargets(...) } }` to skip targets for
+specific variants. Operationally critical for CI cost reduction — the `free`
+tier doesn't need watchOS / tvOS. See [`CONDITIONAL_TARGETS.md`](CONDITIONAL_TARGETS.md)
+for the full pattern + dead-source-set rationale.
+
+Example: `free` tier excluding watchOS / tvOS:
+
+```kotlin
+kmpFlavors {
+    variantFilter {
+        if (flavorNames.contains("free")) {
+            excludeTargets("watchosArm64", "watchosX64", "tvosArm64", "tvosX64")
+        }
+    }
+}
+```
+
+`CompilationRegistrar` + `AggregateTasksRegistrar` consult per-variant
+exclusions and skip the matching `compile{Variant}Kotlin{Target}` tasks.

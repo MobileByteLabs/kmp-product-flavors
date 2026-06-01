@@ -184,6 +184,64 @@ open class BuildKonfigDsl internal constructor() {
         action.execute(scope)
         perTargetBlocks.getOrPut(targetName) { mutableListOf() }.addAll(scope.fields)
     }
+
+    /**
+     * v2.6 Phase 4 — variant-aware network constants. Codegen emits a nested
+     * `BuildKonfig.Network { BASE_URL; TIMEOUT_SECONDS }` block; the URL chosen
+     * matches the active variant's flavor name.
+     *
+     * ```kotlin
+     * kmpFlavors {
+     *     buildKonfig {
+     *         network {
+     *             baseUrl(
+     *                 "free" to "https://api.free.example.com",
+     *                 "paid" to "https://api.paid.example.com",
+     *             )
+     *             timeout(seconds = 30)
+     *         }
+     *     }
+     * }
+     * ```
+     *
+     * Validation: missing flavor keys fire KMPF-V29; variants with no matching
+     * baseUrl fire KMPF-V30. See docs/NETWORK_CONFIG.md.
+     */
+    internal val network: NetworkDsl = NetworkDsl()
+
+    fun network(action: Action<NetworkDsl>) {
+        action.execute(network)
+    }
+}
+
+/**
+ * v2.6 Phase 4 — `network { baseUrl(); timeout() }` block inside `buildKonfig {}`.
+ *
+ * See [BuildKonfigDsl.network] for the consumer-facing entry point.
+ */
+open class NetworkDsl internal constructor() {
+    internal val baseUrls: MutableMap<String, String> = linkedMapOf()
+    internal var timeoutSeconds: Int = 30
+
+    /**
+     * Register one or more `"flavor" to "https://..."` URL mappings.
+     */
+    fun baseUrl(vararg pairs: Pair<String, String>) {
+        require(pairs.isNotEmpty()) { "network { baseUrl(...) } requires at least one flavor → URL pair" }
+        pairs.forEach { (flavor, url) ->
+            require(flavor.isNotBlank()) { "network { baseUrl(...) } flavor key must be non-blank" }
+            require(url.isNotBlank()) { "network { baseUrl(\"$flavor\" to ...) } URL must be non-blank" }
+            baseUrls[flavor] = url
+        }
+    }
+
+    /**
+     * Set the global `TIMEOUT_SECONDS` constant. Must be positive.
+     */
+    fun timeout(seconds: Int) {
+        require(seconds > 0) { "network { timeout(seconds=$seconds) } must be positive" }
+        timeoutSeconds = seconds
+    }
 }
 
 /**

@@ -255,6 +255,12 @@ class KmpFlavorPlugin : Plugin<Project> {
             variantFilters = extension.variantFilterActions,
             buildTypes = buildTypesList,
             enableBuildTypes = enableBuildTypesFlag,
+            // v2.6 Phase 4 — surface the project's Kotlin target names to the variantFilter
+            // so consumers can call `excludeTargets("watchosArm64", ...)`. `android` and
+            // `metadata` are filtered out — they're either a separate (AGP) bridge concern
+            // or KGP internals.
+            availableTargets = kotlin.targets.map { it.name }
+                .filterNot { it == "android" || it == "metadata" }.toSet(),
         )
         // Don't early-return on empty allVariants — the validator below needs to see them so
         // V03/V04/V08 surface as structured findings. We still log the warn line for v1.x
@@ -395,6 +401,15 @@ class KmpFlavorPlugin : Plugin<Project> {
             kotlinTargetNames = kotlin.targets.map { it.name }.toSet() +
                 kotlin.sourceSets.map { it.name }.toSet() +
                 familyIntermediates,
+            // v2.6 Phase 4 inputs — V29 + V30. The baseUrl keys are declared flavor
+            // names; registered flavor names are derived from `flavors` (top-level +
+            // dimension members); active-flavor per variant is the primary flavor
+            // (first dimension's flavor in the variant).
+            buildKonfigBaseUrlFlavors = buildKonfigDsl.network.baseUrls.keys,
+            registeredFlavorNames = flavors.map { it.name }.toSet(),
+            variantActiveFlavors = allVariants.associate { v ->
+                v.name to (v.flavorNames.firstOrNull() ?: "")
+            },
         )
         val combinedFindings = validationFindings + platformFindings + buildKonfigFindings
         val errors = combinedFindings.filter { it.severity == KmpFlavorValidationSeverity.ERROR }
@@ -509,6 +524,13 @@ class KmpFlavorPlugin : Plugin<Project> {
             val variantSpecificSrcDirsFor: (String) -> List<String> = { name ->
                 listOf("src/$name/kotlin")
             }
+            // v2.6 Phase 4 — build per-variant target-exclusion lookup so the registrar
+            // can skip (variant, target) pairs the consumer pruned via
+            // `variantFilter { excludeTargets(...) }`.
+            val variantTargetExclusions: Map<String, Set<String>> =
+                allVariants.filter { it.excludedTargets.isNotEmpty() }
+                    .associate { it.name to it.excludedTargets }
+
             nonAndroidTargets.forEach { target ->
                 CompilationRegistrar.register(
                     target = target,
@@ -516,6 +538,9 @@ class KmpFlavorPlugin : Plugin<Project> {
                     parentSourceSetsFor = parentSourceSetsFor,
                     variantSpecificSrcDirsFor = variantSpecificSrcDirsFor,
                     logger = logger,
+                    shouldRegisterVariantOnTarget = { variantName, targetName ->
+                        variantTargetExclusions[variantName]?.contains(targetName) != true
+                    },
                 )
             }
             logger.lifecycle(
@@ -645,6 +670,28 @@ class KmpFlavorPlugin : Plugin<Project> {
                 flavors = flavors,
                 kotlin = kotlin,
                 shouldGenerate = shouldGenerateCodegen(project, extension),
+            )
+
+            // v2.6 Phase 3 — DI (Koin) per-variant module codegen. No-op when no
+            // `kmpFlavors { di { koin { variantModule(...) { ... } } } }` declared.
+            // Wires active variant into each target's `main` compilation + inactive
+            // variants into their per-variant compilations.
+            com.mobilebytelabs.kmpflavors.internal.PerVariantKoinDiConfigurator.configure(
+                project = project,
+                extension = extension,
+                activeVariant = activeVariantResolved,
+                inactiveVariants = inactiveVariants,
+                kotlin = kotlin,
+            )
+
+            // v2.6 Phase 3 — cross-platform analytics tags codegen. No-op when
+            // `kmpFlavors { analytics { enabled.set(false) } }` (default).
+            com.mobilebytelabs.kmpflavors.internal.PerVariantAnalyticsTagConfigurator.configure(
+                project = project,
+                extension = extension,
+                activeVariant = activeVariantResolved,
+                inactiveVariants = inactiveVariants,
+                kotlin = kotlin,
             )
 
             // v2.5 Phase 3 — register FrameworkSchemaCheckTask when buildKonfig { secret(...) }
@@ -818,6 +865,10 @@ class KmpFlavorPlugin : Plugin<Project> {
             kmpFlavors = flavors,
             kmpBuildTypes = extension.buildTypes.toList(),
             logger = logger,
+            // v2.6 Phase 2 — KMP↔AGP variantFilter parity. The post-filter KMP variant
+            // names define the canonical set; AgpBridge registers a beforeVariants
+            // callback that disables AGP variants whose names are not in this set.
+            allowedVariantNames = allVariants.map { it.name }.toSet(),
         )
 
         // SPM manifest generator — opt-in via spm { generateManifest.set(true) }.
@@ -1147,6 +1198,17 @@ class KmpFlavorPlugin : Plugin<Project> {
                 allBuildTypeNames.set(extension.buildTypes.map { it.name }.toSet())
                 activeBuildTypeName.set(activeVariantResolved.buildType?.name ?: "")
                 buildConfigFields.set(activeVariantResolved.mergedBuildConfigFields)
+                // v2.6 Phase 4 — wire network constants for the active variant too. The
+                // codegen task uses activeFlavorNames to pick the right baseUrl mapping.
+                val bkNetwork = extension.buildKonfigDsl.network
+                if (bkNetwork.baseUrls.isNotEmpty()) {
+                    networkConfigSpec.set(
+                        com.mobilebytelabs.kmpflavors.NetworkConfigSpec(
+                            baseUrls = bkNetwork.baseUrls.toMap(),
+                            timeoutSeconds = bkNetwork.timeoutSeconds,
+                        ),
+                    )
+                }
                 outputDirectory.set(
                     project.layout.buildDirectory.dir("generated/kmpFlavors/commonMain/kotlin"),
                 )

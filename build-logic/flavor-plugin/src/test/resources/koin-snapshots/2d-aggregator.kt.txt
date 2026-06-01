@@ -1,0 +1,9 @@
+package com.example.di
+
+import org.koin.core.module.Module
+
+expect val networkModule: Module
+
+fun flavorDependentModules(): List<Module> = listOf(
+    networkModule
+)

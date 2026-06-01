@@ -58,8 +58,16 @@ class VariantFilter(
      * ```
      */
     val buildType: String? = null,
+    /**
+     * v2.6 — the set of Kotlin target names available in this project
+     * (`"desktop"`, `"iosArm64"`, `"watchosArm64"`, etc.). Surfaced as a
+     * read-only field so consumer filters can reason about which target
+     * names are valid for [excludeTargets].
+     */
+    val availableTargets: Set<String> = emptySet(),
 ) {
     private var excluded = false
+    private val excludedTargets: MutableSet<String> = mutableSetOf()
 
     /**
      * Marks this variant to be excluded from the build.
@@ -121,4 +129,35 @@ class VariantFilter(
      * @return The flavor name from that dimension, or null if not found
      */
     fun getFlavorFromDimension(dimensionName: String): String? = flavors.find { it.dimension.orNull == dimensionName }?.name
+
+    /**
+     * v2.6 — exclude this variant from the named Kotlin targets. The variant
+     * itself stays in the resolved set; only the per-target compilations for
+     * the named targets are skipped. Common use case: gate CI-expensive
+     * targets (`watchosArm64`, `tvosArm64`) on the active variant's tier.
+     *
+     * ```kotlin
+     * variantFilter {
+     *     if (flavorNames.contains("free")) {
+     *         excludeTargets("watchosArm64", "watchosX64", "tvosArm64", "tvosX64")
+     *     }
+     * }
+     * ```
+     *
+     * Target names must match the names declared in the `kotlin { ... }` block
+     * exactly (the same strings you'd find in [availableTargets]). Globs are
+     * not supported in v2.6 — pass each target by name.
+     *
+     * @throws IllegalArgumentException when called with zero target names.
+     */
+    fun excludeTargets(vararg targets: String) {
+        require(targets.isNotEmpty()) { "excludeTargets() requires at least one target name" }
+        targets.forEach { excludedTargets.add(it) }
+    }
+
+    /** v2.6 internal — query whether this variant excluded a given target. */
+    internal fun isTargetExcluded(target: String): Boolean = target in excludedTargets
+
+    /** v2.6 internal — snapshot of declared excluded-target names. */
+    internal fun excludedTargetsSnapshot(): Set<String> = excludedTargets.toSet()
 }

@@ -42,6 +42,9 @@ include(":samples:multi-dim-3d")
 // v2.5 — canonical buildKonfig {} DSL sample exercising secret/enum/customField/perTarget.
 // See samples/buildkonfig-rich/README.md (TBD) + docs/SECRETS_INTEGRATION.md.
 include(":samples:buildkonfig-rich")
+// v2.6 Phase 4 — sample exercising `variantFilter { excludeTargets(...) }` for CI cost
+// discipline (free tier skips watchOS/tvOS). See samples/conditional-targets/README.md.
+include(":samples:conditional-targets")
 
 // Note: samples/kmp-project-template is a standalone project with its own build
 // Build it separately: cd samples/kmp-project-template && ./gradlew build

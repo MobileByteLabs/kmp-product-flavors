@@ -225,4 +225,89 @@ class BuildKonfigCodegenSnapshotTest {
         // SV15 — no real secret values
         assertTrue(!output.contains("Bearer ") && !output.contains("sk_live_"))
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // v2.6 Phase 4 — network() block emission
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `v2-6 network block emits BuildKonfig dot Network with active variant's BASE_URL and TIMEOUT_SECONDS`() {
+        val task = newTask()
+        task.variantName.set("freeDev")
+        task.allFlavorNames.set(setOf("free", "paid"))
+        task.activeFlavorNames.set(setOf("free", "dev"))
+        task.allBuildTypeNames.set(emptySet())
+        task.activeBuildTypeName.set("")
+        task.buildConfigFields.set(emptyMap())
+        task.networkConfigSpec.set(
+            com.mobilebytelabs.kmpflavors.NetworkConfigSpec(
+                baseUrls = mapOf(
+                    "free" to "https://api.free.example.com",
+                    "paid" to "https://api.paid.example.com",
+                ),
+                timeoutSeconds = 30,
+            ),
+        )
+
+        val output = runAndReadOutput(task)
+
+        assertTrue(output.contains("object Network {"), "Network block expected in output:\n$output")
+        assertTrue(
+            output.contains("const val BASE_URL: String = \"https://api.free.example.com\""),
+            "BASE_URL should resolve to the active variant ('free') URL; output:\n$output",
+        )
+        assertTrue(
+            output.contains("const val TIMEOUT_SECONDS: Int = 30"),
+            "TIMEOUT_SECONDS should match the spec value; output:\n$output",
+        )
+        // Active variant resolution: 'paid' baseUrl must NOT leak into a 'free*' variant.
+        assertTrue(
+            !output.contains("https://api.paid.example.com"),
+            "Inactive variant URL must not appear; output:\n$output",
+        )
+    }
+
+    @Test
+    fun `v2-6 network block resolves paid variant to paid URL`() {
+        val task = newTask()
+        task.variantName.set("paidProd")
+        task.allFlavorNames.set(setOf("free", "paid"))
+        task.activeFlavorNames.set(setOf("paid", "prod"))
+        task.allBuildTypeNames.set(emptySet())
+        task.activeBuildTypeName.set("")
+        task.buildConfigFields.set(emptyMap())
+        task.networkConfigSpec.set(
+            com.mobilebytelabs.kmpflavors.NetworkConfigSpec(
+                baseUrls = mapOf(
+                    "free" to "https://api.free.example.com",
+                    "paid" to "https://api.paid.example.com",
+                ),
+                timeoutSeconds = 60,
+            ),
+        )
+
+        val output = runAndReadOutput(task)
+
+        assertTrue(output.contains("const val BASE_URL: String = \"https://api.paid.example.com\""))
+        assertTrue(output.contains("const val TIMEOUT_SECONDS: Int = 60"))
+        assertTrue(!output.contains("https://api.free.example.com"))
+    }
+
+    @Test
+    fun `v2-6 network block is omitted when no networkConfigSpec is set`() {
+        val task = newTask()
+        task.variantName.set("freeDev")
+        task.allFlavorNames.set(setOf("free", "paid"))
+        task.activeFlavorNames.set(setOf("free", "dev"))
+        task.allBuildTypeNames.set(emptySet())
+        task.activeBuildTypeName.set("")
+        task.buildConfigFields.set(emptyMap())
+        // Intentionally do NOT call task.networkConfigSpec.set(...)
+
+        val output = runAndReadOutput(task)
+
+        assertTrue(!output.contains("object Network {"), "Network block must be absent when no spec set")
+        assertTrue(!output.contains("BASE_URL"))
+        assertTrue(!output.contains("TIMEOUT_SECONDS"))
+    }
 }

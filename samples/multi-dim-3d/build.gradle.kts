@@ -95,6 +95,46 @@ kmpFlavors {
             exclude()
         }
     }
+
+    // v2.6 Phase 3 — cross-platform analytics tags codegen. Emits per-variant
+    // `AnalyticsTags.kt` with VARIANT_NAME + BUILD_TYPE + each declared customTag
+    // as `const val` plus an `attachTo(target)` reflective helper. See
+    // docs/ANALYTICS_INTEGRATION.md.
+    analytics {
+        enabled.set(true)
+        customTag("environment") { variant ->
+            variant.flavors.firstOrNull { it.name in listOf("dev", "prd") }?.name ?: "default"
+        }
+        customTag("tier") { variant ->
+            variant.flavors.firstOrNull { it.name in listOf("free", "paid") }?.name ?: "default"
+        }
+    }
+
+    // v2.6 Phase 3 — DI (Koin) variant module codegen. Emits per-variant `actual val
+    // networkModule: Module = module { ... }` files + commonMain `expect val` +
+    // `flavorDependentModules(): List<Module>` aggregator helper. See
+    // docs/DI_INTEGRATION.md for the full integration pattern.
+    //
+    // NOTE: this sample does NOT wire the Koin runtime — the codegen output imports
+    // `org.koin.core.module.Module` and `org.koin.dsl.module`, which only compile
+    // when the consumer adds `io.insert-koin:koin-core`. The block stays commented
+    // to keep `:samples:multi-dim-3d:build` green on the plugin's CI matrix
+    // (no Koin dep on the sample classpath).
+    //
+    // di {
+    //     koin {
+    //         variantModule("network") {
+    //             "free" {
+    //                 singleOf("::FreeNetworkFactory")
+    //                 bind("NetworkFactory")
+    //             }
+    //             "paid" {
+    //                 singleOf("::PaidNetworkFactory")
+    //                 bind("NetworkFactory")
+    //             }
+    //         }
+    //     }
+    // }
 }
 
 kotlin {

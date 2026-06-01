@@ -157,6 +157,18 @@ abstract class GenerateBuildConfigTask : DefaultTask() {
     abstract val buildKonfigSecretIds: ListProperty<String>
 
     /**
+     * v2.6 Phase 4 — variant-aware network constants. When set, codegen emits a
+     * `BuildKonfig.Network { BASE_URL; TIMEOUT_SECONDS }` block. The URL is
+     * selected from [com.mobilebytelabs.kmpflavors.NetworkConfigSpec.baseUrls]
+     * by matching the key against the active variant's flavor names.
+     * Validation surfaces KMPF-V29 (missing flavor) and KMPF-V30 (no baseUrl
+     * for active variant) at extension-evaluation time.
+     */
+    @get:Input
+    @get:Optional
+    abstract val networkConfigSpec: Property<com.mobilebytelabs.kmpflavors.NetworkConfigSpec>
+
+    /**
      * Output directory for generated files.
      * Default: build/generated/kmpFlavors/commonMain/kotlin
      */
@@ -317,6 +329,24 @@ abstract class GenerateBuildConfigTask : DefaultTask() {
                     }
                     appendLine("        }")
                 }
+                appendLine("    }")
+                appendLine()
+            }
+
+            // ─── v2.6 Phase 4 network constants ──────────────────────────────────
+            // Picks the URL whose key matches one of the active variant's flavor
+            // names. If no match is found, emits the sentinel placeholder; the
+            // KMPF-V30 validator should have surfaced this at extension-eval time
+            // so the placeholder is a belt-and-suspenders safety net.
+            val networkSpec = networkConfigSpec.orNull
+            if (networkSpec != null && networkSpec.baseUrls.isNotEmpty()) {
+                val activeFlavors = activeFlavorNames.get()
+                val matchingFlavor = activeFlavors.firstOrNull { it in networkSpec.baseUrls.keys }
+                val activeUrl = networkSpec.baseUrls[matchingFlavor] ?: "<no baseUrl mapped for active variant>"
+                appendLine("    // ─── v2.6 network constants ──────────────────────────────────")
+                appendLine("    object Network {")
+                appendLine("        const val BASE_URL: String = \"$activeUrl\"")
+                appendLine("        const val TIMEOUT_SECONDS: Int = ${networkSpec.timeoutSeconds}")
                 appendLine("    }")
                 appendLine()
             }

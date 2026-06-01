@@ -707,6 +707,45 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
         action.execute(featureFlags)
     }
 
+    /**
+     * v2.6 Phase 3 — DI integration scope (Koin only in v2.6; Kodein/Hilt-KMP/dagger
+     * future). See [DiDsl] for the nested `koin { variantModule(...) { ... } }` DSL.
+     *
+     * Per-variant codegen emits `expect val ${name}Module` in commonMain + per-flavor
+     * `actual val` + a `flavorDependentModules(): List<Module>` aggregator helper.
+     *
+     * No-op when no `variantModule(...)` blocks are declared. The plugin does NOT
+     * inject `io.insert-koin:koin-core` — consumer brings their own Koin dependency.
+     */
+    val di: org.gradle.api.provider.Property<DiDsl> =
+        objects.property(DiDsl::class.java).convention(objects.newInstance(DiDsl::class.java))
+
+    /**
+     * v2.6 Phase 3 — configure DI integration.
+     */
+    fun di(action: Action<DiDsl>) {
+        action.execute(di.get())
+    }
+
+    /**
+     * v2.6 Phase 3 — cross-platform analytics tags scope. See [AnalyticsTagsConfig] for
+     * the `customTag(name) { variant -> ... }` DSL.
+     *
+     * Codegen emits `AnalyticsTags.kt` per variant with `VARIANT_NAME` + `BUILD_TYPE`
+     * constants plus consumer-declared custom tags + an `attachTo(target)` extension
+     * helper that reflectively wires into Firebase Crashlytics-shaped targets.
+     *
+     * No-op when `analytics.enabled = false` (default).
+     */
+    val analytics: AnalyticsTagsConfig = objects.newInstance(AnalyticsTagsConfig::class.java)
+
+    /**
+     * v2.6 Phase 3 — configure analytics tag integration.
+     */
+    fun analytics(action: Action<AnalyticsTagsConfig>) {
+        action.execute(analytics)
+    }
+
     init {
         // Set conventions
         generateBuildConfig.convention(true)

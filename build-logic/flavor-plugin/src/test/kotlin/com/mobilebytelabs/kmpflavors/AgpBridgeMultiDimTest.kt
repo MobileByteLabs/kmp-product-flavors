@@ -17,136 +17,85 @@
 package com.mobilebytelabs.kmpflavors
 
 import com.mobilebytelabs.kmpflavors.internal.AgpBridge
-import io.mockk.every
+import com.mobilebytelabs.kmpflavors.internal.MockAndroidExtension
 import io.mockk.mockk
-import io.mockk.slot
 import io.mockk.verify
-import org.gradle.api.Project
 import org.gradle.api.logging.Logger
-import org.gradle.api.plugins.PluginContainer
 import org.gradle.testfixtures.ProjectBuilder
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 /**
- * v2.5 Phase 1 — `AgpBridge` cross-product routing tests.
+ * v2.6 Tier C — `AgpBridge` cross-product routing tests, re-enabled.
  *
- * Scope: verify the DISPATCH logic added in v2.5 (1-dim → legacy fast path,
- * ≥2-dim → cross-product path).
+ * History: previously @Disabled because [AgpBridge.apply] short-circuits at the
+ * AGP-extension resolution gate when no AGP classpath is present. v2.6 Tier C
+ * (this commit) promotes [AgpBridge.propagateFlavorsLegacy] and
+ * [AgpBridge.propagateFlavorsCrossProduct] from `private` to `internal` so
+ * these tests can invoke them directly with a reflection-shaped
+ * [MockAndroidExtension] — completely sidestepping the AGP-class-loading gate.
  *
- * **All tests in this class are @Disabled.** Reason: `AgpBridge.apply()`
- * short-circuits at AGP-extension resolution when the test project doesn't
- * have AGP on the classpath (`findByType(AndroidComponentsExtension::class)`
- * returns null → fallback → `findApplicationExtension` returns null → WARN log
- * + return). The `propagateFlavors` / `propagateFlavorsLegacy` / `propagateFlavorsCrossProduct`
- * methods are PRIVATE and only reachable through the AGP-class-loading path,
- * which can't be mocked without real AGP on the test classpath (same reason
- * existing `AgpBridgeTest` only tests early-return behavior, not real
- * propagation).
+ * The dispatcher [AgpBridge.apply] stays integration-tested via the
+ * `samples/multi-dim-3d` TestKit build (it needs a real AGP classpath to
+ * exercise `finalizeDsl`). Unit-test scope here is the per-branch propagator
+ * behavior: which dimensions/flavors are added to the mock extension and
+ * which telemetry lines the logger sees.
  *
- * The cross-product routing logic IS exercised end-to-end via:
- *
- * 1. `samples/multi-dim-3d/build.gradle.kts` — applies the plugin with 3 dimensions;
- *    when built with an Android plugin alongside, exercises the `propagateFlavorsCrossProduct`
- *    path with a real `AndroidComponentsExtension`.
- *
- * 2. The CI workflow `sample-target-coverage.yml` builds `samples/multi-dim-3d` per OS
- *    runner — regression discipline at integration level.
- *
- * 3. `KmpFlavorPluginValidatorTest` (V24+V25 tests) covers the validator-level
- *    discipline that supports the bridge rework (dimension-mutex + name-clash
- *    detection); these run at unit-test level and pass.
- *
- * Refactor opportunity (deferred to v2.5.x): change `propagateFlavorsLegacy` and
- * `propagateFlavorsCrossProduct` visibility from `private` to `internal` so these
- * tests can call them directly. Requires a stable internal API for the AGP-side
- * primitives (`appendDimensions`, `registerAgpFlavor`) that can be mocked. Out of
- * scope for v2.5.0-alpha.1.
- *
- * See `plan-layer/.../v25-multidim-targets-buildkonfig/01-dsl-bridge.md` for the
- * full discipline (AC 3, AC 4, AC 5, AC 6, AC 7 bridge portion).
+ * See `plan-layer/.../v26-stability-parity-beyond-platform/01-coverage-gate.md`
+ * Tier C (T6 + T7 + T8) for the contract.
  */
-@org.junit.jupiter.api.Disabled(
-    "Real AGP classpath needed — propagateFlavors short-circuits before cross-product " +
-        "logic runs. Integration coverage in samples/multi-dim-3d build. v2.5.x: " +
-        "refactor to internal visibility for direct testability.",
-)
 class AgpBridgeMultiDimTest {
 
     private val realProject = ProjectBuilder.builder().build()
     private val logger = mockk<Logger>(relaxed = true)
 
-    private fun flavor(name: String, dimension: String): FlavorConfig = realProject.objects.newInstance(FlavorConfig::class.java, name).apply {
-        this.dimension.set(dimension)
-    }
+    private fun flavor(name: String, dimension: String): FlavorConfig =
+        realProject.objects.newInstance(FlavorConfig::class.java, name).apply {
+            this.dimension.set(dimension)
+        }
 
-    private fun dim(name: String, priority: Int = 0): FlavorDimension = realProject.objects.newInstance(FlavorDimension::class.java, name).apply {
-        this.priority.set(priority)
-    }
-
-    /**
-     * Build a project mock that has `com.android.application` applied but with
-     * the rest of AGP missing — `findExtension` returns null. This exercises
-     * the early-return path before any propagator runs, letting us assert
-     * dispatch-time logging without needing AGP on the classpath.
-     */
-    private fun mockProjectWithAgpPluginButNoExtension(): Project {
-        val plugins = mockk<PluginContainer>(relaxed = true) {
-            every { hasPlugin("com.android.application") } returns true
+    private fun dim(name: String, priority: Int = 0): FlavorDimension =
+        realProject.objects.newInstance(FlavorDimension::class.java, name).apply {
+            this.priority.set(priority)
         }
-        val extensions = mockk<org.gradle.api.plugins.ExtensionContainer>(relaxed = true) {
-            every { findByType<Any>(any<Class<Any>>()) } returns null
-        }
-        return mockk<Project>(relaxed = true) {
-            every { this@mockk.plugins } returns plugins
-            every { this@mockk.extensions } returns extensions
-        }
-    }
 
     // ─────────────────────────────────────────────────────────────────────
-    // AC 3 — 1-dimension fast path is taken (regression bounding for v2.4
-    // consumers). We can't assert v2.4.3 byte-identical AGP DSL without AGP
-    // on the classpath; the live snapshot lives in `samples/` TestKit at the
-    // final Phase 4 `./gradlew check`. What we can assert here: the cross-
-    // product telemetry log "cross-product = N variants" is NOT emitted for
-    // 1-dim configs — proves the legacy branch was taken.
+    // AC 3 — 1-dimension legacy path: byte-identical to v2.4.3 behaviour.
+    // Direct call to propagateFlavorsLegacy verifies (a) flavor names landed
+    // in AGP container, (b) dimension landed in flavorDimensions, (c) the
+    // cross-product telemetry log is ABSENT (legacy path's signature).
     // ─────────────────────────────────────────────────────────────────────
 
     @Test
-    fun `1-dim config takes the legacy fast path - no cross-product telemetry log`() {
-        val project = mockProjectWithAgpPluginButNoExtension()
+    fun `legacy 1-dim path registers flavors and dimension on AGP extension`() {
+        val ext = MockAndroidExtension()
         val dimensions = listOf(dim("tier"))
         val flavors = listOf(flavor("free", "tier"), flavor("paid", "tier"))
 
-        AgpBridge.apply(
-            project = project,
-            bridgeProductFlavors = true,
-            bridgeBuildTypes = false,
-            kmpDimensions = dimensions,
-            kmpFlavors = flavors,
-            kmpBuildTypes = emptyList(),
-            logger = logger,
-        )
+        AgpBridge.propagateFlavorsLegacy(ext, dimensions, flavors, logger)
 
-        // Legacy path's hallmark: "Bridged N flavor(s) across 1 dimension(s)" without the
-        // "cross-product = ..." suffix. The cross-product path emits a distinct lifecycle log
-        // with "cross-product = " in the message — verify it's ABSENT for 1-dim.
+        assertEquals(listOf("tier"), ext.getFlavorDimensions())
+        assertEquals(setOf("free", "paid"), ext.getProductFlavors().getNames())
+        assertEquals("tier", ext.getProductFlavors().get("free")?.dimension)
+        assertEquals("tier", ext.getProductFlavors().get("paid")?.dimension)
         verify(exactly = 0) {
             logger.lifecycle(match<String> { it.contains("cross-product = ") })
+        }
+        verify(atLeast = 1) {
+            logger.lifecycle(match<String> { it.contains("Bridged 2 flavor(s) across 1 dimension(s)") })
         }
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // AC 4 + AC 5 — ≥2-dim configs take the cross-product path. Verify via
-    // the distinctive telemetry log emitted by `propagateFlavorsCrossProduct`.
+    // AC 4 + AC 5 — ≥2-dim cross-product path: variant count math + dimension
+    // ordering + per-flavor dimension assignment.
     // ─────────────────────────────────────────────────────────────────────
 
     @Test
-    fun `2D config (2 tier x 2 env) takes cross-product path with variant count = 4`() {
-        val project = mockProjectWithAgpPluginButNoExtension()
+    fun `cross-product 2D (2 tier x 2 env) emits 4-variant telemetry`() {
+        val ext = MockAndroidExtension()
         val dimensions = listOf(dim("tier"), dim("env"))
         val flavors = listOf(
             flavor("free", "tier"),
@@ -155,41 +104,22 @@ class AgpBridgeMultiDimTest {
             flavor("prod", "env"),
         )
 
-        AgpBridge.apply(
-            project = project,
-            bridgeProductFlavors = true,
-            bridgeBuildTypes = false,
-            kmpDimensions = dimensions,
-            kmpFlavors = flavors,
-            kmpBuildTypes = emptyList(),
-            logger = logger,
-        )
+        AgpBridge.propagateFlavorsCrossProduct(ext, dimensions, flavors, logger)
 
-        // Cross-product path emits exactly: "...cross-product = 4 variants from 2 × 2 per-dimension members"
-        val msgSlot = slot<String>()
+        assertEquals(listOf("tier", "env"), ext.getFlavorDimensions())
+        assertEquals(setOf("free", "paid", "dev", "prod"), ext.getProductFlavors().getNames())
         verify(atLeast = 1) {
-            logger.lifecycle(capture(msgSlot))
-        }
-        // Find the cross-product telemetry line (other lifecycle logs may also fire).
-        val crossProductLog = msgSlot.captured.takeIf { it.contains("cross-product = ") }
-        // Defensive — if `slot` only captured the last call, walk through verify with predicate:
-        if (crossProductLog == null) {
-            verify(atLeast = 1) {
-                logger.lifecycle(
-                    match<String> {
-                        it.contains("cross-product = 4 variants") && it.contains("2 × 2")
-                    },
-                )
-            }
-        } else {
-            assertTrue(crossProductLog.contains("cross-product = 4 variants"))
-            assertTrue(crossProductLog.contains("2 × 2"))
+            logger.lifecycle(
+                match<String> {
+                    it.contains("cross-product = 4 variants") && it.contains("2 × 2")
+                },
+            )
         }
     }
 
     @Test
-    fun `3D config (2 x 2 x 2) takes cross-product path with variant count = 8`() {
-        val project = mockProjectWithAgpPluginButNoExtension()
+    fun `cross-product 3D (2 x 2 x 2) emits 8-variant telemetry`() {
+        val ext = MockAndroidExtension()
         val dimensions = listOf(dim("tier"), dim("env"), dim("form"))
         val flavors = listOf(
             flavor("free", "tier"),
@@ -200,16 +130,10 @@ class AgpBridgeMultiDimTest {
             flavor("tablet", "form"),
         )
 
-        AgpBridge.apply(
-            project = project,
-            bridgeProductFlavors = true,
-            bridgeBuildTypes = false,
-            kmpDimensions = dimensions,
-            kmpFlavors = flavors,
-            kmpBuildTypes = emptyList(),
-            logger = logger,
-        )
+        AgpBridge.propagateFlavorsCrossProduct(ext, dimensions, flavors, logger)
 
+        assertEquals(listOf("tier", "env", "form"), ext.getFlavorDimensions())
+        assertEquals(6, ext.getProductFlavors().getNames().size)
         verify(atLeast = 1) {
             logger.lifecycle(
                 match<String> {
@@ -220,8 +144,8 @@ class AgpBridgeMultiDimTest {
     }
 
     @Test
-    fun `4D config (2 x 2 x 2 x 2) takes cross-product path with variant count = 16`() {
-        val project = mockProjectWithAgpPluginButNoExtension()
+    fun `cross-product 4D (2 x 2 x 2 x 2) emits 16-variant telemetry`() {
+        val ext = MockAndroidExtension()
         val dimensions = listOf(dim("tier"), dim("env"), dim("form"), dim("locale"))
         val flavors = listOf(
             flavor("free", "tier"),
@@ -234,16 +158,9 @@ class AgpBridgeMultiDimTest {
             flavor("ja", "locale"),
         )
 
-        AgpBridge.apply(
-            project = project,
-            bridgeProductFlavors = true,
-            bridgeBuildTypes = false,
-            kmpDimensions = dimensions,
-            kmpFlavors = flavors,
-            kmpBuildTypes = emptyList(),
-            logger = logger,
-        )
+        AgpBridge.propagateFlavorsCrossProduct(ext, dimensions, flavors, logger)
 
+        assertEquals(8, ext.getProductFlavors().getNames().size)
         verify(atLeast = 1) {
             logger.lifecycle(
                 match<String> {
@@ -254,9 +171,8 @@ class AgpBridgeMultiDimTest {
     }
 
     @Test
-    fun `cross-product handles uneven per-dimension counts correctly`() {
-        // 2 × 3 × 2 = 12 — proves the variant count math, not just powers of 2.
-        val project = mockProjectWithAgpPluginButNoExtension()
+    fun `cross-product handles uneven per-dimension counts (2 x 3 x 2 = 12)`() {
+        val ext = MockAndroidExtension()
         val dimensions = listOf(dim("tier"), dim("env"), dim("form"))
         val flavors = listOf(
             flavor("free", "tier"),
@@ -268,16 +184,9 @@ class AgpBridgeMultiDimTest {
             flavor("tablet", "form"),
         )
 
-        AgpBridge.apply(
-            project = project,
-            bridgeProductFlavors = true,
-            bridgeBuildTypes = false,
-            kmpDimensions = dimensions,
-            kmpFlavors = flavors,
-            kmpBuildTypes = emptyList(),
-            logger = logger,
-        )
+        AgpBridge.propagateFlavorsCrossProduct(ext, dimensions, flavors, logger)
 
+        assertEquals(7, ext.getProductFlavors().getNames().size)
         verify(atLeast = 1) {
             logger.lifecycle(
                 match<String> {
@@ -288,23 +197,13 @@ class AgpBridgeMultiDimTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // AC 6 — variantFilter pruning is a downstream concern: it operates on
-    // resolved FlavorVariants from FlavorVariantResolver, not on the AGP-side
-    // bridge. The bridge sees the FULL flavor set; AGP cross-products and
-    // then the FlavorVariantResolver applies the variantFilter. The end-to-end
-    // assertion that filtered variants don't reach AGP variants lives in
-    // samples/multi-dim-3d/ TestKit; here we only assert the bridge does NOT
-    // attempt to consume variantFilter (which is correct behavior — bridge is
-    // dimension-level, filter is variant-level).
+    // AC 6 — bridge propagates ALL dimension members; variantFilter pruning
+    // happens at FlavorVariantResolver layer, not at the bridge.
     // ─────────────────────────────────────────────────────────────────────
 
     @Test
-    fun `bridge propagates ALL dimension members - filter happens at variant-resolution layer`() {
-        // 3 × 3 = 9 candidate variants; bridge emits 6 AGP flavors (3 + 3),
-        // AGP cross-products to 9, FlavorVariantResolver+variantFilter prunes to
-        // however-many resolved variants the consumer wants. The bridge doesn't
-        // need to know about the filter — that's a v2.4 contract preserved in v2.5.
-        val project = mockProjectWithAgpPluginButNoExtension()
+    fun `bridge propagates ALL dimension members - filter happens elsewhere`() {
+        val ext = MockAndroidExtension()
         val dimensions = listOf(dim("tier"), dim("env"))
         val flavors = listOf(
             flavor("free", "tier"),
@@ -315,18 +214,10 @@ class AgpBridgeMultiDimTest {
             flavor("prod", "env"),
         )
 
-        AgpBridge.apply(
-            project = project,
-            bridgeProductFlavors = true,
-            bridgeBuildTypes = false,
-            kmpDimensions = dimensions,
-            kmpFlavors = flavors,
-            kmpBuildTypes = emptyList(),
-            logger = logger,
-        )
+        AgpBridge.propagateFlavorsCrossProduct(ext, dimensions, flavors, logger)
 
-        // Cross-product math = 9; bridge doesn't apply any variant-filter pruning
-        // (that happens at FlavorVariantResolver layer per v2.4 contract).
+        // 3 tier + 3 env = 6 flavors land on AGP; cross-product math says 9 variants.
+        assertEquals(6, ext.getProductFlavors().getNames().size)
         verify(atLeast = 1) {
             logger.lifecycle(
                 match<String> {
@@ -337,64 +228,111 @@ class AgpBridgeMultiDimTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // AC 7 — idempotent re-apply + KMPF-V25 conflict detection.
-    //
-    // We can't easily mock the full AGP container probe (`readAgpProductFlavors`)
-    // without AGP on the classpath. The full re-apply scenario is tested in
-    // KmpFlavorPluginIntegrationTest at TestKit level. Here we assert the
-    // documented behavior at the dispatch layer:
-    //  - empty dimensions/flavors short-circuits early
-    //  - the cross-product branch's KMPF-V25 emit-site exists in the log format
-    //    (asserted via the WARN message containing "KMPF-V25")
+    // AC 7 — re-apply idempotency + KMPF-V25 conflict detection.
     // ─────────────────────────────────────────────────────────────────────
 
     @Test
-    fun `empty dimensions short-circuits both branches without telemetry log`() {
-        val project = mockProjectWithAgpPluginButNoExtension()
-
-        AgpBridge.apply(
-            project = project,
-            bridgeProductFlavors = true,
-            bridgeBuildTypes = false,
-            kmpDimensions = emptyList(),
-            kmpFlavors = emptyList(),
-            kmpBuildTypes = emptyList(),
-            logger = logger,
+    fun `re-apply with same flavor set is idempotent - no duplicate registration`() {
+        val ext = MockAndroidExtension()
+        val dimensions = listOf(dim("tier"), dim("env"))
+        val flavors = listOf(
+            flavor("free", "tier"),
+            flavor("paid", "tier"),
+            flavor("dev", "env"),
+            flavor("prod", "env"),
         )
 
-        // Neither legacy nor cross-product branches fire — no "Bridged" or "cross-product"
-        // lifecycle log.
-        verify(exactly = 0) {
-            logger.lifecycle(match<String> { it.contains("Bridged") || it.contains("cross-product") })
-        }
-        // The info "No KMP dimensions/flavors to propagate" log should fire instead.
+        AgpBridge.propagateFlavorsCrossProduct(ext, dimensions, flavors, logger)
+        // Second call should detect existing flavor coverage and short-circuit.
+        AgpBridge.propagateFlavorsCrossProduct(ext, dimensions, flavors, logger)
+
+        assertEquals(4, ext.getProductFlavors().getNames().size)
         verify(atLeast = 1) {
-            logger.info(match<String> { it.contains("No KMP dimensions/flavors to propagate") })
+            logger.info(
+                match<String> {
+                    it.contains("already registered") && it.contains("idempotent, ≥2-dim re-apply")
+                },
+            )
         }
     }
 
     @Test
-    fun `dispatch is deterministic - 1-dim never logs cross-product telemetry`() {
-        // Regression discipline: multiple invocations of a 1-dim config consistently
-        // route to the legacy branch.
-        repeat(3) {
-            val project = mockProjectWithAgpPluginButNoExtension()
-            val dimensions = listOf(dim("tier"))
-            val flavors = listOf(flavor("free", "tier"), flavor("paid", "tier"))
+    fun `KMPF-V25 conflict warn fires when AGP flavors differ from KMP set`() {
+        val ext = MockAndroidExtension()
+        // Consumer hand-wrote android { productFlavors { create("legacyAlpha") } }
+        // before kmpFlavors {} got a chance to bridge.
+        ext.getProductFlavors().maybeCreate("legacyAlpha")
 
-            AgpBridge.apply(
-                project = project,
-                bridgeProductFlavors = true,
-                bridgeBuildTypes = false,
-                kmpDimensions = dimensions,
-                kmpFlavors = flavors,
-                kmpBuildTypes = emptyList(),
-                logger = logger,
-            )
+        val dimensions = listOf(dim("tier"), dim("env"))
+        val flavors = listOf(
+            flavor("free", "tier"),
+            flavor("paid", "tier"),
+            flavor("dev", "env"),
+            flavor("prod", "env"),
+        )
+
+        AgpBridge.propagateFlavorsCrossProduct(ext, dimensions, flavors, logger)
+
+        // Bridge skipped — no KMP flavors added.
+        assertEquals(setOf("legacyAlpha"), ext.getProductFlavors().getNames())
+        verify(atLeast = 1) {
+            logger.warn(match<String> { it.contains("KMPF-V25") })
         }
-        // After 3 invocations of 1-dim config, NO cross-product log was emitted.
-        verify(exactly = 0) {
-            logger.lifecycle(match<String> { it.contains("cross-product = ") })
-        }
+    }
+
+    @Test
+    fun `empty inputs to either propagator register nothing on AGP extension`() {
+        // The "No KMP dimensions/flavors to propagate" short-circuit lives in the
+        // private propagateFlavors dispatcher, exercised end-to-end via the
+        // samples/multi-dim-3d TestKit build. At the per-branch level we only
+        // assert: empty inputs produce no flavor registrations and no dimensions.
+        val ext = MockAndroidExtension()
+
+        AgpBridge.propagateFlavorsCrossProduct(ext, emptyList(), emptyList(), logger)
+        AgpBridge.propagateFlavorsLegacy(ext, emptyList(), emptyList(), logger)
+
+        assertTrue(ext.getProductFlavors().getNames().isEmpty())
+        assertTrue(ext.getFlavorDimensions().isEmpty())
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // AC 8 — dimension priority ordering: higher-priority dimensions land
+    // first in flavorDimensions list, matching FlavorVariantResolver order.
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `dimension priority controls flavorDimensions ordering`() {
+        val ext = MockAndroidExtension()
+        // env priority 10, tier priority 5 → env should appear before tier.
+        val dimensions = listOf(dim("tier", priority = 5), dim("env", priority = 10))
+        val flavors = listOf(
+            flavor("free", "tier"),
+            flavor("paid", "tier"),
+            flavor("dev", "env"),
+            flavor("prod", "env"),
+        )
+
+        AgpBridge.propagateFlavorsCrossProduct(ext, dimensions, flavors, logger)
+
+        assertEquals(listOf("env", "tier"), ext.getFlavorDimensions())
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // AC 9 — legacy path's per-flavor dimension assignment + matchingFallbacks.
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `legacy path assigns dimension on each created flavor`() {
+        val ext = MockAndroidExtension()
+        val dimensions = listOf(dim("tier"))
+        val flavors = listOf(flavor("free", "tier"), flavor("paid", "tier"))
+
+        AgpBridge.propagateFlavorsLegacy(ext, dimensions, flavors, logger)
+
+        assertEquals("tier", ext.getProductFlavors().get("free")?.dimension)
+        assertEquals("tier", ext.getProductFlavors().get("paid")?.dimension)
+        // Suffixes not set on these flavors → mock fields stay null.
+        assertNull(ext.getProductFlavors().get("free")?.applicationIdSuffix)
+        assertNull(ext.getProductFlavors().get("free")?.versionNameSuffix)
     }
 }
