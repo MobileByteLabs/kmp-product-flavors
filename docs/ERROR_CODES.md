@@ -300,6 +300,28 @@ To grep CI output for a specific code:
 | **Fix** | Use a target name actually declared in `kotlin { ... }` (e.g. 'iosMain', 'androidMain', 'desktopMain', 'wasmJsMain'), OR add the missing target to the `kotlin { ... }` block. |
 | **When fires** | Validator emit-site (`validateBuildKonfigDsl`) — fires at configuration time when `perTargetNamesDeclared - kotlinTargetNames` is non-empty. The check uses both `kotlin.targets.map { it.name }` (target names) AND `kotlin.sourceSets.map { it.name }` (source-set names like `iosMain`) so consumers can name either. |
 
+## KMPF-V29 — `baseUrl` flavor missing
+
+| | |
+|---|---|
+| **Severity** | ERROR |
+| **Since** | v2.6.0 (Phase 4 — conditional target sets + Network/Ktor codegen) |
+| **Trigger** | `kmpFlavors.buildKonfig.network { baseUrl("X" to "...") }` references flavor `"X"` but no flavor with that name is registered in any dimension or in `flavors { register() }` |
+| **Message** | `kmpFlavors.buildKonfig.network { baseUrl("X" to ...) } references flavor 'X' but no flavor with that name is registered. Available flavors: ...` |
+| **Fix** | Either register the flavor via `dimensions { dimension("...") { flavor("X") } }` or `flavors { register("X") {} }`, or remove the orphan baseUrl key |
+| **When fires** | Configuration time — `validateBuildKonfigDsl` computes `buildKonfigBaseUrlFlavors - registeredFlavorNames`; non-empty diff fires V29 per missing flavor |
+
+## KMPF-V30 — No baseUrl for active variant
+
+| | |
+|---|---|
+| **Severity** | ERROR |
+| **Since** | v2.6.0 (Phase 4 — conditional target sets + Network/Ktor codegen) |
+| **Trigger** | Some resolved variant's primary active flavor has no `baseUrl` mapped in the `network {}` block |
+| **Message** | `Variant 'X' resolves to active flavor 'Y' but kmpFlavors.buildKonfig.network has no baseUrl mapped for it. baseUrl flavors: ...` |
+| **Fix** | Either add `baseUrl("Y" to "https://...")` to the `network {}` block, or refine `variantFilter {}` to exclude variant `'X'` |
+| **When fires** | Configuration time — validator iterates resolved variants; for each variant's active flavor, checks `flavor ∈ buildKonfigBaseUrlFlavors`; misses fire V30 per offending variant |
+
 ---
 
 ## Backwards compatibility

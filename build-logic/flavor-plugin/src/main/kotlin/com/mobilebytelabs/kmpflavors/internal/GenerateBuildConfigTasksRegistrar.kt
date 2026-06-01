@@ -106,6 +106,16 @@ internal object GenerateBuildConfigTasksRegistrar {
                 this.customFieldSpecs.set(bkDsl.customFields.toList())
                 this.perTargetFieldSpecs.set(bkDsl.perTargetBlocks.values.flatten())
                 this.buildKonfigSecretIds.set(bkDsl.secrets.toList())
+                // v2.6 Phase 4 — variant-aware network constants. No-op when the
+                // consumer didn't declare any baseUrl pairs.
+                if (bkDsl.network.baseUrls.isNotEmpty()) {
+                    this.networkConfigSpec.set(
+                        com.mobilebytelabs.kmpflavors.NetworkConfigSpec(
+                            baseUrls = bkDsl.network.baseUrls.toMap(),
+                            timeoutSeconds = bkDsl.network.timeoutSeconds,
+                        ),
+                    )
+                }
                 this.outputDirectory.set(outputDir)
                 this.group = "kmpFlavors variants"
                 this.description =

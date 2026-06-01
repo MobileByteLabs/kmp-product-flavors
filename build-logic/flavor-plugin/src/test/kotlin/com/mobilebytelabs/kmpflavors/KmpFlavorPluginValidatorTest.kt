@@ -684,4 +684,65 @@ class KmpFlavorPluginValidatorTest {
         // dashboards) depends on the string being stable across minor versions.
         assertEquals("KMPF-V21", KmpFlavorPluginValidator.CODE_LEGACY_ACTIVEFLAVOR_DSL)
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // v2.6 Phase 4 — V29 + V30 validator codes for the network DSL.
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `KMPF-V29 fires when baseUrl references a flavor not registered`() {
+        val findings = KmpFlavorPluginValidator.validateBuildKonfigDsl(
+            buildKonfigBaseUrlFlavors = setOf("free", "paid", "ghost"),
+            kotlinTargetNames = setOf("desktop"),
+            registeredFlavorNames = setOf("free", "paid"),
+        )
+        val v29 = findings.find { it.code == "KMPF-V29" }
+        assertNotNull(v29, "Expected KMPF-V29 finding; got $findings")
+        assertEquals(KmpFlavorValidationSeverity.ERROR, v29!!.severity)
+        assertTrue(v29.message.contains("'ghost'"))
+        assertTrue(v29.fix.contains("flavors {") || v29.fix.contains("dimensions {"))
+    }
+
+    @Test
+    fun `KMPF-V29 does not fire when every baseUrl key maps to a registered flavor`() {
+        val findings = KmpFlavorPluginValidator.validateBuildKonfigDsl(
+            buildKonfigBaseUrlFlavors = setOf("free", "paid"),
+            kotlinTargetNames = setOf("desktop"),
+            registeredFlavorNames = setOf("free", "paid"),
+        )
+        assertTrue(findings.none { it.code == "KMPF-V29" })
+    }
+
+    @Test
+    fun `KMPF-V30 fires when no baseUrl mapped for some variant's active flavor`() {
+        val findings = KmpFlavorPluginValidator.validateBuildKonfigDsl(
+            buildKonfigBaseUrlFlavors = setOf("free"),
+            kotlinTargetNames = setOf("desktop"),
+            registeredFlavorNames = setOf("free", "paid"),
+            variantActiveFlavors = mapOf("freeDebug" to "free", "paidDebug" to "paid"),
+        )
+        val v30 = findings.find { it.code == "KMPF-V30" }
+        assertNotNull(v30, "Expected KMPF-V30 finding; got $findings")
+        assertEquals(KmpFlavorValidationSeverity.ERROR, v30!!.severity)
+        assertTrue(v30.message.contains("paidDebug") || v30.message.contains("'paid'"))
+        assertTrue(v30.fix.contains("baseUrl") || v30.fix.contains("variantFilter"))
+    }
+
+    @Test
+    fun `KMPF-V30 does not fire when every variant's active flavor has a baseUrl`() {
+        val findings = KmpFlavorPluginValidator.validateBuildKonfigDsl(
+            buildKonfigBaseUrlFlavors = setOf("free", "paid"),
+            kotlinTargetNames = setOf("desktop"),
+            registeredFlavorNames = setOf("free", "paid"),
+            variantActiveFlavors = mapOf("freeDebug" to "free", "paidDebug" to "paid"),
+        )
+        assertTrue(findings.none { it.code == "KMPF-V30" })
+    }
+
+    @Test
+    fun `v2-6 KMPF-V29 and V30 constants are stable - regression discipline`() {
+        // Code strings ship as public API — pin so future renames are caught.
+        assertEquals("KMPF-V29", KmpFlavorPluginValidator.CODE_BASE_URL_FLAVOR_MISSING)
+        assertEquals("KMPF-V30", KmpFlavorPluginValidator.CODE_BASE_URL_NOT_FOUND_FOR_VARIANT)
+    }
 }

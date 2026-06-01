@@ -18,6 +18,11 @@ junit = "4.13.2"
 coroutines = "1.10.2"
 mockk = "1.13.16"
 
+# v2.6 Phase 1 — coverage gate + mutation testing baseline
+kover = "0.9.1"
+pitest = "1.19.0-rc.1"
+pitestJunit5 = "1.2.1"
+
 # AndroidX (aligned with kmp-project-template)
 androidx-activityCompose = "1.12.2"
 
@@ -44,3 +49,7 @@ composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "k
 vanniktech-mavenPublish = { id = "com.vanniktech.maven.publish", version.ref = "vanniktechMavenPublish" }
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
+
+# v2.6 Phase 1 — coverage gate (95% line / 90% branch) + Pitest mutation baseline
+kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
+pitest = { id = "info.solidsoft.pitest", version.ref = "pitest" }

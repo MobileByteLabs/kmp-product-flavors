@@ -49,6 +49,7 @@ object FlavorVariantResolver {
         variantFilters: List<Action<VariantFilter>> = emptyList(),
         buildTypes: Collection<BuildTypeConfig> = emptyList(),
         enableBuildTypes: Boolean = false,
+        availableTargets: Set<String> = emptySet(),
     ): List<FlavorVariant> {
         if (flavors.isEmpty()) {
             return emptyList()
@@ -93,7 +94,7 @@ object FlavorVariantResolver {
         }
 
         // Apply variant filters
-        return applyVariantFilters(expanded, variantFilters)
+        return applyVariantFilters(expanded, variantFilters, availableTargets)
     }
 
     /**
@@ -103,17 +104,18 @@ object FlavorVariantResolver {
      * @param filters List of filter actions to apply
      * @return Filtered list of variants
      */
-    private fun applyVariantFilters(variants: List<FlavorVariant>, filters: List<Action<VariantFilter>>): List<FlavorVariant> {
+    private fun applyVariantFilters(variants: List<FlavorVariant>, filters: List<Action<VariantFilter>>, availableTargets: Set<String>): List<FlavorVariant> {
         if (filters.isEmpty()) {
             return variants
         }
 
-        return variants.filter { variant ->
+        return variants.mapNotNull { variant ->
             val filter = VariantFilter(
                 variantName = variant.name,
                 flavorNames = variant.flavorNames,
                 flavors = variant.flavors,
                 buildType = variant.buildType?.name,
+                availableTargets = availableTargets,
             )
 
             // Apply all filter actions
@@ -121,8 +123,14 @@ object FlavorVariantResolver {
                 action.execute(filter)
             }
 
-            // Keep variant if not excluded
-            !filter.isExcluded()
+            if (filter.isExcluded()) {
+                null
+            } else {
+                // v2.6 — surface per-variant target exclusions on the FlavorVariant so
+                // CompilationRegistrar + AggregateTasksRegistrar can skip them.
+                val exclusions = filter.excludedTargetsSnapshot()
+                if (exclusions.isEmpty()) variant else variant.copy(excludedTargets = exclusions)
+            }
         }
     }
 

@@ -51,6 +51,8 @@ class SourceSetConfigurator(private val logger: Logger) {
         platforms: List<PlatformGroup>,
         platformSourceSets: Map<PlatformGroup, KotlinSourceSet>,
         createIntermediates: Boolean,
+        matrixModeEnabled: Boolean = false,
+        createInactiveFlavorSourceSets: Boolean = false,
     ) {
         val sourceSets = kotlin.sourceSets
         val commonMain = sourceSets.getByName("commonMain")
@@ -76,7 +78,14 @@ class SourceSetConfigurator(private val logger: Logger) {
             //    as "Unused Kotlin Source Sets". Same lazy rule applies to all flavor
             //    source sets created below.
             val commonFlavorName = "common$capitalizedFlavor"
-            val commonFlavor = maybeCreateLazy(project, sourceSets, commonFlavorName, isActiveFlavor)
+            val commonFlavor = maybeCreateLazy(
+                project,
+                sourceSets,
+                commonFlavorName,
+                isActiveFlavor,
+                matrixModeEnabled = matrixModeEnabled,
+                createInactiveFlavorSourceSets = createInactiveFlavorSourceSets,
+            )
 
             if (isActiveFlavor && commonFlavor != null) {
                 commonFlavor.dependsOn(commonMain)
@@ -89,7 +98,14 @@ class SourceSetConfigurator(private val logger: Logger) {
             if (createIntermediates) {
                 for (intermediate in intermediatePlatforms) {
                     val intermediateFlavorName = "${intermediate.prefix}$capitalizedFlavor"
-                    val intermediateFlavor = maybeCreateLazy(project, sourceSets, intermediateFlavorName, isActiveFlavor)
+                    val intermediateFlavor = maybeCreateLazy(
+                        project,
+                        sourceSets,
+                        intermediateFlavorName,
+                        isActiveFlavor,
+                        matrixModeEnabled = matrixModeEnabled,
+                        createInactiveFlavorSourceSets = createInactiveFlavorSourceSets,
+                    )
 
                     if (isActiveFlavor && intermediateFlavor != null && commonFlavor != null) {
                         // Wire only to commonFlavor (not intermediateMain to avoid compilation default dependency)
@@ -105,8 +121,14 @@ class SourceSetConfigurator(private val logger: Logger) {
             // Instead, they depend on commonFlavor or intermediate flavor source sets only
             for (platform in leafPlatforms) {
                 val platformFlavorName = "${platform.prefix}$capitalizedFlavor"
-                val platformFlavor = maybeCreateLazy(project, sourceSets, platformFlavorName, isActiveFlavor)
-                    ?: continue
+                val platformFlavor = maybeCreateLazy(
+                    project,
+                    sourceSets,
+                    platformFlavorName,
+                    isActiveFlavor,
+                    matrixModeEnabled = matrixModeEnabled,
+                    createInactiveFlavorSourceSets = createInactiveFlavorSourceSets,
+                ) ?: continue
 
                 if (isActiveFlavor) {
                     // Wire to intermediate flavor or common flavor (NOT to platformMain)
@@ -159,7 +181,14 @@ class SourceSetConfigurator(private val logger: Logger) {
                 // test code under src/<name>/kotlin/. Active-flavor status alone is not
                 // enough — an empty test source set still triggers "Unused" warnings.
                 val commonFlavorTestName = "common${capitalizedFlavor}Test"
-                val commonFlavorTest = maybeCreateLazy(project, sourceSets, commonFlavorTestName, isActive = false)
+                val commonFlavorTest = maybeCreateLazy(
+                    project,
+                    sourceSets,
+                    commonFlavorTestName,
+                    isActive = false,
+                    matrixModeEnabled = matrixModeEnabled,
+                    createInactiveFlavorSourceSets = createInactiveFlavorSourceSets,
+                )
                 if (isActiveFlavor && commonFlavorTest != null) {
                     commonFlavorTest.dependsOn(commonTest)
                     logger.info("[KMP Flavors] Wired $commonFlavorTestName -> commonTest")
@@ -167,7 +196,14 @@ class SourceSetConfigurator(private val logger: Logger) {
 
                 for (platform in leafPlatforms) {
                     val platformFlavorTestName = "${platform.prefix}${capitalizedFlavor}Test"
-                    val platformFlavorTest = maybeCreateLazy(project, sourceSets, platformFlavorTestName, isActive = false)
+                    val platformFlavorTest = maybeCreateLazy(
+                        project,
+                        sourceSets,
+                        platformFlavorTestName,
+                        isActive = false,
+                        matrixModeEnabled = matrixModeEnabled,
+                        createInactiveFlavorSourceSets = createInactiveFlavorSourceSets,
+                    )
                     if (isActiveFlavor && platformFlavorTest != null && commonFlavorTest != null) {
                         platformFlavorTest.dependsOn(commonFlavorTest)
                         logger.info("[KMP Flavors] Wired $platformFlavorTestName -> $commonFlavorTestName")
@@ -190,20 +226,58 @@ class SourceSetConfigurator(private val logger: Logger) {
      * the warning while still letting devs opt-in by simply dropping a file
      * into `src/<name>/kotlin/`.
      */
-    private fun maybeCreateLazy(project: Project, sourceSets: org.gradle.api.NamedDomainObjectContainer<KotlinSourceSet>, name: String, isActive: Boolean): KotlinSourceSet? {
+    private fun maybeCreateLazy(
+        project: Project,
+        sourceSets: org.gradle.api.NamedDomainObjectContainer<KotlinSourceSet>,
+        name: String,
+        isActive: Boolean,
+        matrixModeEnabled: Boolean = false,
+        createInactiveFlavorSourceSets: Boolean = false,
+    ): KotlinSourceSet? {
         val existing = sourceSets.findByName(name)
-        // Lazy: skip creation entirely when the source set doesn't exist, isn't active,
-        // and has no on-disk content. Returning null lets the caller skip wiring.
-        if (existing == null && !isActive && !hasOnDiskContent(project, name)) {
+        if (existing != null) {
+            // Already created (consumer build script or earlier plugin pass) — re-register
+            // src dirs idempotently and return.
+            return sourceSets.maybeCreate(name).apply {
+                kotlin.srcDir("src/$name/kotlin")
+                resources.srcDir("src/$name/resources")
+            }
+        }
+        if (isActive) {
+            return sourceSets.maybeCreate(name).apply {
+                kotlin.srcDir("src/$name/kotlin")
+                resources.srcDir("src/$name/resources")
+            }
+        }
+        // Inactive flavor below.
+        if (!hasOnDiskContent(project, name)) {
+            // No content, no need to create — KGP never sees it.
             return null
         }
-        // maybeCreate is idempotent (findByName ?: create). When existing != null it
-        // returns existing; otherwise creates and returns. Source dirs are registered
-        // both paths, idempotently.
-        return sourceSets.maybeCreate(name).apply {
-            kotlin.srcDir("src/$name/kotlin")
-            resources.srcDir("src/$name/resources")
+        // Inactive + has on-disk content. v2.6 Tier E.1 decision tree:
+        // 1) Matrix mode ON → create (per-variant compilations will use it; KGP won't warn).
+        // 2) Matrix mode OFF + opt-in flag → create (consumer accepts KGP "Unused" warning).
+        // 3) Matrix mode OFF + default → skip + structured WARN (avoids the KGP warning by
+        //    structural means — the source set is never registered).
+        if (matrixModeEnabled || createInactiveFlavorSourceSets) {
+            return sourceSets.maybeCreate(name).apply {
+                kotlin.srcDir("src/$name/kotlin")
+                resources.srcDir("src/$name/resources")
+            }
         }
+        logger.warn(
+            "[KMP Flavors] Skipping creation of inactive source set '$name' — " +
+                "it has on-disk content (src/$name/kotlin or .../resources) but '$name' " +
+                "is not the active flavor and matrix mode is off, so this code is " +
+                "currently DEAD. Options: " +
+                "(a) `kmpFlavors { createInactiveFlavorSourceSets.set(true) }` to " +
+                "preserve the source set (KGP will emit 'Unused Kotlin Source Sets' " +
+                "for it); " +
+                "(b) enable matrix mode (`kmpFlavors { buildMatrix.set(true) }`) so " +
+                "every flavor compiles; " +
+                "(c) switch the active flavor (`-PkmpFlavor=<variant>`) to compile this code.",
+        )
+        return null
     }
 
     private fun hasOnDiskContent(project: Project, name: String): Boolean {

@@ -26,7 +26,19 @@ package com.mobilebytelabs.kmpflavors
  * @property name The combined variant name (e.g., "freeDev")
  * @property flavors The individual flavors that make up this variant, ordered by dimension priority
  */
-data class FlavorVariant(val name: String, val flavors: List<FlavorConfig>, val buildType: BuildTypeConfig? = null) {
+data class FlavorVariant(
+    val name: String,
+    val flavors: List<FlavorConfig>,
+    val buildType: BuildTypeConfig? = null,
+    /**
+     * v2.6 — set of Kotlin target names this variant should NOT register
+     * compilations for. Populated by [com.mobilebytelabs.kmpflavors.VariantFilter.excludeTargets]
+     * via [com.mobilebytelabs.kmpflavors.internal.FlavorVariantResolver.resolveAllVariants].
+     * Empty by default — every target compiles every variant unless the
+     * consumer's `variantFilter {}` opts out.
+     */
+    val excludedTargets: Set<String> = emptySet(),
+) {
     /**
      * Merged build config fields from all flavors **and the active buildType** (if any).
      * Later dimensions (higher priority) override earlier ones; the buildType layer is

@@ -146,6 +146,21 @@ internal object KmpFlavorPluginValidator {
     const val CODE_PERTARGET_ON_NON_KMP: String = "KMPF-V28"
 
     /**
+     * v2.6 Phase 4 — `buildKonfig { network { baseUrl("X" to ...) } }` references
+     * a flavor name not registered in `flavors {}` or any `dimensions { dimension { flavor() } }`
+     * block. Fires at configuration time so consumers see the typo before codegen.
+     */
+    const val CODE_BASE_URL_FLAVOR_MISSING: String = "KMPF-V29"
+
+    /**
+     * v2.6 Phase 4 — a resolved variant's primary flavor has no matching
+     * `network { baseUrl("flavor" to ...) }` entry. The active variant would
+     * compile but `BuildKonfig.Network.BASE_URL` would point at the sentinel
+     * placeholder. Fires at configuration time to make the gap explicit.
+     */
+    const val CODE_BASE_URL_NOT_FOUND_FOR_VARIANT: String = "KMPF-V30"
+
+    /**
      * Auto-generated `BuildKonfig` constants the codegen ALWAYS emits regardless
      * of whether build types are enabled. A custom `buildConfigField` matching
      * one of these names produces a duplicate `const val` at compile time.
@@ -463,6 +478,10 @@ internal object KmpFlavorPluginValidator {
         customFieldUnsupportedTypes: List<Pair<String, String>> = emptyList(),
         perTargetNamesDeclared: Set<String> = emptySet(),
         kotlinTargetNames: Set<String> = emptySet(),
+        // v2.6 Phase 4 inputs — empty defaults so existing callers stay back-compat.
+        buildKonfigBaseUrlFlavors: Set<String> = emptySet(),
+        registeredFlavorNames: Set<String> = emptySet(),
+        variantActiveFlavors: Map<String, String> = emptyMap(),
     ): List<KmpFlavorValidationFinding> {
         val findings = mutableListOf<KmpFlavorValidationFinding>()
 
@@ -502,6 +521,42 @@ internal object KmpFlavorPluginValidator {
                     "stringify the value via a primitive customField. Nested generics " +
                     "(Map<K, V>, List<List<T>>) and open classes are out of scope for v2.5.",
             )
+        }
+
+        // KMPF-V29 — `network { baseUrl("X" to ...) }` references an unregistered flavor.
+        val missingBaseUrlFlavors = buildKonfigBaseUrlFlavors - registeredFlavorNames
+        missingBaseUrlFlavors.forEach { flavor ->
+            findings += KmpFlavorValidationFinding(
+                code = CODE_BASE_URL_FLAVOR_MISSING,
+                severity = KmpFlavorValidationSeverity.ERROR,
+                message = "kmpFlavors.buildKonfig.network { baseUrl(\"$flavor\" to ...) } " +
+                    "references flavor '$flavor', but no flavor with that name is registered. " +
+                    "Available flavors: ${
+                        if (registeredFlavorNames.isEmpty()) {
+                            "<none>"
+                        } else {
+                            registeredFlavorNames.sorted().joinToString { "'$it'" }
+                        }
+                    }.",
+                fix = "Either register the flavor via `flavors { register(\"$flavor\") {} }` " +
+                    "or `dimensions { dimension(\"...\") { flavor(\"$flavor\") } }`, " +
+                    "or remove the orphan baseUrl key from the network block.",
+            )
+        }
+
+        // KMPF-V30 — at least one resolved variant's active flavor has no matching baseUrl.
+        variantActiveFlavors.forEach { (variantName, activeFlavor) ->
+            if (buildKonfigBaseUrlFlavors.isNotEmpty() && activeFlavor !in buildKonfigBaseUrlFlavors) {
+                findings += KmpFlavorValidationFinding(
+                    code = CODE_BASE_URL_NOT_FOUND_FOR_VARIANT,
+                    severity = KmpFlavorValidationSeverity.ERROR,
+                    message = "Variant '$variantName' resolves to active flavor '$activeFlavor', " +
+                        "but kmpFlavors.buildKonfig.network has no baseUrl mapped for it. " +
+                        "baseUrl flavors: ${buildKonfigBaseUrlFlavors.sorted().joinToString { "'$it'" }}.",
+                    fix = "Add `baseUrl(\"$activeFlavor\" to \"https://...\")` to the network {} " +
+                        "block, or refine `variantFilter {}` to exclude variant '$variantName'.",
+                )
+            }
         }
 
         // KMPF-V28 — perTarget references a target name not present in kotlin.targets.

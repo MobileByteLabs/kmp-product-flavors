@@ -303,6 +303,11 @@ class KmpFlavorPluginIntegrationTest {
 
             kmpFlavors {
                 generateBuildConfig.set(false)
+                // v2.6 Tier E.1 — opt-in to inactive source set creation. Default since v2.6
+                // is `false` (silently skip inactive source sets even with on-disk content,
+                // to avoid KGP's "Unused Kotlin Source Sets" warning). Setting `true` here
+                // restores the v2.5 contract this test originally pinned.
+                createInactiveFlavorSourceSets.set(true)
 
                 flavors {
                     register("free") {

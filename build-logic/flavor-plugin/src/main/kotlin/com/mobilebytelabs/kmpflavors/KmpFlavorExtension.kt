@@ -143,6 +143,30 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
     abstract val createIntermediateSourceSets: Property<Boolean>
 
     /**
+     * v2.6 Tier E.1 — controls creation of inactive-flavor source sets when their
+     * on-disk content exists but matrix mode is OFF.
+     *
+     * **Default `false`** — when an inactive flavor has files in
+     * `src/common<Flavor>/kotlin/` or `src/<platform><Flavor>/kotlin/` but matrix
+     * mode is OFF and the flavor isn't the active one, the plugin silently SKIPS
+     * source set creation (and logs an informational WARN telling the consumer
+     * their code is currently unreachable). This eliminates KGP's
+     * "Unused Kotlin Source Sets" warning by structural avoidance — the source
+     * set never gets registered, so KGP never sees an orphan.
+     *
+     * Set to `true` to restore the v2.5 behaviour (lazy-create when content
+     * exists, accept the KGP warning as the cost of keeping IDE editing alive
+     * for inactive flavor code).
+     *
+     * Background: Hypothesis A (`commonProd.dependsOn(commonMain)`) was tried in
+     * v2.5.0-alpha.2 and disproved — KGP's check is compilation-membership-based,
+     * not `dependsOn`-graph-based. See `docs/SOURCE_SET_DISCIPLINE.md`.
+     *
+     * Convention: false
+     */
+    abstract val createInactiveFlavorSourceSets: Property<Boolean>
+
+    /**
      * Container for flavor dimensions.
      * Dimensions define independent axes of variation.
      */
@@ -707,11 +731,54 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
         action.execute(featureFlags)
     }
 
+    /**
+     * v2.6 Phase 3 — DI integration scope (Koin only in v2.6; Kodein/Hilt-KMP/dagger
+     * future). See [DiDsl] for the nested `koin { variantModule(...) { ... } }` DSL.
+     *
+     * Per-variant codegen emits `expect val ${name}Module` in commonMain + per-flavor
+     * `actual val` + a `flavorDependentModules(): List<Module>` aggregator helper.
+     *
+     * No-op when no `variantModule(...)` blocks are declared. The plugin does NOT
+     * inject `io.insert-koin:koin-core` — consumer brings their own Koin dependency.
+     */
+    val di: org.gradle.api.provider.Property<DiDsl> =
+        objects.property(DiDsl::class.java).convention(objects.newInstance(DiDsl::class.java))
+
+    /**
+     * v2.6 Phase 3 — configure DI integration.
+     */
+    fun di(action: Action<DiDsl>) {
+        action.execute(di.get())
+    }
+
+    /**
+     * v2.6 Phase 3 — cross-platform analytics tags scope. See [AnalyticsTagsConfig] for
+     * the `customTag(name) { variant -> ... }` DSL.
+     *
+     * Codegen emits `AnalyticsTags.kt` per variant with `VARIANT_NAME` + `BUILD_TYPE`
+     * constants plus consumer-declared custom tags + an `attachTo(target)` extension
+     * helper that reflectively wires into Firebase Crashlytics-shaped targets.
+     *
+     * No-op when `analytics.enabled = false` (default).
+     */
+    val analytics: AnalyticsTagsConfig = objects.newInstance(AnalyticsTagsConfig::class.java)
+
+    /**
+     * v2.6 Phase 3 — configure analytics tag integration.
+     */
+    fun analytics(action: Action<AnalyticsTagsConfig>) {
+        action.execute(analytics)
+    }
+
     init {
         // Set conventions
         generateBuildConfig.convention(true)
         buildConfigClassName.convention("BuildKonfig")
         createIntermediateSourceSets.convention(true)
+        // v2.6 Tier E.1 — default false: silently skip inactive flavor source sets
+        // even when their src/ dirs have on-disk content. Eliminates KGP's
+        // "Unused Kotlin Source Sets" warning by structural avoidance.
+        createInactiveFlavorSourceSets.convention(false)
         enableBuildTypes.convention(false)
         // NOTE: deliberately NO `buildMatrix.convention(false)` — the resolver
         // relies on `extension.buildMatrix.isPresent` returning `false` when the

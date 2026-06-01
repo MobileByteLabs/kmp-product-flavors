@@ -45,14 +45,22 @@ kmpFlavors {
 }
 ```
 
-> **v2.5 highlights** — optional `dimensions { dimension("tier") { flavor("free") } }`
-> ergonomic DSL block, expanded sample/CI coverage for 9 KMP targets (watchOS×4, tvOS×3,
-> linuxX64, mingwX64, wasmJs), and `buildKonfig { secret(); enum(); customField(); perTarget {} }`
-> for vault-integrated secrets, dimension enums, custom-type fields, and per-target conditional
-> codegen. **v2.5 does not raise the v2.4 version floor** (Gradle 8.0+ / KGP 2.0.21+ / AGP 8.0+ /
-> JDK 17+ / CMP 1.7.0+ — UNCHANGED). See [`docs/COMPATIBILITY_MATRIX.md`](docs/COMPATIBILITY_MATRIX.md)
-> + [`docs/MIGRATION_v2.4_TO_v2.5.md`](docs/MIGRATION_v2.4_TO_v2.5.md) (opens with
+> **v2.6 highlights** — coverage gate (PR check via `koverVerify`) + AGP matrix CI
+> (8.0.2 / 8.5.2 / 8.10.0 / 9.0-rc01) + **KMP↔AGP variantFilter parity** via reflective
+> `beforeVariants` (closes the v2.5 asymmetry) + 4 beyond-platform capabilities:
+> per-variant **Koin DI module** selection (`di { koin { variantModule() } }`),
+> cross-platform **analytics tags** (`analytics { customTag() }`), conditional
+> **KMP target sets** per variant (`variantFilter { excludeTargets() }`), and
+> variant-aware **Ktor base URL** constants (`buildKonfig { network { baseUrl() } }`).
+> **v2.6 does not raise the v2.4 version floor** (Gradle 8.0+ / KGP 2.0.21+ / AGP 8.0+ /
+> JDK 17+ / CMP 1.7.0+ — UNCHANGED across v2.4 → v2.5 → v2.6).
+> See [`docs/COMPATIBILITY_MATRIX.md`](docs/COMPATIBILITY_MATRIX.md)
+> + [`docs/MIGRATION_v2.5_TO_v2.6.md`](docs/MIGRATION_v2.5_TO_v2.6.md) (opens with
 > "You do not need to migrate.").
+>
+> **v2.5 highlights (preserved)** — `dimensions { dimension("tier") { flavor("free") } }`
+> ergonomic DSL, expanded sample/CI coverage for 9 KMP targets, and
+> `buildKonfig { secret(); enum(); customField(); perTarget {} }` codegen.
 
 That's a 4-variant matrix (`freeDebug`, `freeRelease`, `paidDebug`, `paidRelease`) on every KMP target you declare. Source-set conventions are `src/commonFree/kotlin/`, `src/commonPaid/kotlin/`, etc. Switch active variant via `-PkmpFlavor=paidRelease`.
 

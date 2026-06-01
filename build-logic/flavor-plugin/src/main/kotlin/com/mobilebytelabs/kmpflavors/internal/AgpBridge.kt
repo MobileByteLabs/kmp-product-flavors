@@ -54,6 +54,7 @@ internal object AgpBridge {
         kmpFlavors: List<FlavorConfig>,
         kmpBuildTypes: List<BuildTypeConfig>,
         logger: Logger,
+        allowedVariantNames: Set<String> = emptySet(),
     ) {
         if (!bridgeProductFlavors && !bridgeBuildTypes) return
 
@@ -93,6 +94,13 @@ internal object AgpBridge {
                 null
             }
             finalizeDsl.invoke(components, proxy)
+            // v2.6 Phase 2 — forward KMP-side variantFilter exclusions to AGP variants
+            // via beforeVariants(null, action). Registered on the same components
+            // extension so AGP fires the disable-action AFTER finalizeDsl locks the
+            // DSL and BEFORE it materialises the variant matrix.
+            if (allowedVariantNames.isNotEmpty()) {
+                propagateVariantFilterToAgp(components, allowedVariantNames, logger)
+            }
             true
         }.getOrDefault(false)
 
@@ -121,6 +129,76 @@ internal object AgpBridge {
         val cls = Class.forName("com.android.build.api.dsl.ApplicationExtension")
         project.extensions.findByType(cls)
     }.getOrNull()
+
+    /**
+     * v2.6 Phase 2 — forwards KMP-side variant filtering to AGP via `beforeVariants`.
+     *
+     * Called from [apply] after [propagateFlavors]. AGP fires `beforeVariants` per
+     * variant after `finalizeDsl` locks the DSL and before the variant matrix is
+     * materialised. The registered `Action<VariantBuilder>` disables variants whose
+     * names are not in [allowedVariantNames].
+     *
+     * Visibility is `internal` so unit tests can invoke directly with a
+     * reflection-shaped [MockAndroidComponentsExtension] — same pattern Phase 1
+     * established for [propagateFlavorsLegacy] / [propagateFlavorsCrossProduct].
+     *
+     * Version compatibility:
+     * - `beforeVariants(selector, action)` exists since AGP 7.0 (plugin floor 8.0).
+     * - `VariantBuilder.setEnabled(boolean)` setter has been stable since 7.0.
+     * - Reflective lookup means future setter renames degrade to WARN, not throw.
+     */
+    internal fun propagateVariantFilterToAgp(components: Any, allowedVariantNames: Set<String>, logger: Logger) {
+        runCatching {
+            val componentsClass = components.javaClass
+            val beforeVariants = componentsClass.methods.firstOrNull {
+                it.name == "beforeVariants" && it.parameterCount == 2
+            } ?: run {
+                logger.warn(
+                    "[KMP Flavors] AGP fallback — beforeVariants() not available on this AGP " +
+                        "version; KMP↔AGP variantFilter parity disabled.",
+                )
+                return@runCatching
+            }
+            val actionClass = Class.forName("org.gradle.api.Action")
+            val proxy = java.lang.reflect.Proxy.newProxyInstance(
+                actionClass.classLoader,
+                arrayOf(actionClass),
+            ) { _, _, args ->
+                val variantBuilder = args[0]
+                val getName = variantBuilder.javaClass.methods.firstOrNull { it.name == "getName" }
+                val setEnabled = variantBuilder.javaClass.methods.firstOrNull {
+                    it.name == "setEnabled" && it.parameterCount == 1
+                }
+                val variantName = getName?.invoke(variantBuilder) as? String
+                if (variantName != null && variantName !in allowedVariantNames) {
+                    if (setEnabled != null) {
+                        setEnabled.invoke(variantBuilder, false)
+                        logger.lifecycle(
+                            "[KMP Flavors] Disabled AGP variant '$variantName' " +
+                                "(excluded by kmpFlavors.variantFilter).",
+                        )
+                    } else {
+                        logger.warn(
+                            "[KMP Flavors] KMP↔AGP parity: variant '$variantName' should be " +
+                                "disabled but setEnabled() setter missing on this AGP version.",
+                        )
+                    }
+                }
+                null
+            }
+            // beforeVariants(selector = null, action = proxy) — null selector matches every variant.
+            beforeVariants.invoke(components, null, proxy)
+            logger.info(
+                "[KMP Flavors] KMP↔AGP variantFilter forwarding registered " +
+                    "(${allowedVariantNames.size} allowed variants).",
+            )
+        }.onFailure { e ->
+            logger.warn(
+                "[KMP Flavors] propagateVariantFilterToAgp failed: ${e.message}; " +
+                    "KMP↔AGP variantFilter parity not enforced.",
+            )
+        }
+    }
 
     /**
      * v2.5 refactor — dispatch on dimension count.
@@ -162,7 +240,7 @@ internal object AgpBridge {
      * mandates this branch is byte-identical to v2.4.3 — single-dim consumers see
      * zero behavior drift.
      */
-    private fun propagateFlavorsLegacy(androidExt: Any, kmpDimensions: List<FlavorDimension>, kmpFlavors: List<FlavorConfig>, logger: Logger) {
+    internal fun propagateFlavorsLegacy(androidExt: Any, kmpDimensions: List<FlavorDimension>, kmpFlavors: List<FlavorConfig>, logger: Logger) {
         // Collision check.
         // - If AGP productFlavors already contains every KMP flavor name (e.g. the
         //   consumer's convention plugin called configureFlavors() synchronously inside
@@ -232,7 +310,7 @@ internal object AgpBridge {
      *    materialize `product(|dim_i|)` variants — useful for `multi-dim-3d` sample
      *    debugging.
      */
-    private fun propagateFlavorsCrossProduct(androidExt: Any, kmpDimensions: List<FlavorDimension>, kmpFlavors: List<FlavorConfig>, logger: Logger) {
+    internal fun propagateFlavorsCrossProduct(androidExt: Any, kmpDimensions: List<FlavorDimension>, kmpFlavors: List<FlavorConfig>, logger: Logger) {
         // Same idempotency check as legacy — short-circuit on exact-coverage re-apply.
         val existing = readAgpProductFlavors(androidExt)
         if (existing.isNotEmpty()) {
