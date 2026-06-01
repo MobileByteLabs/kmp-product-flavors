@@ -150,6 +150,17 @@ class KmpFlavorPlugin : Plugin<Project> {
             // confusing "Return type mismatch: expected 'Boolean'" error.
             val createPerFlavorSourceSet = object : Action<FlavorConfig> {
                 override fun execute(flavor: FlavorConfig) {
+                    // v2.6 Tier E.1 — only create eagerly when the consumer opted into
+                    // matrix mode OR `createInactiveFlavorSourceSets`. Both flags must be
+                    // set BEFORE `flavors {}` to be observed by this hook (Property values
+                    // surface here via `getOrElse`; the convention default is consulted
+                    // only as a fallback). When neither is true (the v2.6 default),
+                    // SourceSetConfigurator creates the active flavor's source set in
+                    // `afterEvaluate` and skips inactive ones outright — eliminating
+                    // KGP's "Unused Kotlin Source Sets" warning by structural avoidance.
+                    val matrixModeOptIn = extension.buildMatrix.getOrElse(false)
+                    val inactiveOptIn = extension.createInactiveFlavorSourceSets.getOrElse(false)
+                    if (!matrixModeOptIn && !inactiveOptIn) return
                     val ssName = "common${flavor.name.replaceFirstChar { it.uppercase() }}"
                     kotlin.sourceSets.maybeCreate(ssName)
                 }
@@ -458,6 +469,11 @@ class KmpFlavorPlugin : Plugin<Project> {
             platforms = platforms,
             platformSourceSets = platformSourceSets,
             createIntermediates = createIntermediates,
+            // v2.6 Tier E.1 — matrix mode ON makes inactive source sets safe (they
+            // become members of inactive compilations); matrix mode OFF makes them
+            // orphans → KGP "Unused" warning unless the flag opts in.
+            matrixModeEnabled = matrixModeEnabled,
+            createInactiveFlavorSourceSets = extension.createInactiveFlavorSourceSets.get(),
         )
 
         // v2.2 Phase 1A — intermediate source-set map; populated inside the matrix-mode

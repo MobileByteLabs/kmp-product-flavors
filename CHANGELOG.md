@@ -49,6 +49,15 @@ See [`docs/MIGRATION_v2.5_TO_v2.6.md`](docs/MIGRATION_v2.5_TO_v2.6.md) (opens wi
 - **AGP bridge 1-dim fast path** — byte-identical to v2.4.3 (regression-bounded by AGP matrix CI).
 - **All existing TestKit + ProjectBuilder tests** continue to pass under the new coverage gate (279 tests at ship vs. 258 at v2.5 GA).
 
+### Added — Tier E.1: "Unused Kotlin Source Sets" warning fix (Hypothesis D shipped)
+
+- **`kmpFlavors { createInactiveFlavorSourceSets.set(true | false) }`** — strict-additive boolean flag (default `false`). When `false`, inactive flavor source sets with on-disk content are silently SKIPPED — KGP never sees an orphan source set, so the "Unused Kotlin Source Sets" warning fires `0` times.
+- **Structured WARN log** when the skip path fires: tells the consumer their `src/common<Flavor>/kotlin/` code is currently dead + lists 3 options to address it (opt-in flag / matrix mode / switch active flavor).
+- **Matrix mode + opt-in flag are read at `flavors.whenObjectAdded` hook time** via `getOrElse(false)` — must be set BEFORE `flavors {}` to be observed by the eager source-set creation hook (which preserves `val commonPaid by getting` for matrix-mode consumers).
+- **`SourceSetWiringRegressionTest`** (TestKit) reproduces the consumer scenario surfaced 2026-06-01 and locks both paths (default off + opt-in on).
+- **Existing `KmpFlavorPluginIntegrationTest.plugin creates flavor source sets`** now opts in via the flag — documents the new contract while preserving v2.5 behaviour under explicit opt-in.
+- **Background**: Hypothesis A (`commonProd.dependsOn(commonMain)`) was tried in v2.5.0-alpha.2 and disproved. KGP's check is compilation-membership-based, not `dependsOn`-graph-based. Full disproof + recommendation in `docs/SOURCE_SET_DISCIPLINE.md`.
+
 ### Deferred to v2.7
 
 - Ktor client factory codegen (Approach B; v2.6 ships constants-only per D7)
@@ -57,7 +66,6 @@ See [`docs/MIGRATION_v2.5_TO_v2.6.md`](docs/MIGRATION_v2.5_TO_v2.6.md) (opens wi
 - Mutation testing as CI gate (v2.6 informational only)
 - Kodein-DI / Hilt-KMP / dagger integration (Koin first per D8)
 - `excludeTargets` glob pattern support
-- Active-variant inactive-source-set "Unused Kotlin Source Sets" suppression (Hypothesis D opt-in flag — see `SOURCE_SET_DISCIPLINE.md`; deferred to Tier E.1 follow-up plan)
 
 ### Dependencies
 

@@ -1,9 +1,10 @@
 # Source-set Wiring Discipline
 
-> **Status:** Research finding (2026-06-01). Recommended fix
-> ([Hypothesis D](#hypothesis-d-opt-in-flag)) is pending implementation in a
-> follow-up Tier E.1 plan. This document is the canonical reference for the
-> failure mode + the disproved fix + the path forward.
+> **Status:** Shipped 2026-06-01. Hypothesis D
+> ([opt-in flag](#hypothesis-d-opt-in-flag-shipped-in-v26)) is now the
+> default behaviour. The warning is silenced by structural avoidance —
+> inactive source sets with on-disk content aren't created when matrix mode
+> is off and the flag is `false` (the default).
 
 A consumer (kmp-project-template, 2026-06-01) surfaced a long-standing KGP
 warning when the plugin was active alongside on-disk `src/commonProd/kotlin/`
@@ -112,9 +113,9 @@ use case.
 - Unknown whether registering a sourceSetTree without a backing compilation
   actually silences the "Unused" warning — KGP's check may still fire.
 
-### Hypothesis D — opt-in flag `kmpFlavors.createInactiveFlavorSourceSets`
+### Hypothesis D — opt-in flag (SHIPPED in v2.6)
 
-Add a strict-additive boolean flag (default `false`):
+Strict-additive boolean flag, default `false`:
 
 ```kotlin
 kmpFlavors {
@@ -148,30 +149,53 @@ keeping the IDE editing experience.
 - Existing consumers (kmp-project-template + others) need to either set the
   flag OR drop their `afterEvaluate` workaround — minor migration.
 
-### Recommendation
+### Recommendation (shipped)
 
 **Hypothesis D + log.** Conservative, strict-additive, preserves the v2.4
 contract for opt-in consumers, removes the warning for the silent majority.
-Hypothesis B's behaviour is one knob away (the default-off path); Hypothesis
-C remains a possible future enhancement under the same flag (toggle the
-implementation, not the DSL surface).
 
 ---
 
-## Implementation plan (deferred to Tier E.1)
+## Shipped implementation (v2.6 Tier E.1)
 
-The user pre-approved Tier E in v2.6 Phase 1 as **research-only**. The
-implementation lands as a separate plan:
+| Change | Where |
+|--------|-------|
+| Added `createInactiveFlavorSourceSets: Property<Boolean>` to `KmpFlavorExtension` (default `false`) | `KmpFlavorExtension.kt` |
+| Gated `maybeCreateLazy()` decision tree in `SourceSetConfigurator` on the flag + matrix mode | `SourceSetConfigurator.kt` |
+| Gated the eager `flavors.whenObjectAdded` source-set creation hook on the flag OR `buildMatrix` | `KmpFlavorPlugin.kt` |
+| `SourceSetWiringRegressionTest` (TestKit) — reproduces the consumer scenario, asserts no KGP "was configured but not added to any Kotlin compilation" line | `internal/SourceSetWiringRegressionTest.kt` |
+| Existing `KmpFlavorPluginIntegrationTest.plugin creates flavor source sets` now opts in via `createInactiveFlavorSourceSets.set(true)` — locks the v2.5 contract under the new opt-in | `KmpFlavorPluginIntegrationTest.kt` |
 
-| Task | Description | Where |
-|------|-------------|-------|
-| T-E1.1 | Add `createInactiveFlavorSourceSets: Property<Boolean>` to `KmpFlavorExtension` (default false) | `KmpFlavorExtension.kt` |
-| T-E1.2 | Gate `maybeCreateLazy()` in `SourceSetConfigurator` on the new flag | `SourceSetConfigurator.kt` |
-| T-E1.3 | Author `SourceSetWiringRegressionTest` (TestKit) — reproduces consumer scenario, asserts `--warning-mode=all` output has zero "Unused Kotlin Source Sets" matches when flag is default-off | `internal/SourceSetWiringRegressionTest.kt` |
-| T-E1.4 | Cascade-clean kmp-project-template consumer — remove the `afterEvaluate { ?.dependsOn(commonMain) }` workaround in `KotlinMultiplatform.kt` | `samples/kmp-project-template/build-logic/convention/...` (cross-repo PR) |
-| T-E1.5 | Document the flag in `docs/PRODUCT_FLAVORS.md` (DSL reference) + cross-link from this guide | `PRODUCT_FLAVORS.md` |
+### Decision tree
 
-Acceptance: `./gradlew :samples:multi-dim-3d:tasks --all --warning-mode=all 2>&1 | grep -c "Unused Kotlin Source Sets"` returns `0`.
+When `SourceSetConfigurator` evaluates an inactive flavor's `common<Flavor>`
+(or `<platform><Flavor>` / `common<Flavor>Test`) source set with on-disk
+content:
+
+```
+hasOnDiskContent ──┬── matrixModeEnabled? ──── YES → create (used by inactive variant compilation)
+                   │
+                   └── createInactiveFlavorSourceSets? ──── YES → create (consumer accepts KGP warning)
+                                                       └── NO  → SKIP + structured WARN log
+```
+
+### Order constraints
+
+`createInactiveFlavorSourceSets.set(true)` and `buildMatrix.set(true)` must
+be set **before** the `flavors { ... }` block — the eager
+`whenObjectAdded` hook reads the flags via `getOrElse(false)` when each
+flavor registers. After-the-fact `.set(...)` calls are ignored by the eager
+hook (though `SourceSetConfigurator` in `afterEvaluate` still honours the
+final value for the lazy path).
+
+### Cascade-clean
+
+Consumers carrying the `afterEvaluate { ?.dependsOn(commonMain) }`
+workaround (e.g. `samples/kmp-project-template/build-logic/convention/.../KotlinMultiplatform.kt`)
+can now remove it — the plugin handles the case structurally. A separate
+PR ships the cleanup for the kmp-project-template submodule.
+
+Acceptance: `./gradlew :samples:multi-dim-3d:tasks --all --warning-mode=all 2>&1 | grep -c "was configured but not added to any Kotlin compilation"` returns `0`.
 
 ---
 

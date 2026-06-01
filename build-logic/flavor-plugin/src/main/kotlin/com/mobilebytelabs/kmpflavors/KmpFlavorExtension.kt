@@ -143,6 +143,30 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
     abstract val createIntermediateSourceSets: Property<Boolean>
 
     /**
+     * v2.6 Tier E.1 — controls creation of inactive-flavor source sets when their
+     * on-disk content exists but matrix mode is OFF.
+     *
+     * **Default `false`** — when an inactive flavor has files in
+     * `src/common<Flavor>/kotlin/` or `src/<platform><Flavor>/kotlin/` but matrix
+     * mode is OFF and the flavor isn't the active one, the plugin silently SKIPS
+     * source set creation (and logs an informational WARN telling the consumer
+     * their code is currently unreachable). This eliminates KGP's
+     * "Unused Kotlin Source Sets" warning by structural avoidance — the source
+     * set never gets registered, so KGP never sees an orphan.
+     *
+     * Set to `true` to restore the v2.5 behaviour (lazy-create when content
+     * exists, accept the KGP warning as the cost of keeping IDE editing alive
+     * for inactive flavor code).
+     *
+     * Background: Hypothesis A (`commonProd.dependsOn(commonMain)`) was tried in
+     * v2.5.0-alpha.2 and disproved — KGP's check is compilation-membership-based,
+     * not `dependsOn`-graph-based. See `docs/SOURCE_SET_DISCIPLINE.md`.
+     *
+     * Convention: false
+     */
+    abstract val createInactiveFlavorSourceSets: Property<Boolean>
+
+    /**
      * Container for flavor dimensions.
      * Dimensions define independent axes of variation.
      */
@@ -751,6 +775,10 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
         generateBuildConfig.convention(true)
         buildConfigClassName.convention("BuildKonfig")
         createIntermediateSourceSets.convention(true)
+        // v2.6 Tier E.1 — default false: silently skip inactive flavor source sets
+        // even when their src/ dirs have on-disk content. Eliminates KGP's
+        // "Unused Kotlin Source Sets" warning by structural avoidance.
+        createInactiveFlavorSourceSets.convention(false)
         enableBuildTypes.convention(false)
         // NOTE: deliberately NO `buildMatrix.convention(false)` — the resolver
         // relies on `extension.buildMatrix.isPresent` returning `false` when the
