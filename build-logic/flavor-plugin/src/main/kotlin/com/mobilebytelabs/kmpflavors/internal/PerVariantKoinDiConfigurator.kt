@@ -38,13 +38,7 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
  */
 internal object PerVariantKoinDiConfigurator {
 
-    fun configure(
-        project: Project,
-        extension: KmpFlavorExtension,
-        activeVariant: FlavorVariant,
-        inactiveVariants: List<FlavorVariant>,
-        kotlin: KotlinMultiplatformExtension,
-    ) {
+    fun configure(project: Project, extension: KmpFlavorExtension, activeVariant: FlavorVariant, inactiveVariants: List<FlavorVariant>, kotlin: KotlinMultiplatformExtension) {
         val di = extension.di.orNull ?: return
         val specs = di.koin.variantModules.values.toList()
         if (specs.isEmpty()) return

@@ -532,8 +532,11 @@ internal object KmpFlavorPluginValidator {
                 message = "kmpFlavors.buildKonfig.network { baseUrl(\"$flavor\" to ...) } " +
                     "references flavor '$flavor', but no flavor with that name is registered. " +
                     "Available flavors: ${
-                        if (registeredFlavorNames.isEmpty()) "<none>"
-                        else registeredFlavorNames.sorted().joinToString { "'$it'" }
+                        if (registeredFlavorNames.isEmpty()) {
+                            "<none>"
+                        } else {
+                            registeredFlavorNames.sorted().joinToString { "'$it'" }
+                        }
                     }.",
                 fix = "Either register the flavor via `flavors { register(\"$flavor\") {} }` " +
                     "or `dimensions { dimension(\"...\") { flavor(\"$flavor\") } }`, " +

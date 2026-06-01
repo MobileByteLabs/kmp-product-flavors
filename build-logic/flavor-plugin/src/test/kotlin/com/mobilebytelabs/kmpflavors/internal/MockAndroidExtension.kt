@@ -53,8 +53,7 @@ class MockFlavorContainer {
 
     fun getNames(): Set<String> = backing.keys.toSet()
 
-    fun maybeCreate(name: String): MockFlavor =
-        backing.getOrPut(name) { MockFlavor(name) }
+    fun maybeCreate(name: String): MockFlavor = backing.getOrPut(name) { MockFlavor(name) }
 
     fun get(name: String): MockFlavor? = backing[name]
 
@@ -66,8 +65,7 @@ class MockBuildTypeContainer {
 
     fun getNames(): Set<String> = backing.keys.toSet()
 
-    fun maybeCreate(name: String): MockBuildType =
-        backing.getOrPut(name) { MockBuildType(name) }
+    fun maybeCreate(name: String): MockBuildType = backing.getOrPut(name) { MockBuildType(name) }
 
     fun get(name: String): MockBuildType? = backing[name]
 

@@ -88,12 +88,7 @@ abstract class GenerateAnalyticsTagsTask : DefaultTask() {
         )
     }
 
-    private fun buildSource(
-        pkg: String,
-        variant: String,
-        buildType: String,
-        customs: Map<String, String>,
-    ): String = buildString {
+    private fun buildSource(pkg: String, variant: String, buildType: String, customs: Map<String, String>): String = buildString {
         appendLine("package $pkg")
         appendLine()
         appendLine("/** v2.6 auto-generated cross-platform analytics metadata. */")

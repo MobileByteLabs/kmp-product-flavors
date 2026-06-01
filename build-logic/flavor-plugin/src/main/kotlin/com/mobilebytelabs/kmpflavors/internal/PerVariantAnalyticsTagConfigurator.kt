@@ -37,13 +37,7 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
  */
 internal object PerVariantAnalyticsTagConfigurator {
 
-    fun configure(
-        project: Project,
-        extension: KmpFlavorExtension,
-        activeVariant: FlavorVariant,
-        inactiveVariants: List<FlavorVariant>,
-        kotlin: KotlinMultiplatformExtension,
-    ) {
+    fun configure(project: Project, extension: KmpFlavorExtension, activeVariant: FlavorVariant, inactiveVariants: List<FlavorVariant>, kotlin: KotlinMultiplatformExtension) {
         val analytics = extension.analytics
         if (!analytics.enabled.getOrElse(false)) return
         val pkg = extension.buildConfigPackage.orNull ?: return

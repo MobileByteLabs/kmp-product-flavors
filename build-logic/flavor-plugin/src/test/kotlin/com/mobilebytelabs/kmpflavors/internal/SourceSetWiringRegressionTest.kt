@@ -85,17 +85,16 @@ class SourceSetWiringRegressionTest {
         }
     }
 
-    private fun runTasks(extraArgs: List<String> = emptyList()) =
-        GradleRunner.create()
-            .withProjectDir(testProjectDir)
-            // TestKit manages the daemon itself, so `--no-daemon` is not a valid arg here.
-            // Configuration cache stays off so warning-mode aggregates per-configure properly.
-            .withArguments(
-                listOf("tasks", "--warning-mode=all", "--no-configuration-cache") + extraArgs,
-            )
-            .withPluginClasspath()
-            .forwardOutput()
-            .build()
+    private fun runTasks(extraArgs: List<String> = emptyList()) = GradleRunner.create()
+        .withProjectDir(testProjectDir)
+        // TestKit manages the daemon itself, so `--no-daemon` is not a valid arg here.
+        // Configuration cache stays off so warning-mode aggregates per-configure properly.
+        .withArguments(
+            listOf("tasks", "--warning-mode=all", "--no-configuration-cache") + extraArgs,
+        )
+        .withPluginClasspath()
+        .forwardOutput()
+        .build()
 
     @Test
     fun `default (flag=false) — Unused Kotlin Source Sets warning does NOT fire for inactive flavor with on-disk content`() {

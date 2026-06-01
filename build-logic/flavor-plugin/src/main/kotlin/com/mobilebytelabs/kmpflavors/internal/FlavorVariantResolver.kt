@@ -104,11 +104,7 @@ object FlavorVariantResolver {
      * @param filters List of filter actions to apply
      * @return Filtered list of variants
      */
-    private fun applyVariantFilters(
-        variants: List<FlavorVariant>,
-        filters: List<Action<VariantFilter>>,
-        availableTargets: Set<String>,
-    ): List<FlavorVariant> {
+    private fun applyVariantFilters(variants: List<FlavorVariant>, filters: List<Action<VariantFilter>>, availableTargets: Set<String>): List<FlavorVariant> {
         if (filters.isEmpty()) {
             return variants
         }

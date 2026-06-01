@@ -15,6 +15,5 @@
 
 package com.example.condtargets
 
-fun describeActive(): String =
-    "active variant: ${BuildKonfig.VARIANT_NAME} " +
-        "(premium=${BuildKonfig.IS_PREMIUM}, apiBase=${BuildKonfig.API_BASE_URL})"
+fun describeActive(): String = "active variant: ${BuildKonfig.VARIANT_NAME} " +
+    "(premium=${BuildKonfig.IS_PREMIUM}, apiBase=${BuildKonfig.API_BASE_URL})"

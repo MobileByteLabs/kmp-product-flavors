@@ -79,7 +79,10 @@ class SourceSetConfigurator(private val logger: Logger) {
             //    source sets created below.
             val commonFlavorName = "common$capitalizedFlavor"
             val commonFlavor = maybeCreateLazy(
-                project, sourceSets, commonFlavorName, isActiveFlavor,
+                project,
+                sourceSets,
+                commonFlavorName,
+                isActiveFlavor,
                 matrixModeEnabled = matrixModeEnabled,
                 createInactiveFlavorSourceSets = createInactiveFlavorSourceSets,
             )
@@ -96,7 +99,10 @@ class SourceSetConfigurator(private val logger: Logger) {
                 for (intermediate in intermediatePlatforms) {
                     val intermediateFlavorName = "${intermediate.prefix}$capitalizedFlavor"
                     val intermediateFlavor = maybeCreateLazy(
-                        project, sourceSets, intermediateFlavorName, isActiveFlavor,
+                        project,
+                        sourceSets,
+                        intermediateFlavorName,
+                        isActiveFlavor,
                         matrixModeEnabled = matrixModeEnabled,
                         createInactiveFlavorSourceSets = createInactiveFlavorSourceSets,
                     )
@@ -116,7 +122,10 @@ class SourceSetConfigurator(private val logger: Logger) {
             for (platform in leafPlatforms) {
                 val platformFlavorName = "${platform.prefix}$capitalizedFlavor"
                 val platformFlavor = maybeCreateLazy(
-                    project, sourceSets, platformFlavorName, isActiveFlavor,
+                    project,
+                    sourceSets,
+                    platformFlavorName,
+                    isActiveFlavor,
                     matrixModeEnabled = matrixModeEnabled,
                     createInactiveFlavorSourceSets = createInactiveFlavorSourceSets,
                 ) ?: continue
@@ -173,7 +182,10 @@ class SourceSetConfigurator(private val logger: Logger) {
                 // enough — an empty test source set still triggers "Unused" warnings.
                 val commonFlavorTestName = "common${capitalizedFlavor}Test"
                 val commonFlavorTest = maybeCreateLazy(
-                    project, sourceSets, commonFlavorTestName, isActive = false,
+                    project,
+                    sourceSets,
+                    commonFlavorTestName,
+                    isActive = false,
                     matrixModeEnabled = matrixModeEnabled,
                     createInactiveFlavorSourceSets = createInactiveFlavorSourceSets,
                 )
@@ -185,7 +197,10 @@ class SourceSetConfigurator(private val logger: Logger) {
                 for (platform in leafPlatforms) {
                     val platformFlavorTestName = "${platform.prefix}${capitalizedFlavor}Test"
                     val platformFlavorTest = maybeCreateLazy(
-                        project, sourceSets, platformFlavorTestName, isActive = false,
+                        project,
+                        sourceSets,
+                        platformFlavorTestName,
+                        isActive = false,
                         matrixModeEnabled = matrixModeEnabled,
                         createInactiveFlavorSourceSets = createInactiveFlavorSourceSets,
                     )

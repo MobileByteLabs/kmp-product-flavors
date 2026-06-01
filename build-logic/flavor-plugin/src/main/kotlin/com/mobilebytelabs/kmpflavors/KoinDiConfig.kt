@@ -29,10 +29,7 @@ import java.io.Serializable
  * configuration cache, matching the pattern of `BuildKonfigSpec` and other
  * task-input data classes.
  */
-data class KoinModuleSpec(
-    val moduleName: String,
-    val variantBindings: Map<String, String>,
-) : Serializable {
+data class KoinModuleSpec(val moduleName: String, val variantBindings: Map<String, String>) : Serializable {
     companion object {
         private const val serialVersionUID: Long = 1L
     }

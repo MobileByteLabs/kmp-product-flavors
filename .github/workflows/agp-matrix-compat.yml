@@ -43,8 +43,13 @@ jobs:
       matrix:
         # Pinned AGP versions covering 8.x stable line + 9.x preview.
         # Source of truth lives in the plan's Tier B spec; bump here in lockstep
-        # with documented AGP support window in DEVELOPMENT.md.
-        agp: ['8.0.2', '8.5.2', '8.10.0', '9.0.0-rc01']
+        # with documented AGP support window in COMPATIBILITY_MATRIX.md.
+        #
+        # AGP < 8.2 omitted: the project's root build.gradle.kts declares
+        # `com.android.kotlin.multiplatform.library` (an `apply false` alias).
+        # That plugin first shipped in AGP 8.2; matrix runs below that floor
+        # fail at plugin-resolution before the AgpBridge tests even compile.
+        agp: ['8.2.2', '8.5.2', '8.10.0', '9.0.0-rc01']
     steps:
       - uses: actions/checkout@v4
 

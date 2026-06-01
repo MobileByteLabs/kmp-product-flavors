@@ -48,8 +48,7 @@ fun describeActiveVariant(): String {
  * PerVariantAnalyticsTagConfigurator (active variant routes into each target's
  * `main` compilation defaultSourceSet — the same path BuildKonfig uses).
  */
-fun describeAnalyticsTags(): String =
-    "variant=${AnalyticsTags.VARIANT_NAME}, " +
-        "buildType=${AnalyticsTags.BUILD_TYPE}, " +
-        "environment=${AnalyticsTags.ENVIRONMENT}, " +
-        "tier=${AnalyticsTags.TIER}"
+fun describeAnalyticsTags(): String = "variant=${AnalyticsTags.VARIANT_NAME}, " +
+    "buildType=${AnalyticsTags.BUILD_TYPE}, " +
+    "environment=${AnalyticsTags.ENVIRONMENT}, " +
+    "tier=${AnalyticsTags.TIER}"

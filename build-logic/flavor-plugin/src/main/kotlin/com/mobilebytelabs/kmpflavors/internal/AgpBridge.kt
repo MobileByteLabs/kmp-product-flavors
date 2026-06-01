@@ -147,11 +147,7 @@ internal object AgpBridge {
      * - `VariantBuilder.setEnabled(boolean)` setter has been stable since 7.0.
      * - Reflective lookup means future setter renames degrade to WARN, not throw.
      */
-    internal fun propagateVariantFilterToAgp(
-        components: Any,
-        allowedVariantNames: Set<String>,
-        logger: Logger,
-    ) {
+    internal fun propagateVariantFilterToAgp(components: Any, allowedVariantNames: Set<String>, logger: Logger) {
         runCatching {
             val componentsClass = components.javaClass
             val beforeVariants = componentsClass.methods.firstOrNull {

@@ -51,15 +51,13 @@ class AgpBridgeMultiDimTest {
     private val realProject = ProjectBuilder.builder().build()
     private val logger = mockk<Logger>(relaxed = true)
 
-    private fun flavor(name: String, dimension: String): FlavorConfig =
-        realProject.objects.newInstance(FlavorConfig::class.java, name).apply {
-            this.dimension.set(dimension)
-        }
+    private fun flavor(name: String, dimension: String): FlavorConfig = realProject.objects.newInstance(FlavorConfig::class.java, name).apply {
+        this.dimension.set(dimension)
+    }
 
-    private fun dim(name: String, priority: Int = 0): FlavorDimension =
-        realProject.objects.newInstance(FlavorDimension::class.java, name).apply {
-            this.priority.set(priority)
-        }
+    private fun dim(name: String, priority: Int = 0): FlavorDimension = realProject.objects.newInstance(FlavorDimension::class.java, name).apply {
+        this.priority.set(priority)
+    }
 
     // ─────────────────────────────────────────────────────────────────────
     // AC 3 — 1-dimension legacy path: byte-identical to v2.4.3 behaviour.

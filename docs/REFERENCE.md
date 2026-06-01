@@ -273,6 +273,27 @@ Distinct from `createIntermediateBuildTypeSourceSets` (which creates `common{Bui
 
 ---
 
+### 🟢 `createInactiveFlavorSourceSets`
+
+```kotlin
+abstract val createInactiveFlavorSourceSets: Property<Boolean>
+```
+
+Default: `false` (since v2.6).
+
+Controls whether the plugin creates `common<Flavor>` / `<platform><Flavor>` source sets for **inactive** flavors when their `src/` directory has on-disk content and matrix mode is **off**.
+
+- **`false`** (default): the plugin silently SKIPS creation, emits a structured WARN log telling the consumer their `src/common<Flavor>/kotlin/` code is currently dead, and KGP never sees an orphan source set — so the `"Unused Kotlin Source Sets"` warning never fires.
+- **`true`**: lazy-creates the inactive source set when content is found (v2.5 behaviour). KGP will emit `"Unused Kotlin Source Sets"` for the orphan, which is the cost of keeping IDE editing alive for inactive-flavor code.
+
+Set **before** the `flavors { ... }` block so the eager `whenObjectAdded` source-set hook observes the flag. Setting it after `flavors {}` only affects the lazy `afterEvaluate` creation path; `kotlin { sourceSets { val commonPaid by getting } }` references inside the same build script won't see the source set when the flag is read late.
+
+Matrix mode (`buildMatrix.set(true)`) always creates inactive source sets regardless of this flag — they're members of inactive per-variant compilations so KGP doesn't see them as orphans.
+
+Background: Hypothesis A (`commonProd.dependsOn(commonMain)`) was tried in `v2.5.0-alpha.2` and disproved — KGP's "Unused" check is compilation-membership-based, not `dependsOn`-graph-based. This flag is Hypothesis D from `docs/SOURCE_SET_DISCIPLINE.md`.
+
+---
+
 ### 🟠 `activeFlavor` (v1.x compat shim, removed 2026-11-14)
 
 ```kotlin

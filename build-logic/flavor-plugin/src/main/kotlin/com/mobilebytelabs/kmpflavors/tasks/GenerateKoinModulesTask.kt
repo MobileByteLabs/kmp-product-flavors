@@ -88,39 +88,37 @@ abstract class GenerateKoinModulesTask : DefaultTask() {
         )
     }
 
-    private fun buildActualValSource(pkg: String, moduleName: String, bindingBody: String): String =
-        buildString {
-            appendLine("package $pkg")
-            appendLine()
-            appendLine("import org.koin.core.module.Module")
-            appendLine("import org.koin.dsl.module")
-            appendLine()
-            appendLine("actual val ${moduleName}Module: Module = module {")
-            // Ensure exactly one trailing newline on the binding body so the closing
-            // `}` lands on its own line regardless of whether the caller supplied a
-            // trailing `\n` (DSL helpers do; raw string inputs in tests may not).
-            append(bindingBody.trimEnd('\n'))
-            appendLine()
-            appendLine("}")
-        }
+    private fun buildActualValSource(pkg: String, moduleName: String, bindingBody: String): String = buildString {
+        appendLine("package $pkg")
+        appendLine()
+        appendLine("import org.koin.core.module.Module")
+        appendLine("import org.koin.dsl.module")
+        appendLine()
+        appendLine("actual val ${moduleName}Module: Module = module {")
+        // Ensure exactly one trailing newline on the binding body so the closing
+        // `}` lands on its own line regardless of whether the caller supplied a
+        // trailing `\n` (DSL helpers do; raw string inputs in tests may not).
+        append(bindingBody.trimEnd('\n'))
+        appendLine()
+        appendLine("}")
+    }
 
-    private fun buildCommonAggregatorSource(pkg: String, specs: List<KoinModuleSpec>): String =
-        buildString {
-            appendLine("package $pkg")
-            appendLine()
-            appendLine("import org.koin.core.module.Module")
-            appendLine()
-            for (spec in specs) {
-                appendLine("expect val ${spec.moduleName}Module: Module")
-            }
-            appendLine()
-            appendLine("fun flavorDependentModules(): List<Module> = listOf(")
-            specs.forEachIndexed { idx, spec ->
-                val suffix = if (idx == specs.lastIndex) "" else ","
-                appendLine("    ${spec.moduleName}Module$suffix")
-            }
-            appendLine(")")
+    private fun buildCommonAggregatorSource(pkg: String, specs: List<KoinModuleSpec>): String = buildString {
+        appendLine("package $pkg")
+        appendLine()
+        appendLine("import org.koin.core.module.Module")
+        appendLine()
+        for (spec in specs) {
+            appendLine("expect val ${spec.moduleName}Module: Module")
         }
+        appendLine()
+        appendLine("fun flavorDependentModules(): List<Module> = listOf(")
+        specs.forEachIndexed { idx, spec ->
+            val suffix = if (idx == specs.lastIndex) "" else ","
+            appendLine("    ${spec.moduleName}Module$suffix")
+        }
+        appendLine(")")
+    }
 
     private fun String.cap(): String = replaceFirstChar { it.uppercase() }
 }

@@ -13,7 +13,7 @@
 |---|---|---|---|
 | Gradle | **8.0** | 9.5 | `gradle/wrapper/gradle-wrapper.properties` |
 | Kotlin / KGP | **2.0.21** | 2.3.0 | `gradle/libs.versions.toml` → `kotlin` |
-| Android Gradle Plugin (AGP) | **8.0** | 8.12.3 (matrix-tested against 8.0 / 8.5 / 8.10 / 9.0-rc since v2.6) | `AgpBridge.kt` reflection |
+| Android Gradle Plugin (AGP) | **8.2** | 8.12.3 (matrix-tested against 8.2 / 8.5 / 8.10 / 9.0-rc since v2.6) | `AgpBridge.kt` reflection |
 | Compose Multiplatform | **1.7.0** | 1.10.3 | `ComposeResourcesConfigurator.kt#MIN_CMP_VERSION` |
 | JDK toolchain | **17** | 17 | `build-logic/flavor-plugin/build.gradle.kts` → `jvmToolchain(17)` |
 | BuildKonfig (codingfeline/BuildKonfig) | (pinned in `libs.versions.toml`) | (pinned in `libs.versions.toml`) | `gradle/libs.versions.toml` |

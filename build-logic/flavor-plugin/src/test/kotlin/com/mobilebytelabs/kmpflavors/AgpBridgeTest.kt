@@ -97,15 +97,13 @@ class AgpBridgeTest {
 
     private val realProject = ProjectBuilder.builder().build()
 
-    private fun flavor(name: String, dimension: String): FlavorConfig =
-        realProject.objects.newInstance(FlavorConfig::class.java, name).apply {
-            this.dimension.set(dimension)
-        }
+    private fun flavor(name: String, dimension: String): FlavorConfig = realProject.objects.newInstance(FlavorConfig::class.java, name).apply {
+        this.dimension.set(dimension)
+    }
 
-    private fun dim(name: String, priority: Int = 0): FlavorDimension =
-        realProject.objects.newInstance(FlavorDimension::class.java, name).apply {
-            this.priority.set(priority)
-        }
+    private fun dim(name: String, priority: Int = 0): FlavorDimension = realProject.objects.newInstance(FlavorDimension::class.java, name).apply {
+        this.priority.set(priority)
+    }
 
     @Test
     fun `variantFilter forwards to AGP for single-dim config`() {
@@ -197,8 +195,14 @@ class AgpBridgeTest {
         )
         assertEquals(
             setOf(
-                "freeDevPhone", "freeDevTablet", "freeProdPhone", "freeProdTablet",
-                "paidDevPhone", "paidDevTablet", "paidProdPhone", "paidProdTablet",
+                "freeDevPhone",
+                "freeDevTablet",
+                "freeProdPhone",
+                "freeProdTablet",
+                "paidDevPhone",
+                "paidDevTablet",
+                "paidProdPhone",
+                "paidProdTablet",
             ),
             kmpVariants.map { it.name }.toSet(),
         )
