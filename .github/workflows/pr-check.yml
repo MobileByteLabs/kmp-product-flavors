@@ -98,7 +98,7 @@ jobs:
         # the matrix is 2 tiers × 3 buildTypes = 6 variants, active = demoDebug.)
         run: |
           ./gradlew :cmp-navigation:generateFlavorBuildConfig --rerun-tasks --no-daemon --no-configuration-cache
-          GEN=cmp-navigation/build/generated/kmpFlavors/commonMain/kotlin/org/openmf/kmptemplate/BuildKonfig.kt
+          GEN=cmp-navigation/build/generated/kmpFlavors/commonMain/kotlin/org/mifos/kmp/template/BuildKonfig.kt
           test -f "$GEN" || { echo "::error::BuildKonfig.kt missing"; exit 1; }
           for needle in 'VARIANT_NAME: String = "demoDebug"' 'IS_DEMO: Boolean = true' 'IS_PROD: Boolean = false' 'BUILD_TYPE: String = "debug"' 'IS_DEBUG: Boolean = true' 'ENABLE_LOGGING: Boolean = true' 'LOG_TAG: String = "KMPTemplate-DEBUG"' 'IS_DEMO_BUILD: Boolean = true'; do
             if ! grep -qF "$needle" "$GEN"; then
@@ -112,7 +112,7 @@ jobs:
         working-directory: samples/kmp-project-template
         run: |
           ./gradlew :cmp-navigation:generateFlavorBuildConfig -PkmpFlavor=prodStaging --rerun-tasks --no-daemon --no-configuration-cache
-          GEN=cmp-navigation/build/generated/kmpFlavors/commonMain/kotlin/org/openmf/kmptemplate/BuildKonfig.kt
+          GEN=cmp-navigation/build/generated/kmpFlavors/commonMain/kotlin/org/mifos/kmp/template/BuildKonfig.kt
           for needle in 'VARIANT_NAME: String = "prodStaging"' 'IS_PROD: Boolean = true' 'IS_DEMO: Boolean = false' 'BUILD_TYPE: String = "staging"' 'IS_STAGING: Boolean = true' 'IS_DEMO_BUILD: Boolean = false'; do
             if ! grep -qF "$needle" "$GEN"; then
               echo "::error::Override missing line: $needle"
