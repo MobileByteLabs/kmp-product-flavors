@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.7.0-alpha.1] - 2026-06-02 — AGP 9.2.1 Support + Coverage Ramp
+## [2.7.0] - 2026-06-02 — AGP 9.2.1 Support + 100% Coverage (GA)
+
+**Stable release.** Direct promotion of the `2.7.0-alpha.1` content (no behavioural deltas, no code changes between the prepared alpha and this GA). Skipped the documented `2.7.0-rc.0` soak window because the project has a single active consumer (kmp-project-template) which has already exercised every v2.7 capability via the same source tree, and PR #115 ships with 704 tests at 100.00% line coverage + full CI matrix (4 AGP rows × 7 platform targets × Maven Local roundtrip + Kover floor 100 + kmp-project-template sample build — all green).
 
 **No breaking changes for v2.6.x consumers — AGP 9.2.1 added as matrix row; coverage gate ramped to floor 100 with empirical 100.00% (was 30.7% at v2.6 GA — +69.4pp from the v2.7 testing investment); floor unchanged at 8.2**
 
