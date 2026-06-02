@@ -310,4 +310,169 @@ class BuildKonfigCodegenSnapshotTest {
         assertTrue(!output.contains("BASE_URL"))
         assertTrue(!output.contains("TIMEOUT_SECONDS"))
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // v2.7 — coverage gap closure for previously-uncovered emit branches
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `v2-7 network block with no active flavor match emits sentinel BASE_URL`() {
+        val task = newTask()
+        task.variantName.set("ghostDev")
+        task.allFlavorNames.set(setOf("free", "paid"))
+        task.activeFlavorNames.set(setOf("ghost", "dev"))
+        task.allBuildTypeNames.set(emptySet())
+        task.activeBuildTypeName.set("")
+        task.buildConfigFields.set(emptyMap())
+        task.networkConfigSpec.set(
+            com.mobilebytelabs.kmpflavors.NetworkConfigSpec(
+                baseUrls = mapOf("free" to "https://api.free.example.com", "paid" to "https://api.paid.example.com"),
+                timeoutSeconds = 30,
+            ),
+        )
+
+        val output = runAndReadOutput(task)
+
+        assertTrue(output.contains("object Network {"))
+        assertTrue(
+            output.contains("BASE_URL: String = \"<no baseUrl mapped for active variant>\""),
+            "Sentinel placeholder should appear when no flavor matches; output:\n$output",
+        )
+    }
+
+    @Test
+    fun `v2-7 network block with non-default timeout 120 emits TIMEOUT_SECONDS 120`() {
+        val task = newTask()
+        task.variantName.set("freeDev")
+        task.allFlavorNames.set(setOf("free", "paid"))
+        task.activeFlavorNames.set(setOf("free", "dev"))
+        task.allBuildTypeNames.set(emptySet())
+        task.activeBuildTypeName.set("")
+        task.buildConfigFields.set(emptyMap())
+        task.networkConfigSpec.set(
+            com.mobilebytelabs.kmpflavors.NetworkConfigSpec(
+                baseUrls = mapOf("free" to "https://x"),
+                timeoutSeconds = 120,
+            ),
+        )
+
+        val output = runAndReadOutput(task)
+
+        assertTrue(output.contains("TIMEOUT_SECONDS: Int = 120"))
+    }
+
+    @Test
+    fun `v2-7 network block with single-entry baseUrl map emits correct URL`() {
+        val task = newTask()
+        task.variantName.set("singleActive")
+        task.allFlavorNames.set(setOf("only"))
+        task.activeFlavorNames.set(setOf("only"))
+        task.allBuildTypeNames.set(emptySet())
+        task.activeBuildTypeName.set("")
+        task.buildConfigFields.set(emptyMap())
+        task.networkConfigSpec.set(
+            com.mobilebytelabs.kmpflavors.NetworkConfigSpec(
+                baseUrls = mapOf("only" to "https://api.only.example.com"),
+                timeoutSeconds = 15,
+            ),
+        )
+
+        val output = runAndReadOutput(task)
+
+        assertTrue(output.contains("BASE_URL: String = \"https://api.only.example.com\""))
+        assertTrue(output.contains("TIMEOUT_SECONDS: Int = 15"))
+    }
+
+    @Test
+    fun `v2-7 empty networkConfigSpec baseUrls map skips Network block emission`() {
+        val task = newTask()
+        task.variantName.set("freeDev")
+        task.allFlavorNames.set(setOf("free"))
+        task.activeFlavorNames.set(setOf("free", "dev"))
+        task.allBuildTypeNames.set(emptySet())
+        task.activeBuildTypeName.set("")
+        task.buildConfigFields.set(emptyMap())
+        task.networkConfigSpec.set(
+            com.mobilebytelabs.kmpflavors.NetworkConfigSpec(baseUrls = emptyMap()),
+        )
+
+        val output = runAndReadOutput(task)
+
+        assertTrue(!output.contains("object Network {"), "Empty baseUrls must skip Network block; output:\n$output")
+    }
+
+    @Test
+    fun `v2-7 customField with primitive type emits public val without type prefix`() {
+        val task = newTask()
+        task.variantName.set("freeDev")
+        task.allFlavorNames.set(setOf("free"))
+        task.activeFlavorNames.set(setOf("free", "dev"))
+        task.allBuildTypeNames.set(emptySet())
+        task.activeBuildTypeName.set("")
+        task.buildConfigFields.set(emptyMap())
+        task.customFieldSpecs.set(
+            listOf(
+                com.mobilebytelabs.kmpflavors.CustomFieldDeclaration(
+                    name = "maxRetries",
+                    typeDescriptor = "Int",
+                    value = "5",
+                ),
+            ),
+        )
+
+        val output = runAndReadOutput(task)
+
+        assertTrue(output.contains("val maxRetries: Int = 5"))
+    }
+
+    @Test
+    fun `v2-7 multiple customField declarations preserve insertion order in output`() {
+        val task = newTask()
+        task.variantName.set("freeDev")
+        task.allFlavorNames.set(setOf("free"))
+        task.activeFlavorNames.set(setOf("free", "dev"))
+        task.allBuildTypeNames.set(emptySet())
+        task.activeBuildTypeName.set("")
+        task.buildConfigFields.set(emptyMap())
+        task.customFieldSpecs.set(
+            listOf(
+                com.mobilebytelabs.kmpflavors.CustomFieldDeclaration("first", "String", "\"a\""),
+                com.mobilebytelabs.kmpflavors.CustomFieldDeclaration("second", "String", "\"b\""),
+                com.mobilebytelabs.kmpflavors.CustomFieldDeclaration("third", "String", "\"c\""),
+            ),
+        )
+
+        val output = runAndReadOutput(task)
+
+        val idxFirst = output.indexOf("val first:")
+        val idxSecond = output.indexOf("val second:")
+        val idxThird = output.indexOf("val third:")
+        assertTrue(idxFirst in 0..<idxSecond, "first must appear before second in output")
+        assertTrue(idxSecond < idxThird, "second must appear before third in output")
+    }
+
+    @Test
+    fun `v2-7 perTarget block emits one nested PerTarget object per target`() {
+        val task = newTask()
+        task.variantName.set("freeDev")
+        task.allFlavorNames.set(setOf("free"))
+        task.activeFlavorNames.set(setOf("free", "dev"))
+        task.allBuildTypeNames.set(emptySet())
+        task.activeBuildTypeName.set("")
+        task.buildConfigFields.set(emptyMap())
+        task.perTargetFieldSpecs.set(
+            listOf(
+                com.mobilebytelabs.kmpflavors.PerTargetFieldDeclaration("RUNTIME_FLAG", "Boolean", "true", "iosMain"),
+                com.mobilebytelabs.kmpflavors.PerTargetFieldDeclaration("API_TIER", "String", "\"premium\"", "iosMain"),
+                com.mobilebytelabs.kmpflavors.PerTargetFieldDeclaration("ENABLE_DEBUG", "Boolean", "true", "desktopMain"),
+            ),
+        )
+
+        val output = runAndReadOutput(task)
+
+        assertTrue(output.contains("object PerTarget"))
+        assertTrue(output.contains("RUNTIME_FLAG"))
+        assertTrue(output.contains("API_TIER"))
+        assertTrue(output.contains("ENABLE_DEBUG"))
+    }
 }

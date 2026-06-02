@@ -177,11 +177,14 @@ kover {
             }
         }
         verify {
-            // Phase 1 floor — empirical baseline (26.5% measured 2026-06-01).
-            // Set to 25 so first commit passes; v2.6.x ramps to 95 via
-            // `-PkoverLineMin=95` as individual gaps close (per Tier E roadmap).
+            // v2.7 incremental ramp — empirical baseline 31.7% measured against
+            // AGP 9.2.1 + Kotlin 2.3.21 (was 30.6% at v2.6 GA). Floor bumped to
+            // 30 (passes immediately + locks against regression); v2.7.x point
+            // releases continue toward 100 as each gap batch closes per the
+            // v27-agp9-support GOAL's three patterns (direct/snapshot/TestKit).
+            // Override via `-PkoverLineMin=N` for incident-response scenarios.
             rule {
-                minBound((project.findProperty("koverLineMin") as? String)?.toIntOrNull() ?: 25)
+                minBound((project.findProperty("koverLineMin") as? String)?.toIntOrNull() ?: 30)
             }
         }
     }

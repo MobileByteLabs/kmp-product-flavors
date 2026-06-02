@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.0-alpha.1] - 2026-06-02 — AGP 9.2.1 Support + Coverage Ramp
+
+**No breaking changes for v2.6.x consumers — AGP 9.2.1 added as matrix row; coverage gate ramped to floor 30; floor unchanged at 8.2**
+
+See [`docs/MIGRATION_v2.6_TO_v2.7.md`](docs/MIGRATION_v2.6_TO_v2.7.md) (opens with "You do not need to migrate.") for the optional cookbook. AGP-9-specific consumer migration steps live in [`docs/AGP_9_MIGRATION_NOTES.md`](docs/AGP_9_MIGRATION_NOTES.md).
+
+### Added
+
+- **AGP 9.2.1 + Kotlin 2.3.21 build toolchain alignment** — plugin built against AGP 9.2.1 and Kotlin 2.3.21 (was AGP 8.12.3 + Kotlin 2.3.0). Reflection-based bridge means consumers stay on 8.2+ AGP transparently.
+- **AGP 9.2.1 in `.github/workflows/agp-matrix-compat.yml`** matrix — every PR that touches `AgpBridge.kt` runs against AGP 8.2.2 / 8.5.2 / 8.10.0 / 9.2.1
+- **`docs/AGP_9_MIGRATION_NOTES.md`** — consumer-facing cookbook covering `CommonExtension` type-param drop, `dataBinding` deprecation, `com.android.kotlin.multiplatform.library` adoption, and `dependencyGuard` afterEvaluate workaround
+- **`docs/COVERAGE_DEEP_DIVE.md`** — contributor playbook documenting the three gap-closing patterns (direct unit / snapshot fixture / TestKit fixture) with worked examples per the v2.7 100%-coverage GOAL
+- **5 new direct-test classes**: `NetworkConfigSpecTest`, `BuildKonfigDslTest`, `DiDslTest`, `AnalyticsTagsConfigTest`, `FlavorVariantTest` — documenting the consumer-facing DSL contracts at unit-test level
+- **7 new `BuildKonfigCodegenSnapshotTest` `@Test` methods** covering previously-uncovered network DSL emit branches (no-flavor-match sentinel, custom timeout, single-entry baseUrl, empty baseUrls skip, primitive customField, multi-customField ordering, perTarget multi-field)
+- **`NetworkDslRegressionTest`** — TestKit fixture exercising the `buildKonfig { network { } }` DSL end-to-end through real plugin application
+- **`coverage-gap-ledger.md`** — sealed per-class gap classification at `plan-layer/.../v27-agp9-support/`
+
+### Changed
+
+- **Kover line-coverage floor**: 25 → **30** (v2.6 baseline was 30.7%; v2.7 closes the easy direct-test + snapshot + TestKit gaps; v2.7.x continues toward 100%)
+- **`docs/COMPATIBILITY_MATRIX.md`** Built-against column: AGP 8.12.3 → 9.2.1, Kotlin 2.3.0 → 2.3.21; floor headline UNCHANGED at AGP 8.2
+- **`docs/COVERAGE_GUIDE.md`** floor table: Default = 40; Roadmap target = 100% (per-class ≥ 95%); v2.6.x ramp-ladder section removed in favour of v2.7.x continuation roadmap
+
+### Removed
+
+- **AGP 9.0.0-rc01 matrix row** — superseded by 9.2.1 stable
+
+### Preserved
+
+- **Version floor** — Gradle 8.0+ / KGP 2.0.21+ / AGP 8.2+ / JDK 17+ / CMP 1.7.0+. **UNCHANGED across v2.4 → v2.5 → v2.6 → v2.7.**
+- **All v2.6 DSL surfaces** — `dimensions {}`, `variantFilter { excludeTargets() }`, `buildKonfig { network {} }`, `di { koin {} }`, `analytics { customTag() }`, `createInactiveFlavorSourceSets` opt-in flag — all unchanged
+- **V01–V30 validator codes** — no new validator codes; existing codes verified against new matrix
+
+### Deferred to v2.7.1
+
+- **Coverage gate ramp 40 → 100** continues; each v2.7.x release closes another gap batch
+- **Pitest mutation testing promoted to gate** (informational in v2.7)
+- **Per-class line coverage ≥ 95% enforcement** (currently aggregate-only)
+
+### Dependencies
+
+- Build-side: `agp` 8.12.3 → 9.2.1, `kotlin` 2.3.0 → 2.3.21 in `gradle/libs.versions.toml` (build-only; not exposed to consumers)
+- No new runtime dependencies on the consumer side. Plugin remains Koin-agnostic / Ktor-agnostic / Crashlytics-agnostic.
+
 ## [2.6.0] - 2026-06-01 — GA promotion of `2.6.0-alpha.1`
 
 **Stable release.** Direct promotion from `2.6.0-alpha.1` (published 2026-06-01) — no behavioural deltas, no code changes between alpha.1 and GA. Skipped the documented `2.6.0-rc.0` soak window because the project has a single active consumer (kmp-project-template) which has already exercised every v2.6 capability via the same source tree.
