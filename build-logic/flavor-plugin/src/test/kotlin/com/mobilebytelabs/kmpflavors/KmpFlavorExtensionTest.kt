@@ -197,4 +197,13 @@ class KmpFlavorExtensionTest {
         e.buildKonfig { secret("AUTH_TOKEN") }
         assertEquals(2, e.buildKonfigDsl.secrets.size)
     }
+
+    @Test
+    fun `internal mutex setter functions are exercised`() {
+        val e = newExtension()
+        e.dimensionsDslUsed = true
+        e.legacyFlatDslUsed = true
+        assertTrue(e.dimensionsDslUsed)
+        assertTrue(e.legacyFlatDslUsed)
+    }
 }

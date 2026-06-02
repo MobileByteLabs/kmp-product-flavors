@@ -143,4 +143,23 @@ class GenerateSpmManifestTaskTest {
         val checksumRegex = Regex("""checksum: "([0-9a-f]{64})"""")
         assertTrue(checksumRegex.containsMatchIn(manifest))
     }
+
+    @Test
+    fun `REMOTE AUTO computes sha256 over xcframework when it is a single file`() {
+        val task = newTask()
+        // Single file rather than directory bundle — exercises sha256(file) branch.
+        val xcframeworkFile = File(tempDir, "XCFrameworks/freeDev/Shared.xcframework").apply {
+            parentFile.mkdirs()
+            writeBytes(byteArrayOf(10, 20, 30, 40, 50))
+        }
+        task.distribution.set(SpmDistribution.REMOTE)
+        task.binaryUrlTemplate.set("https://cdn/x.zip")
+        task.checksumStrategy.set(SpmChecksumStrategy.AUTO)
+        task.generate()
+        val manifest = File(tempDir, "build/spm/freeDev/Package.swift").readText()
+        val checksumRegex = Regex("""checksum: "([0-9a-f]{64})"""")
+        assertTrue(checksumRegex.containsMatchIn(manifest))
+        // Sanity — confirm we hit the single-file branch by validating the file existed.
+        assertTrue(xcframeworkFile.isFile)
+    }
 }

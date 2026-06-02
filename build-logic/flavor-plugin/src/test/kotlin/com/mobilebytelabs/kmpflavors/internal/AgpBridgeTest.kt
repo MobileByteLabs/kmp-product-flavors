@@ -194,4 +194,124 @@ class AgpBridgeTest {
         // No throw, no extension changes.
         assertTrue(true)
     }
+
+    /**
+     * Exercise the private propagateBuildTypes path via reflection. The bridge
+     * dispatches into this from apply()'s fallback branch when androidComponents
+     * is unavailable — we can't reach that branch from ProjectBuilder without a
+     * real AGP classpath, but the helper itself is callable directly via reflection
+     * against the FakeAndroidExtension shape.
+     */
+    private fun invokePropagateBuildTypes(androidExt: Any, kmpBuildTypes: List<com.mobilebytelabs.kmpflavors.BuildTypeConfig>) {
+        val method = AgpBridge::class.java.getDeclaredMethod(
+            "propagateBuildTypes",
+            Any::class.java,
+            List::class.java,
+            org.gradle.api.logging.Logger::class.java,
+        )
+        method.isAccessible = true
+        method.invoke(AgpBridge, androidExt, kmpBuildTypes, project().logger)
+    }
+
+    @Test
+    fun `propagateBuildTypes empty list short-circuits silently`() {
+        val ext = FakeAndroidExtension()
+        invokePropagateBuildTypes(ext, emptyList())
+        assertEquals(emptySet<String>(), ext.getBuildTypes().entries.keys)
+    }
+
+    @Test
+    fun `propagateBuildTypes creates AGP build types from KMP shapes`() {
+        val ext = FakeAndroidExtension()
+        val debug = newBuildType("debug").apply {
+            applicationIdSuffix.set(".debug")
+        }
+        val release = newBuildType("release").apply {
+            applicationIdSuffix.set(".release")
+        }
+        invokePropagateBuildTypes(ext, listOf(debug, release))
+        // FakeAndroidExtension pre-populates debug + release as AGP defaults.
+        // The bridge sees those (containsAll true on KMP names ⊆ existing names
+        // after filtering AGP defaults) and short-circuits as idempotent re-apply.
+        // Confirms the idempotency branch.
+        assertTrue(ext.getBuildTypes().entries.containsKey("debug"))
+        assertTrue(ext.getBuildTypes().entries.containsKey("release"))
+    }
+
+    @Test
+    fun `propagateBuildTypes propagates non-default custom build type`() {
+        val ext = FakeAndroidExtension()
+        // Remove default debug/release to force the registration path.
+        ext.getBuildTypes().entries.clear()
+        val staging = newBuildType("staging").apply {
+            isDebuggable.set(true)
+            isMinifyEnabled.set(false)
+            applicationIdSuffix.set(".staging")
+        }
+        invokePropagateBuildTypes(ext, listOf(staging))
+        val bt = ext.getBuildTypes().entries["staging"]!!
+        assertEquals(true, bt.debuggable)
+        assertEquals(false, bt.minify)
+        assertEquals(".staging", bt.appIdSuffix)
+    }
+
+    @Test
+    fun `propagateBuildTypes conflict path warns and skips`() {
+        val ext = FakeAndroidExtension()
+        ext.getBuildTypes().maybeCreate("preexistingCustom") // hand-written conflict
+        val staging = newBuildType("staging")
+        invokePropagateBuildTypes(ext, listOf(staging))
+        // Bridge sees nonDefault has entries that don't cover KMP names → skips.
+        assertTrue(!ext.getBuildTypes().entries.containsKey("staging"))
+    }
+
+    /** Reflection access to the private propagateFlavors dispatcher. */
+    private fun invokePropagateFlavors(androidExt: Any, dims: List<FlavorDimension>, flavors: List<FlavorConfig>) {
+        val method = AgpBridge::class.java.getDeclaredMethod(
+            "propagateFlavors",
+            Any::class.java,
+            List::class.java,
+            List::class.java,
+            org.gradle.api.logging.Logger::class.java,
+        )
+        method.isAccessible = true
+        method.invoke(AgpBridge, androidExt, dims, flavors, project().logger)
+    }
+
+    @Test
+    fun `propagateFlavors dispatcher empty dimensions short-circuits`() {
+        val ext = FakeAndroidExtension()
+        invokePropagateFlavors(ext, emptyList(), listOf(newFlavor("free")))
+        assertEquals(emptyList<String>(), ext.dimensions)
+    }
+
+    @Test
+    fun `propagateFlavors dispatcher empty flavors short-circuits`() {
+        val ext = FakeAndroidExtension()
+        invokePropagateFlavors(ext, listOf(newDimension("tier")), emptyList())
+        assertEquals(emptyList<String>(), ext.dimensions)
+    }
+
+    @Test
+    fun `propagateFlavors dispatcher routes single-dim to Legacy`() {
+        val ext = FakeAndroidExtension()
+        val dim = newDimension("tier")
+        val flavors = listOf(newFlavor("free", "tier"))
+        invokePropagateFlavors(ext, listOf(dim), flavors)
+        assertEquals(listOf("tier"), ext.dimensions)
+        assertTrue(ext.getProductFlavors().entries.containsKey("free"))
+    }
+
+    @Test
+    fun `propagateFlavors dispatcher routes multi-dim to CrossProduct`() {
+        val ext = FakeAndroidExtension()
+        val dims = listOf(newDimension("tier", 0), newDimension("env", 1))
+        val flavors = listOf(
+            newFlavor("free", "tier"),
+            newFlavor("dev", "env"),
+        )
+        invokePropagateFlavors(ext, dims, flavors)
+        // Both dimensions registered.
+        assertEquals(setOf("tier", "env"), ext.dimensions.toSet())
+    }
 }

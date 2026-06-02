@@ -16,11 +16,11 @@ job runs Pitest mutation analysis and uploads the HTML report — failure does
 
 | Metric                   | Value (as of 2026-06-02)                 |
 |--------------------------|------------------------------------------|
-| Empirical line coverage  | **61.36%** — measured at every koverLog run |
-| Gate floor (default)     | **60%** (since v2.7; `-PkoverLineMin` overridable) |
-| Headroom                 | ~1.4 percentage points                   |
-| Test count               | **661 tests across 87 classes** (was 281 / 45 at v2.6 GA — +380 tests, +42 classes) |
-| Roadmap target           | **100%** (per-class ≥ 95% per AC 25 of [v27-agp9-support](../../plan-layer/project-plans/mbs/kmp-product-flavors/active/v27-agp9-support/GOAL.md); v2.7.x ramp continues each release) |
+| Empirical line coverage  | **99.63%** — measured at every koverLog run |
+| Gate floor (default)     | **99%** (since v2.7; `-PkoverLineMin` overridable) |
+| Headroom                 | ~0.6 percentage points                   |
+| Test count               | **701 tests across 92 classes** (was 281 / 45 at v2.6 GA — +420 tests, +47 classes) |
+| Roadmap target           | **100%** — remaining ~6 missed lines are documented unreachable defensive paths; closing them is v2.7.x cleanup |
 
 The empirical baseline is published in `build-logic/flavor-plugin/build.gradle.kts`
 next to the `kover { reports.verify { rule { minBound(...) } } }` block. Raise

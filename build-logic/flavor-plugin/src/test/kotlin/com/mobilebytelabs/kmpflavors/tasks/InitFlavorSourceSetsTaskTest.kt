@@ -188,6 +188,19 @@ class InitFlavorSourceSetsTaskTest {
     }
 
     @Test
+    fun `createIntermediates false skips intermediate dirs`() {
+        val task = newTask()
+        task.flavorNames.set(setOf("free"))
+        task.platformPrefixes.set(emptySet())
+        task.intermediatePrefixes.set(setOf("web", "native"))
+        task.createIntermediates.set(false)
+        task.generateSampleCode.set(false)
+        task.init()
+        assertFalse(File(tempDir, "src/webFree/kotlin").exists())
+        assertFalse(File(tempDir, "src/nativeFree/kotlin").exists())
+    }
+
+    @Test
     fun `Test suffix triggers test classification in README`() {
         val task = newTask()
         task.flavorNames.set(setOf("freeTest"))

@@ -59,4 +59,16 @@ class KmpFlavorVariantTest {
         assertEquals(emptyMap<Any, Any>(), v.compilations)
         assertEquals(emptyList<Any>(), v.intermediateSourceSets)
     }
+
+    @Test
+    fun `internal setters are exercised`() {
+        val v = newVariant()
+        v.flavors = listOf("free", "dev")
+        v.buildType = "debug"
+        v.targets = emptySet()
+        v.compilations = emptyMap()
+        v.intermediateSourceSets = emptyList()
+        assertEquals(listOf("free", "dev"), v.flavors)
+        assertEquals("debug", v.buildType)
+    }
 }
