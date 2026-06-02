@@ -148,7 +148,6 @@ abstract class GenerateSpmManifestTask : DefaultTask() {
 
     private fun resolveChecksum(variant: String, name: String): String {
         val strategy = checksumStrategy.get()
-        if (strategy == SpmChecksumStrategy.SKIP) return SKIP_PLACEHOLDER
 
         val expected = xcframeworkPath.orNull
             ?: "../../XCFrameworks/$variant/$name.xcframework"
@@ -156,6 +155,8 @@ abstract class GenerateSpmManifestTask : DefaultTask() {
         val sidecar = File(xcframework.parentFile, "${xcframework.name}.checksum")
 
         return when (strategy) {
+            SpmChecksumStrategy.SKIP -> SKIP_PLACEHOLDER
+
             SpmChecksumStrategy.REQUIRE_FILE -> {
                 if (!sidecar.exists()) {
                     error(
@@ -179,8 +180,6 @@ abstract class GenerateSpmManifestTask : DefaultTask() {
                     TODO_PLACEHOLDER
                 }
             }
-
-            SpmChecksumStrategy.SKIP -> SKIP_PLACEHOLDER
         }
     }
 

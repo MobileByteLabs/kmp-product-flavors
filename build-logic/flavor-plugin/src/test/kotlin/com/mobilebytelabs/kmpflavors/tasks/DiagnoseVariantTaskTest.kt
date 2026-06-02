@@ -148,4 +148,24 @@ class DiagnoseVariantTaskTest {
         assertEquals("kmp flavors", task.group)
         assertTrue(task.description!!.contains("BuildConfig"))
     }
+
+    @Test
+    fun `human render covers fully-empty variant`() {
+        val task = newTask()
+        // Override every map so the requested variant has empty flavors/targets/sourceSets.
+        task.flavorsByVariant.set(mapOf("emptyVariant" to emptyList()))
+        task.buildTypeByVariant.set(mapOf("emptyVariant" to ""))
+        task.sourceSetsByVariant.set(mapOf("emptyVariant" to emptyList()))
+        task.targetsByVariant.set(mapOf("emptyVariant" to emptyList()))
+        task.buildConfigFieldsByVariant.set(mapOf("emptyVariant" to emptyMap()))
+        task.activeVariantName.set("emptyVariant")
+        task.variantToDiagnose.set("emptyVariant")
+        task.variantFilterCount.set(0)
+        task.diagnose()
+        val out = captured.toString()
+        assertTrue(out.contains("Flavors           : (none)"))
+        assertTrue(out.contains("Targets           : (no compilation registered)"))
+        assertTrue(out.contains("(no source sets"))
+        assertTrue(out.contains("(none — no buildConfigField"))
+    }
 }

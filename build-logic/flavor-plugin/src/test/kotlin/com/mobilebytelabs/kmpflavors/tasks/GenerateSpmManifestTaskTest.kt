@@ -128,6 +128,19 @@ class GenerateSpmManifestTaskTest {
     }
 
     @Test
+    fun `REMOTE REQUIRE_FILE reads sidecar happy path`() {
+        val task = newTask()
+        val xcframeworkDir = File(tempDir, "XCFrameworks/freeDev/Shared.xcframework").apply { mkdirs() }
+        File(xcframeworkDir.parentFile, "Shared.xcframework.checksum").writeText("sha256-required-file-value\n")
+        task.distribution.set(SpmDistribution.REMOTE)
+        task.binaryUrlTemplate.set("https://cdn/x.zip")
+        task.checksumStrategy.set(SpmChecksumStrategy.REQUIRE_FILE)
+        task.generate()
+        val manifest = File(tempDir, "build/spm/freeDev/Package.swift").readText()
+        assertTrue(manifest.contains("checksum: \"sha256-required-file-value\""))
+    }
+
+    @Test
     fun `REMOTE AUTO computes sha256 over xcframework directory when present`() {
         val task = newTask()
         // Build a fake .xcframework bundle with a couple of files.

@@ -16,11 +16,10 @@ job runs Pitest mutation analysis and uploads the HTML report — failure does
 
 | Metric                   | Value (as of 2026-06-02)                 |
 |--------------------------|------------------------------------------|
-| Empirical line coverage  | **99.63%** — measured at every koverLog run |
-| Gate floor (default)     | **99%** (since v2.7; `-PkoverLineMin` overridable) |
-| Headroom                 | ~0.6 percentage points                   |
-| Test count               | **701 tests across 92 classes** (was 281 / 45 at v2.6 GA — +420 tests, +47 classes) |
-| Roadmap target           | **100%** — remaining ~6 missed lines are documented unreachable defensive paths; closing them is v2.7.x cleanup |
+| Empirical line coverage  | **100.00%** — measured at every koverLog run |
+| Gate floor (default)     | **100%** (since v2.7; `-PkoverLineMin` overridable) |
+| Test count               | **704 tests across 92 classes** (was 281 / 45 at v2.6 GA — +423 tests, +47 classes) |
+| Roadmap target           | **ACHIEVED** at v2.7.0-alpha.1 ship — every reachable line is covered, every Tier E exclusion documents its alternative verification path |
 
 The empirical baseline is published in `build-logic/flavor-plugin/build.gradle.kts`
 next to the `kover { reports.verify { rule { minBound(...) } } }` block. Raise

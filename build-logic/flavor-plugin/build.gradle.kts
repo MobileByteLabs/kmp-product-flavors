@@ -285,22 +285,33 @@ kover {
             }
         }
         verify {
-            // v2.7 ramp — empirical baseline measured against AGP 9.2.1 + Kotlin
-            // 2.3.21 with the Tier E sealed exclusion list above scoping coverage
-            // to human-testable surfaces. Empirical 99.63% (up from v2.6's 30.6%
-            // GA value — +69pp from the testing investment). Floor 99 leaves
-            // ~0.6pp headroom and locks against regression.
+            // v2.7 ramp — empirical 100.00% line coverage measured against
+            // AGP 9.2.1 + Kotlin 2.3.21 with the Tier E sealed exclusion list
+            // scoping coverage to human-testable surfaces. Up from v2.6 GA's
+            // 30.6% — +69.4pp delta from the v2.7 testing investment.
+            // Floor 100 locks the achievement against regression.
             //
-            // Remaining ~6 missed lines are documented unreachable defensive
-            // paths (Elvis chains protected by upstream isEmpty() guards,
-            // exhaustive `when` arms that the early-return preempts). Each is
-            // intentional belt-and-suspenders code that's correct by design but
-            // unreachable in normal flow — see docs/COVERAGE_DEEP_DIVE.md
-            // "Unreachable-by-design lines" for the per-line audit.
+            // Path to 100 closed by:
+            //   1. Refactoring 2 unreachable defensive Elvis chains in
+            //      FlavorVariantResolver.resolveDefaultVariant to use first()
+            //      instead of firstOrNull() ?: return null — the upstream
+            //      isEmpty() guards make them safe.
+            //   2. Reordering GenerateSpmManifestTask.resolveChecksum to make
+            //      the SKIP `when` arm reachable (folded the prior early-return
+            //      into the when branch — semantically identical, structurally
+            //      reachable).
+            //   3. Making KmpFlavorPluginValidator.suggestRename internal +
+            //      adding a direct unit test for the defensive `else` branch.
+            //   4. Adding a DiagnoseVariantTask.renderHuman test that passes
+            //      genuinely-empty flavors/targets/sourceSets/buildConfigFields
+            //      to exercise the "(none)" / "(no compilation registered)"
+            //      / "(no source sets ...)" branches.
+            //   5. Adding a GenerateSpmManifestTask REQUIRE_FILE happy-path
+            //      test where the sidecar exists (only error path was tested).
             //
             // Override via `-PkoverLineMin=N` for incident-response scenarios.
             rule {
-                minBound((project.findProperty("koverLineMin") as? String)?.toIntOrNull() ?: 99)
+                minBound((project.findProperty("koverLineMin") as? String)?.toIntOrNull() ?: 100)
             }
         }
     }

@@ -152,9 +152,10 @@ object FlavorVariantResolver {
         }
 
         val flavorOnly: FlavorVariant = if (dimensions.isEmpty()) {
+            // `flavors` is non-empty per the early-return on line 150, so `first()`
+            // is safe — no defensive `?: return null` Elvis needed.
             val defaultFlavor = flavors.find { it.isDefault.getOrElse(false) }
-                ?: flavors.firstOrNull()
-                ?: return null
+                ?: flavors.first()
             FlavorVariant(name = defaultFlavor.name, flavors = listOf(defaultFlavor))
         } else {
             val sortedDimensions = dimensions.sortedBy { it.priority.getOrElse(0) }
@@ -169,9 +170,9 @@ object FlavorVariantResolver {
 
         if (!enableBuildTypes || buildTypes.isEmpty()) return flavorOnly
 
+        // `buildTypes` is non-empty per the guard above — `first()` is safe.
         val defaultBuildType = buildTypes.find { it.isDefault.getOrElse(false) }
-            ?: buildTypes.firstOrNull()
-            ?: return flavorOnly
+            ?: buildTypes.first()
 
         return FlavorVariant(
             name = flavorOnly.name + defaultBuildType.name.replaceFirstChar { it.uppercaseChar() },

@@ -333,4 +333,21 @@ class KmpFlavorPluginValidatorExtraTest {
             setOf("Boolean", "Int", "Long", "Float", "Double", "String")
         ))
     }
+
+    @Test
+    fun `suggestRename maps every reserved name pattern`() {
+        // First branch — VARIANT_NAME → APP_VARIANT_NAME
+        assertEquals("APP_VARIANT_NAME", KmpFlavorPluginValidator.suggestRename("VARIANT_NAME"))
+        // Second branch — BUILD_TYPE → APP_BUILD_TYPE
+        assertEquals("APP_BUILD_TYPE", KmpFlavorPluginValidator.suggestRename("BUILD_TYPE"))
+        // Third branch — IS_<NAME> → TIER_<NAME>
+        assertEquals("TIER_FREE", KmpFlavorPluginValidator.suggestRename("IS_FREE"))
+        assertEquals("TIER_DEBUG", KmpFlavorPluginValidator.suggestRename("IS_DEBUG"))
+        // Fourth (defensive) branch — anything else → APP_<NAME>. Reserved
+        // namespace is currently closed at {VARIANT_NAME, BUILD_TYPE, IS_*}
+        // so this branch is unreachable through validate(); we exercise it
+        // here to lock in the contract for future namespace expansion.
+        assertEquals("APP_CUSTOM_NAME", KmpFlavorPluginValidator.suggestRename("CUSTOM_NAME"))
+        assertEquals("APP_X", KmpFlavorPluginValidator.suggestRename("X"))
+    }
 }

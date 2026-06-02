@@ -673,7 +673,7 @@ internal object KmpFlavorPluginValidator {
      * - `VARIANT_NAME` → `APP_VARIANT_NAME`.
      * - `BUILD_TYPE` → `APP_BUILD_TYPE`.
      */
-    private fun suggestRename(reservedName: String): String = when {
+    internal fun suggestRename(reservedName: String): String = when {
         reservedName == "VARIANT_NAME" -> "APP_VARIANT_NAME"
         reservedName == "BUILD_TYPE" -> "APP_BUILD_TYPE"
         reservedName.startsWith("IS_") -> "TIER_" + reservedName.removePrefix("IS_")

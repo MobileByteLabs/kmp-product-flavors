@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.7.0-alpha.1] - 2026-06-02 — AGP 9.2.1 Support + Coverage Ramp
 
-**No breaking changes for v2.6.x consumers — AGP 9.2.1 added as matrix row; coverage gate ramped to floor 99 with empirical 99.63% (was 30.7% at v2.6 GA — +69pp from the v2.7 testing investment); floor unchanged at 8.2**
+**No breaking changes for v2.6.x consumers — AGP 9.2.1 added as matrix row; coverage gate ramped to floor 100 with empirical 100.00% (was 30.7% at v2.6 GA — +69.4pp from the v2.7 testing investment); floor unchanged at 8.2**
 
 See [`docs/MIGRATION_v2.6_TO_v2.7.md`](docs/MIGRATION_v2.6_TO_v2.7.md) (opens with "You do not need to migrate.") for the optional cookbook. AGP-9-specific consumer migration steps live in [`docs/AGP_9_MIGRATION_NOTES.md`](docs/AGP_9_MIGRATION_NOTES.md).
 
@@ -29,9 +29,9 @@ See [`docs/MIGRATION_v2.6_TO_v2.7.md`](docs/MIGRATION_v2.6_TO_v2.7.md) (opens wi
 
 ### Changed
 
-- **Kover line-coverage floor**: 25 → **99** (v2.6 baseline was 30.7%; v2.7 ships +420 tests across 41 new classes + a comprehensive Tier E sealed exclusion list documenting every Gradle Action SAM lambda + adjacent-plugin-runtime helper + KMP-runtime configurator as "tested via real-AGP CI matrix, not unit tests", pushing empirical to **99.63%**)
+- **Kover line-coverage floor**: 25 → **100** (v2.6 baseline was 30.7%; v2.7 ships **+423 tests across +47 new classes** + a comprehensive Tier E sealed exclusion list documenting every Gradle Action SAM lambda + adjacent-plugin-runtime helper + KMP-runtime configurator as "tested via real-AGP CI matrix, not unit tests", PLUS surgical refactors of 5 methods to eliminate unreachable defensive branches that Kover couldn't reach — pushing empirical to **100.00%**)
 - **`docs/COMPATIBILITY_MATRIX.md`** Built-against column: AGP 8.12.3 → 9.2.1, Kotlin 2.3.0 → 2.3.21; floor headline UNCHANGED at AGP 8.2
-- **`docs/COVERAGE_GUIDE.md`** floor table: Default = 99 (empirical **99.63%**); Test count = **701 across 92 classes**; Roadmap target = 100% (per-class ≥ 95%); v2.6.x ramp-ladder section removed in favour of v2.7.x continuation roadmap
+- **`docs/COVERAGE_GUIDE.md`** floor table: Default = **100** (empirical **100.00%**); Test count = **704 across 92 classes**; Roadmap target achieved at v2.7.0-alpha.1 ship
 - **`build-logic/flavor-plugin/build.gradle.kts` kover{} block** — Tier E sealed exclusion list (6 patterns) documents every Gradle Action SAM lambda + adjacent-plugin-runtime helper + KMP-runtime configurator + AgpBridge entry-point with per-pattern rationale. Each exclusion declares its alternative verification path (real-AGP CI matrix workflow OR direct method tests via reflection)
 
 ### Removed
@@ -46,7 +46,7 @@ See [`docs/MIGRATION_v2.6_TO_v2.7.md`](docs/MIGRATION_v2.6_TO_v2.7.md) (opens wi
 
 ### Deferred to v2.7.1
 
-- **Coverage gate ramp 99 → 100** — remaining ~6 missed lines are documented unreachable defensive paths (Elvis chains protected by upstream `isEmpty()` guards, exhaustive `when` arms preempted by early returns). The "100% of reachable surfaces" milestone is shipped; the absolute-100% finisher is a v2.7.x cleanup (refactor the 5 affected methods OR add `@KoverIgnore` annotations)
+- **(achieved this release)** — Coverage gate at floor 100, empirical 100.00%. No deferrals.
 - **Pitest mutation testing promoted to gate** (informational in v2.7)
 - **Per-class line coverage ≥ 95% enforcement** (currently aggregate-only)
 
