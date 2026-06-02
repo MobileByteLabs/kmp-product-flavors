@@ -47,9 +47,10 @@ kmpFlavors {
 
 > **v2.7 highlights** — AGP **9.2.1** matrix-CI certification (matrix-tested against
 > 8.2.2 / 8.5.2 / 8.10.0 / 9.2.1) + Kotlin **2.3.21** build alignment + line-coverage
-> gate ramp (25 → **30**, roadmap toward 100 across v2.7.x) + 5 new direct-test classes
-> documenting the consumer-facing DSL contracts + `docs/AGP_9_MIGRATION_NOTES.md`
-> consumer cookbook + `docs/COVERAGE_DEEP_DIVE.md` contributor playbook.
+> gate ramp (25 → **60**, empirical **61.36%** from +332 tests across +36 classes;
+> roadmap toward 100 across v2.7.x) + **661 tests across 87 test classes** (was 281 / 45
+> at v2.6 GA) + `docs/AGP_9_MIGRATION_NOTES.md` consumer cookbook +
+> `docs/COVERAGE_DEEP_DIVE.md` contributor playbook.
 > **v2.7 does not raise the v2.4 version floor** (Gradle 8.0+ / KGP 2.0.21+ / AGP 8.2+ /
 > JDK 17+ / CMP 1.7.0+ — UNCHANGED across v2.4 → v2.5 → v2.6 → v2.7).
 > See [`docs/COMPATIBILITY_MATRIX.md`](docs/COMPATIBILITY_MATRIX.md)

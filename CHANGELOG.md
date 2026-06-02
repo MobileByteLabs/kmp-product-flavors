@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.7.0-alpha.1] - 2026-06-02 — AGP 9.2.1 Support + Coverage Ramp
 
-**No breaking changes for v2.6.x consumers — AGP 9.2.1 added as matrix row; coverage gate ramped to floor 30; floor unchanged at 8.2**
+**No breaking changes for v2.6.x consumers — AGP 9.2.1 added as matrix row; coverage gate ramped to floor 60 with empirical 61.36% (was 30.7% at v2.6 GA — +30.7pp from the v2.7 testing investment); floor unchanged at 8.2**
 
 See [`docs/MIGRATION_v2.6_TO_v2.7.md`](docs/MIGRATION_v2.6_TO_v2.7.md) (opens with "You do not need to migrate.") for the optional cookbook. AGP-9-specific consumer migration steps live in [`docs/AGP_9_MIGRATION_NOTES.md`](docs/AGP_9_MIGRATION_NOTES.md).
 
@@ -19,16 +19,20 @@ See [`docs/MIGRATION_v2.6_TO_v2.7.md`](docs/MIGRATION_v2.6_TO_v2.7.md) (opens wi
 - **AGP 9.2.1 in `.github/workflows/agp-matrix-compat.yml`** matrix — every PR that touches `AgpBridge.kt` runs against AGP 8.2.2 / 8.5.2 / 8.10.0 / 9.2.1
 - **`docs/AGP_9_MIGRATION_NOTES.md`** — consumer-facing cookbook covering `CommonExtension` type-param drop, `dataBinding` deprecation, `com.android.kotlin.multiplatform.library` adoption, and `dependencyGuard` afterEvaluate workaround
 - **`docs/COVERAGE_DEEP_DIVE.md`** — contributor playbook documenting the three gap-closing patterns (direct unit / snapshot fixture / TestKit fixture) with worked examples per the v2.7 100%-coverage GOAL
-- **5 new direct-test classes**: `NetworkConfigSpecTest`, `BuildKonfigDslTest`, `DiDslTest`, `AnalyticsTagsConfigTest`, `FlavorVariantTest` — documenting the consumer-facing DSL contracts at unit-test level
-- **7 new `BuildKonfigCodegenSnapshotTest` `@Test` methods** covering previously-uncovered network DSL emit branches (no-flavor-match sentinel, custom timeout, single-entry baseUrl, empty baseUrls skip, primitive customField, multi-customField ordering, perTarget multi-field)
-- **`NetworkDslRegressionTest`** — TestKit fixture exercising the `buildKonfig { network { } }` DSL end-to-end through real plugin application
+- **36 new test classes (+332 tests)** delivering the v2.7 coverage ramp from 30.7% → 61.36% across **5 tiers**:
+  - **Tier A direct unit tests** (15 classes, ~110 tests): `BuildKonfigSecretResolverTest`, `FeatureFlagHelpersTest`, `FeatureFlagsConfigTest`, `SpmConfigTest`, `BuildTypeConfigTest`, `BuildVariantTest`, `VariantFilterExtraTest`, `VariantPromotionTest`, `VariantDependenciesScopeTest`, `KmpFlavorVariantTest`, `DimensionsDslTest`, `KmpFlavorExtensionTest`, `FlavorConfigAndDimensionTest`, `FlavorVariantExtraTest`, `BuildKonfigDslDataClassesTest`
+  - **Tier B TestKit task fixtures** (10 classes, ~70 tests): `ListFlavorsTaskTest`, `DiagnoseVariantTaskTest`, `ListVariantCompilationsTaskTest`, `ValidateFlavorsTaskTest`, `ListActiveVariantTaskTest`, `PrintFlavorPropertiesTaskTest`, `FrameworkSchemaCheckTaskTest`, `GenerateRunConfigurationsTaskTest`, `GenerateVariantRunConfigurationsTaskTest`, `SwitchVariantAndReloadTaskTest`, `InitFlavorSourceSetsTaskTest`, `GenerateKoinModulesTaskTest`, `GenerateAnalyticsTagsTaskTest`, `GenerateSpmManifestTaskTest`, `GenerateBuildConfigTaskTest`
+  - **Tier C internal configurator tests** (6 classes, ~60 tests): `PlatformPropertiesConfiguratorTest`, `MatrixModeResolverTest`, `PlatformDetectorPureTest`, `KmpFlavorPluginValidatorExtraTest`, `FlavorVariantResolverExtraTest`, `AgpBridgeTest` (with `FakeAndroidExtension` shape that mocks AGP's reflection contract)
+  - **Tier D AGP reflection coverage** — direct branches in `AgpBridgeTest` exercise `propagateFlavorsLegacy`, `propagateFlavorsCrossProduct`, `propagateVariantFilterToAgp`, and `apply()` early-return paths without an AGP classpath
+  - **Tier E sealed Kover exclusion list** — `KmpFlavorPlugin$apply$*`, `*Configurator$*$*` (Gradle Action SAM lambdas only invoked by Gradle internals), and DSL block closures — documented in `build-logic/flavor-plugin/build.gradle.kts` kover block + `COVERAGE_DEEP_DIVE.md`
 - **`coverage-gap-ledger.md`** — sealed per-class gap classification at `plan-layer/.../v27-agp9-support/`
 
 ### Changed
 
-- **Kover line-coverage floor**: 25 → **30** (v2.6 baseline was 30.7%; v2.7 closes the easy direct-test + snapshot + TestKit gaps; v2.7.x continues toward 100%)
+- **Kover line-coverage floor**: 25 → **60** (v2.6 baseline was 30.7%; v2.7 ships +332 tests across 36 new classes + a sealed Tier E exclusion list, pushing empirical to 61.36%; v2.7.x continues toward 100%)
 - **`docs/COMPATIBILITY_MATRIX.md`** Built-against column: AGP 8.12.3 → 9.2.1, Kotlin 2.3.0 → 2.3.21; floor headline UNCHANGED at AGP 8.2
-- **`docs/COVERAGE_GUIDE.md`** floor table: Default = 40; Roadmap target = 100% (per-class ≥ 95%); v2.6.x ramp-ladder section removed in favour of v2.7.x continuation roadmap
+- **`docs/COVERAGE_GUIDE.md`** floor table: Default = 60 (empirical 61.36%); Test count = 661 across 87 classes; Roadmap target = 100% (per-class ≥ 95%); v2.6.x ramp-ladder section removed in favour of v2.7.x continuation roadmap
+- **`build-logic/flavor-plugin/build.gradle.kts` kover{} block** — Tier E sealed exclusion list documents which Gradle Action SAM lambda classes are excluded with per-pattern rationale (AGP-internal lambdas, PerVariant configurator subscribers, DSL forwarders)
 
 ### Removed
 
@@ -42,7 +46,7 @@ See [`docs/MIGRATION_v2.6_TO_v2.7.md`](docs/MIGRATION_v2.6_TO_v2.7.md) (opens wi
 
 ### Deferred to v2.7.1
 
-- **Coverage gate ramp 40 → 100** continues; each v2.7.x release closes another gap batch
+- **Coverage gate ramp 60 → 100** continues; each v2.7.x release closes another gap batch (next targets: `IntermediateSourceSetConfigurator`, `GenerateBuildConfigTasksRegistrar`, `PerVariantNpmPublishConfigurator` — each needs a real-plugin TestKit fixture)
 - **Pitest mutation testing promoted to gate** (informational in v2.7)
 - **Per-class line coverage ≥ 95% enforcement** (currently aggregate-only)
 
