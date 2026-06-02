@@ -32,12 +32,9 @@ class KmpFlavorPluginValidatorExtraTest {
         if (dim != null) f.dimension.set(dim)
         return f
     }
-    private fun newDim(name: String): FlavorDimension =
-        project().objects.newInstance(FlavorDimension::class.java, name)
-    private fun newBuildType(name: String): BuildTypeConfig =
-        project().objects.newInstance(BuildTypeConfig::class.java, name)
-    private fun variant(name: String, flavors: List<FlavorConfig> = emptyList()): FlavorVariant =
-        FlavorVariant(name = name, flavors = flavors)
+    private fun newDim(name: String): FlavorDimension = project().objects.newInstance(FlavorDimension::class.java, name)
+    private fun newBuildType(name: String): BuildTypeConfig = project().objects.newInstance(BuildTypeConfig::class.java, name)
+    private fun variant(name: String, flavors: List<FlavorConfig> = emptyList()): FlavorVariant = FlavorVariant(name = name, flavors = flavors)
 
     @Test
     fun `KMPF-V24 fires when both dimensions and legacy DSL used`() {
@@ -139,10 +136,12 @@ class KmpFlavorPluginValidatorExtraTest {
             detectedTargetCount = 1,
             dimensions = listOf(newDim("tier"), newDim("env")),
         )
-        assertTrue(findings.any {
-            it.code == KmpFlavorPluginValidator.CODE_DIMENSION_HAS_NO_FLAVORS &&
-                it.message.contains("'env'")
-        })
+        assertTrue(
+            findings.any {
+                it.code == KmpFlavorPluginValidator.CODE_DIMENSION_HAS_NO_FLAVORS &&
+                    it.message.contains("'env'")
+            },
+        )
     }
 
     @Test
@@ -187,10 +186,12 @@ class KmpFlavorPluginValidatorExtraTest {
             detectedTargetCount = 1,
             dimensions = listOf(newDim("tier")),
         )
-        assertTrue(findings.any {
-            it.code == KmpFlavorPluginValidator.CODE_BUILD_CONFIG_FIELD_AUTO_DERIVED_COLLISION &&
-                it.message.contains("VARIANT_NAME")
-        })
+        assertTrue(
+            findings.any {
+                it.code == KmpFlavorPluginValidator.CODE_BUILD_CONFIG_FIELD_AUTO_DERIVED_COLLISION &&
+                    it.message.contains("VARIANT_NAME")
+            },
+        )
     }
 
     @Test
@@ -204,10 +205,12 @@ class KmpFlavorPluginValidatorExtraTest {
             detectedTargetCount = 1,
             dimensions = listOf(newDim("tier")),
         )
-        assertTrue(findings.any {
-            it.code == KmpFlavorPluginValidator.CODE_BUILD_CONFIG_FIELD_AUTO_DERIVED_COLLISION &&
-                it.message.contains("BUILD_TYPE")
-        })
+        assertTrue(
+            findings.any {
+                it.code == KmpFlavorPluginValidator.CODE_BUILD_CONFIG_FIELD_AUTO_DERIVED_COLLISION &&
+                    it.message.contains("BUILD_TYPE")
+            },
+        )
     }
 
     @Test
@@ -231,10 +234,12 @@ class KmpFlavorPluginValidatorExtraTest {
             buildKonfigSecretIds = listOf("API_KEY"),
             secretsManifestSchemaVersion = "2.0",
         )
-        assertTrue(findings.any {
-            it.code == KmpFlavorPluginValidator.CODE_SECRET_RESOLUTION_FAIL &&
-                it.severity == KmpFlavorValidationSeverity.WARNING
-        })
+        assertTrue(
+            findings.any {
+                it.code == KmpFlavorPluginValidator.CODE_SECRET_RESOLUTION_FAIL &&
+                    it.severity == KmpFlavorValidationSeverity.WARNING
+            },
+        )
     }
 
     @Test
@@ -251,10 +256,12 @@ class KmpFlavorPluginValidatorExtraTest {
             perTargetNamesDeclared = setOf("iosMain", "phantomMain"),
             kotlinTargetNames = setOf("iosMain", "jvmMain"),
         )
-        assertTrue(findings.any {
-            it.code == KmpFlavorPluginValidator.CODE_PERTARGET_ON_NON_KMP &&
-                it.message.contains("phantomMain")
-        })
+        assertTrue(
+            findings.any {
+                it.code == KmpFlavorPluginValidator.CODE_PERTARGET_ON_NON_KMP &&
+                    it.message.contains("phantomMain")
+            },
+        )
     }
 
     @Test
@@ -263,10 +270,12 @@ class KmpFlavorPluginValidatorExtraTest {
             buildKonfigBaseUrlFlavors = setOf("free", "ghost"),
             registeredFlavorNames = setOf("free", "paid"),
         )
-        assertTrue(findings.any {
-            it.code == KmpFlavorPluginValidator.CODE_BASE_URL_FLAVOR_MISSING &&
-                it.message.contains("ghost")
-        })
+        assertTrue(
+            findings.any {
+                it.code == KmpFlavorPluginValidator.CODE_BASE_URL_FLAVOR_MISSING &&
+                    it.message.contains("ghost")
+            },
+        )
     }
 
     @Test
@@ -329,9 +338,11 @@ class KmpFlavorPluginValidatorExtraTest {
 
     @Test
     fun `SUPPORTED_BUILD_CONFIG_FIELD_TYPES is stable`() {
-        assertTrue(KmpFlavorPluginValidator.SUPPORTED_BUILD_CONFIG_FIELD_TYPES.containsAll(
-            setOf("Boolean", "Int", "Long", "Float", "Double", "String")
-        ))
+        assertTrue(
+            KmpFlavorPluginValidator.SUPPORTED_BUILD_CONFIG_FIELD_TYPES.containsAll(
+                setOf("Boolean", "Int", "Long", "Float", "Double", "String"),
+            ),
+        )
     }
 
     @Test

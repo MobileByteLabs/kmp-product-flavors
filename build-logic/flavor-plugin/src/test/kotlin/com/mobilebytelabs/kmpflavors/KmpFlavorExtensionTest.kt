@@ -21,8 +21,7 @@ import org.junit.jupiter.api.Test
 
 class KmpFlavorExtensionTest {
 
-    private fun newExtension(): KmpFlavorExtension =
-        ProjectBuilder.builder().build().objects.newInstance(KmpFlavorExtension::class.java)
+    private fun newExtension(): KmpFlavorExtension = ProjectBuilder.builder().build().objects.newInstance(KmpFlavorExtension::class.java)
 
     @Test
     fun `generateBuildConfig convention is true`() {

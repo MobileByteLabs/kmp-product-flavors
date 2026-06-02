@@ -23,13 +23,11 @@ class BuildKonfigSecretResolverTest {
     @TempDir
     lateinit var tempDir: File
 
-    private fun writeManifest(content: String): File =
-        File(tempDir, "secrets-manifest.yaml").apply { writeText(content) }
+    private fun writeManifest(content: String): File = File(tempDir, "secrets-manifest.yaml").apply { writeText(content) }
 
-    private fun writeLocalProperties(vararg pairs: Pair<String, String>): File =
-        File(tempDir, "local.properties").apply {
-            writeText(pairs.joinToString("\n") { "${it.first}=${it.second}" })
-        }
+    private fun writeLocalProperties(vararg pairs: Pair<String, String>): File = File(tempDir, "local.properties").apply {
+        writeText(pairs.joinToString("\n") { "${it.first}=${it.second}" })
+    }
 
     @Test
     fun `missing manifest returns secrets-manifest-missing`() {

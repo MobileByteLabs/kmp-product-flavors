@@ -27,8 +27,7 @@ class VariantPromotionConfiguratorTest {
     lateinit var tempDir: File
 
     private fun project() = ProjectBuilder.builder().withProjectDir(tempDir).build()
-    private fun newFlavor(name: String): FlavorConfig =
-        project().objects.newInstance(FlavorConfig::class.java, name)
+    private fun newFlavor(name: String): FlavorConfig = project().objects.newInstance(FlavorConfig::class.java, name)
 
     @Test
     fun `no promotions short-circuits without registering tasks`() {

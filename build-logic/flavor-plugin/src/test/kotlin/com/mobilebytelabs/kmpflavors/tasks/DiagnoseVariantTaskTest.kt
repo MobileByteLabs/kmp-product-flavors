@@ -25,8 +25,13 @@ class DiagnoseVariantTaskTest {
     private val originalOut: PrintStream = System.out
     private val captured = ByteArrayOutputStream()
 
-    @BeforeEach fun redirect() { System.setOut(PrintStream(captured)) }
-    @AfterEach fun restore() { System.setOut(originalOut) }
+    @BeforeEach fun redirect() {
+        System.setOut(PrintStream(captured))
+    }
+
+    @AfterEach fun restore() {
+        System.setOut(originalOut)
+    }
 
     private fun newTask(): DiagnoseVariantTask {
         val project = ProjectBuilder.builder().build()
@@ -98,8 +103,10 @@ class DiagnoseVariantTaskTest {
         task.diagnose()
         val out = captured.toString()
         assertTrue(out.contains("Build type        : (none)"))
-        assertTrue(out.contains("(no source sets — variant has no registered compilation on any target)") ||
-            out.contains("commonMain"))
+        assertTrue(
+            out.contains("(no source sets — variant has no registered compilation on any target)") ||
+                out.contains("commonMain"),
+        )
         assertTrue(out.contains("(none — no buildConfigField(...) declarations contribute to this variant)"))
     }
 
@@ -132,7 +139,7 @@ class DiagnoseVariantTaskTest {
     fun `json escapes special characters in fields`() {
         val task = newTask()
         task.buildConfigFieldsByVariant.set(
-            mapOf("freeDev" to mapOf("MSG" to "String::\"hello\nworld\""))
+            mapOf("freeDev" to mapOf("MSG" to "String::\"hello\nworld\"")),
         )
         task.jsonOutput.set(true)
         task.diagnose()

@@ -43,7 +43,7 @@ class ValidateFlavorsTaskTest {
     fun `valid configuration passes`() {
         val task = newTask()
         task.preset()
-        task.validate()  // no throw
+        task.validate() // no throw
     }
 
     @Test

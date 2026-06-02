@@ -24,8 +24,13 @@ class ListActiveVariantTaskTest {
     private val originalOut: PrintStream = System.out
     private val captured = ByteArrayOutputStream()
 
-    @BeforeEach fun redirect() { System.setOut(PrintStream(captured)) }
-    @AfterEach fun restore() { System.setOut(originalOut) }
+    @BeforeEach fun redirect() {
+        System.setOut(PrintStream(captured))
+    }
+
+    @AfterEach fun restore() {
+        System.setOut(originalOut)
+    }
 
     private fun newTask(): ListActiveVariantTask {
         val project = ProjectBuilder.builder().build()

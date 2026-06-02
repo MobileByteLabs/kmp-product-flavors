@@ -19,8 +19,7 @@ import org.junit.jupiter.api.Test
 
 class AnalyticsTagsConfigTest {
 
-    private fun newConfig(): AnalyticsTagsConfig =
-        ProjectBuilder.builder().build().objects.newInstance(AnalyticsTagsConfig::class.java)
+    private fun newConfig(): AnalyticsTagsConfig = ProjectBuilder.builder().build().objects.newInstance(AnalyticsTagsConfig::class.java)
 
     @Test
     fun `enabled convention is false`() {

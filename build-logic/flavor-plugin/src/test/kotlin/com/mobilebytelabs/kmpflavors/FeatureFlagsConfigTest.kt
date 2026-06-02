@@ -20,8 +20,7 @@ import org.junit.jupiter.api.Test
 
 class FeatureFlagsConfigTest {
 
-    private fun newConfig(): FeatureFlagsConfig =
-        ProjectBuilder.builder().build().objects.newInstance(FeatureFlagsConfig::class.java)
+    private fun newConfig(): FeatureFlagsConfig = ProjectBuilder.builder().build().objects.newInstance(FeatureFlagsConfig::class.java)
 
     @Test
     fun `growthbook is non-null and enabled defaults to false`() {

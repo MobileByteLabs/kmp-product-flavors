@@ -18,8 +18,7 @@ import org.junit.jupiter.api.Test
 
 class DiDslTest {
 
-    private fun newDi(): DiDsl =
-        DiDsl::class.java.getDeclaredConstructor().apply { isAccessible = true }.newInstance()
+    private fun newDi(): DiDsl = DiDsl::class.java.getDeclaredConstructor().apply { isAccessible = true }.newInstance()
 
     @Test
     fun `koin builder applies action against shared KoinDiConfig`() {
@@ -29,7 +28,10 @@ class DiDslTest {
                 variantModule(
                     "network",
                     Action<KoinVariantModuleScope> {
-                        "free" { single("FreeNetworkFactory()"); bind("NetworkFactory") }
+                        "free" {
+                            single("FreeNetworkFactory()")
+                            bind("NetworkFactory")
+                        }
                     },
                 )
             },

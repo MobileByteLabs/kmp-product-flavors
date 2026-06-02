@@ -27,14 +27,14 @@ class FeatureFlagHelpersTest {
 
     private fun newProject() = ProjectBuilder.builder().withProjectDir(tempDir).build()
 
-    private fun newExtension(project: org.gradle.api.Project): KmpFlavorExtension =
-        project.objects.newInstance(KmpFlavorExtension::class.java)
+    private fun newExtension(project: org.gradle.api.Project): KmpFlavorExtension = project.objects.newInstance(KmpFlavorExtension::class.java)
 
-    private fun variants(vararg names: String): List<FlavorVariant> =
-        names.map { FlavorVariant(name = it, flavors = emptyList()) }
+    private fun variants(vararg names: String): List<FlavorVariant> = names.map { FlavorVariant(name = it, flavors = emptyList()) }
 
-    private fun writeJson(name: String, content: String): File =
-        File(tempDir, name).apply { parentFile.mkdirs(); writeText(content) }
+    private fun writeJson(name: String, content: String): File = File(tempDir, name).apply {
+        parentFile.mkdirs()
+        writeText(content)
+    }
 
     @Test
     fun `no-op when matrix mode is off`() {

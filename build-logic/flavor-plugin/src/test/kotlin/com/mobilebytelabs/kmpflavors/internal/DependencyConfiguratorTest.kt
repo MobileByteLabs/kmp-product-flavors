@@ -19,8 +19,7 @@ import org.junit.jupiter.api.Test
 class DependencyConfiguratorTest {
 
     private fun project() = ProjectBuilder.builder().build()
-    private fun newFlavor(name: String): FlavorConfig =
-        project().objects.newInstance(FlavorConfig::class.java, name)
+    private fun newFlavor(name: String): FlavorConfig = project().objects.newInstance(FlavorConfig::class.java, name)
 
     @Test
     fun `no-op when activeVariant has no dependencies`() {

@@ -16,8 +16,7 @@ import org.junit.jupiter.api.Test
 
 class VariantDependenciesScopeTest {
 
-    private fun newScope(): VariantDependenciesScope =
-        ProjectBuilder.builder().build().objects.newInstance(VariantDependenciesScope::class.java)
+    private fun newScope(): VariantDependenciesScope = ProjectBuilder.builder().build().objects.newInstance(VariantDependenciesScope::class.java)
 
     @Test
     fun `excludes starts empty`() {

@@ -19,8 +19,7 @@ import org.junit.jupiter.api.Test
 
 class KmpFlavorVariantTest {
 
-    private fun newVariant(name: String = "freeDev"): KmpFlavorVariant =
-        ProjectBuilder.builder().build().objects.newInstance(KmpFlavorVariant::class.java, name)
+    private fun newVariant(name: String = "freeDev"): KmpFlavorVariant = ProjectBuilder.builder().build().objects.newInstance(KmpFlavorVariant::class.java, name)
 
     @Test
     fun `getName returns the constructor argument`() {

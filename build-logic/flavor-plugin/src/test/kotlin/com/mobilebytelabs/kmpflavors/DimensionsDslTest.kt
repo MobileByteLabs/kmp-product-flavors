@@ -18,8 +18,7 @@ import org.junit.jupiter.api.Test
 
 class DimensionsDslTest {
 
-    private fun newExtension(): KmpFlavorExtension =
-        ProjectBuilder.builder().build().objects.newInstance(KmpFlavorExtension::class.java)
+    private fun newExtension(): KmpFlavorExtension = ProjectBuilder.builder().build().objects.newInstance(KmpFlavorExtension::class.java)
 
     @Test
     fun `dimension registers the dimension name`() {

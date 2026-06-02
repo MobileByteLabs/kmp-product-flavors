@@ -18,8 +18,7 @@ import org.junit.jupiter.api.Test
 
 class BuildKonfigDslTest {
 
-    private fun newDsl(): BuildKonfigDsl =
-        BuildKonfigDsl::class.java.getDeclaredConstructor().apply { isAccessible = true }.newInstance()
+    private fun newDsl(): BuildKonfigDsl = BuildKonfigDsl::class.java.getDeclaredConstructor().apply { isAccessible = true }.newInstance()
 
     @Test
     fun `secret registration trims and stores ids`() {
@@ -65,11 +64,19 @@ class BuildKonfigDslTest {
     @Test
     fun `perTarget groups fields by target name`() {
         val dsl = newDsl()
-        dsl.perTarget("iosMain", Action<PerTargetScope> {
-field("RUNTIME_FLAG", "Boolean", "true")
-            field("API_TIER", "String", "\"premium\"")})
-        dsl.perTarget("desktopMain", Action<PerTargetScope> {
-field("ENABLE_DEBUG", "Boolean", "true")})
+        dsl.perTarget(
+            "iosMain",
+            Action<PerTargetScope> {
+                field("RUNTIME_FLAG", "Boolean", "true")
+                field("API_TIER", "String", "\"premium\"")
+            },
+        )
+        dsl.perTarget(
+            "desktopMain",
+            Action<PerTargetScope> {
+                field("ENABLE_DEBUG", "Boolean", "true")
+            },
+        )
 
         val iosFields = dsl.perTargetBlocks["iosMain"].orEmpty()
         val desktopFields = dsl.perTargetBlocks["desktopMain"].orEmpty()
@@ -123,8 +130,9 @@ field("ENABLE_DEBUG", "Boolean", "true")})
         val dsl = newDsl()
         dsl.network(
             Action<NetworkDsl> {
-baseUrl("free" to "https://a", "paid" to "https://b")
-                timeout(45)},
+                baseUrl("free" to "https://a", "paid" to "https://b")
+                timeout(45)
+            },
         )
         assertEquals(linkedMapOf("free" to "https://a", "paid" to "https://b"), dsl.network.baseUrls)
         assertEquals(45, dsl.network.timeoutSeconds)

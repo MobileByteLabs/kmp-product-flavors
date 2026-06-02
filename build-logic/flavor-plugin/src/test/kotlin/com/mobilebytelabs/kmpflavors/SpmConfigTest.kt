@@ -17,8 +17,7 @@ import org.junit.jupiter.api.Test
 
 class SpmConfigTest {
 
-    private fun newConfig(): SpmConfig =
-        ProjectBuilder.builder().build().objects.newInstance(SpmConfig::class.java)
+    private fun newConfig(): SpmConfig = ProjectBuilder.builder().build().objects.newInstance(SpmConfig::class.java)
 
     @Test
     fun `generateManifest convention is false`() {

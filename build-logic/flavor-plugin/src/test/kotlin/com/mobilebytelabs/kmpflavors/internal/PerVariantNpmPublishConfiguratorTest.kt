@@ -23,8 +23,7 @@ import org.junit.jupiter.api.Test
 class PerVariantNpmPublishConfiguratorTest {
 
     private fun project() = ProjectBuilder.builder().build()
-    private fun newExtension(): KmpFlavorExtension =
-        project().objects.newInstance(KmpFlavorExtension::class.java)
+    private fun newExtension(): KmpFlavorExtension = project().objects.newInstance(KmpFlavorExtension::class.java)
     private fun variant(name: String) = FlavorVariant(name = name, flavors = emptyList())
 
     @Test

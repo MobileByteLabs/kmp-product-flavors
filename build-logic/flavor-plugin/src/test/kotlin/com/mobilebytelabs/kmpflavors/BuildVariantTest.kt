@@ -21,11 +21,9 @@ class BuildVariantTest {
 
     private fun project() = ProjectBuilder.builder().build()
 
-    private fun newFlavor(name: String): FlavorConfig =
-        project().objects.newInstance(FlavorConfig::class.java, name)
+    private fun newFlavor(name: String): FlavorConfig = project().objects.newInstance(FlavorConfig::class.java, name)
 
-    private fun newBuildType(name: String): BuildTypeConfig =
-        project().objects.newInstance(BuildTypeConfig::class.java, name)
+    private fun newBuildType(name: String): BuildTypeConfig = project().objects.newInstance(BuildTypeConfig::class.java, name)
 
     @Test
     fun `fromFlavorVariant creates BuildVariant without buildType`() {

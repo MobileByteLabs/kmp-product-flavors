@@ -33,21 +33,35 @@ class AgpBridgeTest {
         val dimensions: MutableList<String> = mutableListOf()
         private val pf = FakeFlavorContainer()
         private val bt = FakeBuildTypeContainer()
-        @Suppress("unused") fun getFlavorDimensions(): MutableList<String> = dimensions
-        @Suppress("unused") fun getProductFlavors(): FakeFlavorContainer = pf
-        @Suppress("unused") fun getBuildTypes(): FakeBuildTypeContainer = bt
+
+        @Suppress("unused")
+        fun getFlavorDimensions(): MutableList<String> = dimensions
+
+        @Suppress("unused")
+        fun getProductFlavors(): FakeFlavorContainer = pf
+
+        @Suppress("unused")
+        fun getBuildTypes(): FakeBuildTypeContainer = bt
     }
 
     class FakeFlavorContainer {
         val entries: MutableMap<String, FakeAgpFlavor> = linkedMapOf()
-        @Suppress("unused") fun getNames(): Set<String> = entries.keys
-        @Suppress("unused") fun maybeCreate(name: String): FakeAgpFlavor = entries.getOrPut(name) { FakeAgpFlavor(name) }
+
+        @Suppress("unused")
+        fun getNames(): Set<String> = entries.keys
+
+        @Suppress("unused")
+        fun maybeCreate(name: String): FakeAgpFlavor = entries.getOrPut(name) { FakeAgpFlavor(name) }
     }
 
     class FakeBuildTypeContainer {
         val entries: MutableMap<String, FakeAgpBuildType> = linkedMapOf()
-        @Suppress("unused") fun getNames(): Set<String> = entries.keys
-        @Suppress("unused") fun maybeCreate(name: String): FakeAgpBuildType = entries.getOrPut(name) { FakeAgpBuildType(name) }
+
+        @Suppress("unused")
+        fun getNames(): Set<String> = entries.keys
+
+        @Suppress("unused")
+        fun maybeCreate(name: String): FakeAgpBuildType = entries.getOrPut(name) { FakeAgpBuildType(name) }
     }
 
     class FakeAgpFlavor(@Suppress("unused") val name: String) {
@@ -56,19 +70,45 @@ class AgpBridgeTest {
         var versionSuffix: String? = null
         private val fb: MutableList<String> = mutableListOf()
         fun fallbacks(): List<String> = fb.toList()
-        @Suppress("unused") fun setDimension(d: String) { dim = d }
-        @Suppress("unused") fun setApplicationIdSuffix(s: String) { appIdSuffix = s }
-        @Suppress("unused") fun setVersionNameSuffix(s: String) { versionSuffix = s }
-        @Suppress("unused") fun getMatchingFallbacks(): MutableList<String> = fb
+
+        @Suppress("unused")
+        fun setDimension(d: String) {
+            dim = d
+        }
+
+        @Suppress("unused")
+        fun setApplicationIdSuffix(s: String) {
+            appIdSuffix = s
+        }
+
+        @Suppress("unused")
+        fun setVersionNameSuffix(s: String) {
+            versionSuffix = s
+        }
+
+        @Suppress("unused")
+        fun getMatchingFallbacks(): MutableList<String> = fb
     }
 
     class FakeAgpBuildType(@Suppress("unused") val name: String) {
         var debuggable: Boolean? = null
         var minify: Boolean? = null
         var appIdSuffix: String? = null
-        @Suppress("unused") fun setDebuggable(b: Boolean) { debuggable = b }
-        @Suppress("unused") fun setMinifyEnabled(b: Boolean) { minify = b }
-        @Suppress("unused") fun setApplicationIdSuffix(s: String) { appIdSuffix = s }
+
+        @Suppress("unused")
+        fun setDebuggable(b: Boolean) {
+            debuggable = b
+        }
+
+        @Suppress("unused")
+        fun setMinifyEnabled(b: Boolean) {
+            minify = b
+        }
+
+        @Suppress("unused")
+        fun setApplicationIdSuffix(s: String) {
+            appIdSuffix = s
+        }
     }
 
     private fun project() = ProjectBuilder.builder().build()
@@ -82,8 +122,7 @@ class AgpBridgeTest {
         d.priority.set(priority)
         return d
     }
-    private fun newBuildType(name: String): BuildTypeConfig =
-        project().objects.newInstance(BuildTypeConfig::class.java, name)
+    private fun newBuildType(name: String): BuildTypeConfig = project().objects.newInstance(BuildTypeConfig::class.java, name)
 
     @Test
     fun `single-dim legacy path appends dimensions and creates flavors`() {

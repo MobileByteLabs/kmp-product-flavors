@@ -171,13 +171,11 @@ kover {
                     "*BuildConfig",
                     "*BuildKonfig*",
                     "*Test*",
-
                     // ────────────────────────────────────────────────────────
                     // Tier E sealed exclusion list (v2.7) — full inventory in
                     // docs/COVERAGE_DEEP_DIVE.md "Sealed exclusion list".
                     // Each pattern below carries per-line rationale.
                     // ────────────────────────────────────────────────────────
-
                     // Pattern 1 — KmpFlavorPlugin entry-point + its anonymous SAM lambdas.
                     //   The entire apply() orchestration is Gradle-invoked: it walks
                     //   project.afterEvaluate, project.plugins.withId, kotlin extension
@@ -187,7 +185,6 @@ kover {
                     //   covered via direct unit + TestKit fixtures.
                     "com.mobilebytelabs.kmpflavors.KmpFlavorPlugin",
                     "com.mobilebytelabs.kmpflavors.KmpFlavorPlugin\$*",
-
                     // Pattern 2 — PerVariant configurator family: each requires the
                     // matching adjacent Gradle plugin AND a real KMP target set with
                     // populated compilations. Early-return branches are unit-tested in
@@ -196,7 +193,6 @@ kover {
                     // in the real-plugin TestKit fixtures shipped per consumer demand.
                     "com.mobilebytelabs.kmpflavors.internal.PerVariant*",
                     "com.mobilebytelabs.kmpflavors.internal.PerVariant*\$*",
-
                     // Pattern 3 — adjacent-plugin helpers that gate on
                     // pluginManager.withPlugin/withId callbacks and only fire when the
                     // matching plugin (Spotless / Detekt / Develocity / DependencyGuard /
@@ -215,7 +211,6 @@ kover {
                     "com.mobilebytelabs.kmpflavors.internal.ProjectIsolationCompatChecker\$*",
                     "com.mobilebytelabs.kmpflavors.internal.VariantBuildCacheKeyConfigurator",
                     "com.mobilebytelabs.kmpflavors.internal.VariantBuildCacheKeyConfigurator\$*",
-
                     // Pattern 4 — KMP-runtime registrars: AggregateTasksRegistrar,
                     // GenerateBuildConfigTasksRegistrar, CompilationRegistrar,
                     // TestCompilationRegistrar, SourceSetConfigurator,
@@ -248,7 +243,6 @@ kover {
                     "com.mobilebytelabs.kmpflavors.internal.DependencyConfigurator\$*",
                     "com.mobilebytelabs.kmpflavors.internal.VariantPromotionConfigurator",
                     "com.mobilebytelabs.kmpflavors.internal.VariantPromotionConfigurator\$*",
-
                     // Pattern 5 — AgpBridge reflection bridge.
                     //
                     //   AgpBridge is unit-tested at the helper-method level via
@@ -271,7 +265,6 @@ kover {
                     //   boundary; CI matrix workflow is the end-to-end gate.
                     "com.mobilebytelabs.kmpflavors.internal.AgpBridge",
                     "com.mobilebytelabs.kmpflavors.internal.AgpBridge\$*",
-
                     // Pattern 6 — DSL block SAM closures captured for AGP forwarding +
                     // KMP container access. Pure forwarding lambdas — value is in the
                     // host method, not the lambda itself.

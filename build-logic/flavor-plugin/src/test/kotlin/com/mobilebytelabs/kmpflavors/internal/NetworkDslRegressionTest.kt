@@ -73,13 +73,12 @@ class NetworkDslRegressionTest {
         )
     }
 
-    private fun runGenerate() =
-        GradleRunner.create()
-            .withProjectDir(testProjectDir)
-            .withArguments("generateFlavorBuildConfig", "--warning-mode=all", "--no-configuration-cache")
-            .withPluginClasspath()
-            .forwardOutput()
-            .build()
+    private fun runGenerate() = GradleRunner.create()
+        .withProjectDir(testProjectDir)
+        .withArguments("generateFlavorBuildConfig", "--warning-mode=all", "--no-configuration-cache")
+        .withPluginClasspath()
+        .forwardOutput()
+        .build()
 
     @Test
     fun `network DSL emits BuildKonfig dot Network object with active flavor URL + timeout`() {

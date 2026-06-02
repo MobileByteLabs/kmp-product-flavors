@@ -19,8 +19,7 @@ import org.junit.jupiter.api.Test
 
 class MatrixModeResolverTest {
 
-    private fun newExtension(): KmpFlavorExtension =
-        ProjectBuilder.builder().build().objects.newInstance(KmpFlavorExtension::class.java)
+    private fun newExtension(): KmpFlavorExtension = ProjectBuilder.builder().build().objects.newInstance(KmpFlavorExtension::class.java)
 
     @Test
     fun `explicit extension buildMatrix true wins over everything`() {

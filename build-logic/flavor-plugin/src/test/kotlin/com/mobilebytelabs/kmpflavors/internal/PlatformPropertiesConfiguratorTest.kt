@@ -19,8 +19,7 @@ import org.junit.jupiter.api.Test
 
 class PlatformPropertiesConfiguratorTest {
 
-    private fun newFlavor(name: String): FlavorConfig =
-        ProjectBuilder.builder().build().objects.newInstance(FlavorConfig::class.java, name)
+    private fun newFlavor(name: String): FlavorConfig = ProjectBuilder.builder().build().objects.newInstance(FlavorConfig::class.java, name)
 
     @Test
     fun `extras include variant name and flavor list`() {

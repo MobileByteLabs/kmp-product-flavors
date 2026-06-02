@@ -21,11 +21,9 @@ class FlavorConfigAndDimensionTest {
 
     private fun project() = ProjectBuilder.builder().build()
 
-    private fun newFlavor(name: String): FlavorConfig =
-        project().objects.newInstance(FlavorConfig::class.java, name)
+    private fun newFlavor(name: String): FlavorConfig = project().objects.newInstance(FlavorConfig::class.java, name)
 
-    private fun newDimension(name: String): FlavorDimension =
-        project().objects.newInstance(FlavorDimension::class.java, name)
+    private fun newDimension(name: String): FlavorDimension = project().objects.newInstance(FlavorDimension::class.java, name)
 
     @Test
     fun `FlavorConfig getName matches constructor arg`() {
