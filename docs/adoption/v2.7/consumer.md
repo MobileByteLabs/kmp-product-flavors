@@ -703,31 +703,55 @@ A single command that exercises plugin + DSL + codegen + validators + a compile.
 
 ### What you should know
 
-`samples/kmp-project-template` is our **first-party canonical consumer**, owned by the Mifos Initiative. It's the reference implementation for every adoption pattern in this doc:
+`samples/kmp-project-template` is our **first-party canonical consumer**, owned by the Mifos Initiative. It's the **Tier 2 reference implementation** in the [three-tier source-of-truth chain](../README.md#three-tier-source-of-truth-chain) — every abstract verify gate in this doc has a concrete realization in that template's own adoption record.
 
-| Pattern | Location in kmp-project-template |
+### Tier 2 adoption record
+
+The template ships its own adoption record at [`samples/kmp-project-template/docs/ADOPTION_KMP_PRODUCT_FLAVORS.md`](https://github.com/openMF/kmp-project-template/blob/main/docs/ADOPTION_KMP_PRODUCT_FLAVORS.md). That file:
+
+- Documents the **files inventory** of the convention-plugin adoption pattern (kmpFlavorsConventionPlugin.kt + AppFlavor.kt + LocalFlavorsLoader.kt + libs.versions.toml entries)
+- Realizes **all 14 verify gates** in this doc concretely — with that template's actual paths and actual expected outputs
+- Maintains a **per-version section** for every plugin version adopted (v2.7.0 is the seed; v2.8+ append at the top)
+- Documents the **"how future bumps work"** 8-step recipe for adopting future library releases
+- Provides a **template for downstream Tier 3 forks** (`mifos-mobile`, `mifos-pay`, `mifos-x-…`) to ship their own adoption records
+
+When you adopt this library, the Tier 2 record IS the worked example — read it alongside this abstract spec.
+
+### Cross-references — every section in THIS doc ↔ Tier 2 realization
+
+| This section (abstract) | Tier 2 realization (concrete) |
 |---|---|
-| 1.  Plugin pinned via `libs.versions.toml` (both entries) | [`gradle/libs.versions.toml`](https://github.com/openMF/kmp-project-template/blob/main/gradle/libs.versions.toml) |
-| 3b. Convention-plugin adoption | [`build-logic/convention/`](https://github.com/openMF/kmp-project-template/tree/main/build-logic/convention) |
-| 4b. Plugin applied + configured | [`KMPFlavorsConventionPlugin.kt`](https://github.com/openMF/kmp-project-template/blob/main/build-logic/convention/src/main/kotlin/KMPFlavorsConventionPlugin.kt) |
-| 6.  Single-source-of-truth `buildConfigPackage` via `[versions].appId` | `libs.findVersion("appId").get().requiredVersion` inside KMPFlavorsConventionPlugin |
-| 8.  Codegen-host claim mechanism | `cmp-navigation` is the deterministic winner |
-| 10. AGP-only-module helper | [`org/convention/AppFlavor.kt`](https://github.com/openMF/kmp-project-template/blob/main/build-logic/convention/src/main/kotlin/org/convention/AppFlavor.kt) |
-| 11. Downstream extension hook | [`LocalFlavorsLoader.kt`](https://github.com/openMF/kmp-project-template/blob/main/build-logic/convention/src/main/kotlin/LocalFlavorsLoader.kt) + the `local/` directory excluded from `sync-dirs.sh` |
+| §1 — Plugin pinned via libs.versions.toml | [`gradle/libs.versions.toml`](https://github.com/openMF/kmp-project-template/blob/main/gradle/libs.versions.toml) (both `[plugins]` + `[libraries]` entries) |
+| §3b — Convention-plugin adoption | [`build-logic/convention/`](https://github.com/openMF/kmp-project-template/tree/main/build-logic/convention) |
+| §4b — Plugin applied + configured | [`KMPFlavorsConventionPlugin.kt`](https://github.com/openMF/kmp-project-template/blob/main/build-logic/convention/src/main/kotlin/KMPFlavorsConventionPlugin.kt) |
+| §5 — Flat-DSL flavors + dimensions + 6-variant matrix | KMPFlavorsConventionPlugin.kt `flavors {}` / `buildTypes {}` blocks |
+| §6 — `buildConfigPackage` from `[versions].appId` | `libs.findVersion("appId").get().requiredVersion` |
+| §8 — Codegen-host claim = `cmp-navigation` | KMPFlavorsConventionPlugin.kt + `pr-check.yml` validation |
+| §10 — AGP-only-module helper | [`org/convention/AppFlavor.kt`](https://github.com/openMF/kmp-project-template/blob/main/build-logic/convention/src/main/kotlin/org/convention/AppFlavor.kt) + `withPlugin` wiring |
+| §11 — Downstream extension hook | [`LocalFlavorsLoader.kt`](https://github.com/openMF/kmp-project-template/blob/main/build-logic/convention/src/main/kotlin/LocalFlavorsLoader.kt) + `local/` dir excluded from `sync-dirs.sh` |
 | Chained convention application | [`KMPLibraryConventionPlugin.kt`](https://github.com/openMF/kmp-project-template/blob/main/build-logic/convention/src/main/kotlin/KMPLibraryConventionPlugin.kt) applies `org.convention.kmp.flavors` transitively |
 
-If you're starting from zero, **copy this template's `build-logic/convention/` structure** as your starting point.
+### If you're starting from zero
 
-### ✅ Verify
+The fastest adoption path:
+
+1. Fork or copy `kmp-project-template`'s `build-logic/convention/` directory + `gradle/libs.versions.toml`.
+2. Copy `kmp-project-template/docs/ADOPTION_KMP_PRODUCT_FLAVORS.md` into your repo's `docs/`.
+3. Fill in your fork-specific deltas in the new copy (your codegen-host module, your `appId`, your fork-specific flavors).
+4. Run the §1–§14 verify suite against your codebase.
+5. Commit + ship. Future migrations just append a new version section to YOUR adoption record.
+
+### ✅ Verify (shape parity with the Tier 2 reference)
 
 ```bash
 # Confirm you've got the same shape as the reference
 test -f build-logic/convention/src/main/kotlin/KMPFlavorsConventionPlugin.kt && echo "✓ convention plugin"
-test -f build-logic/convention/src/main/kotlin/org/convention/AppFlavor.kt && echo "✓ AGP helper (optional)"
-test -f build-logic/convention/src/main/kotlin/LocalFlavorsLoader.kt && echo "✓ downstream extension hook (optional)"
+test -f build-logic/convention/src/main/kotlin/org/convention/AppFlavor.kt && echo "✓ AGP helper (optional, §10)"
+test -f build-logic/convention/src/main/kotlin/LocalFlavorsLoader.kt && echo "✓ downstream extension hook (optional, §11)"
+test -f docs/ADOPTION_KMP_PRODUCT_FLAVORS.md && echo "✓ Tier 3 adoption record (recommended)"
 ```
 
-**Expected output**: at minimum, the convention plugin file exists. The other two are optional based on Sections 10 + 11 conditions.
+**Expected output**: at minimum, the convention plugin file exists. The AGP helper + downstream extension hook are conditional. The Tier 3 adoption record is RECOMMENDED for every consumer — see [`adoption/README.md`](../README.md#three-tier-source-of-truth-chain) for the rationale.
 
 ---
 
@@ -748,6 +772,7 @@ If every applicable `✅ Verify` from Sections 1–13 returned the expected outp
 - [x] Downstream extension hook in place (if you're a template — Section 11)
 - [x] AGP 9 landmines avoided (if on AGP 9 — Section 12)
 - [x] End-to-end smoke test green (Section 13)
+- [x] Tier 2/3 adoption record shipped at `docs/ADOPTION_KMP_PRODUCT_FLAVORS.md` documenting your concrete realization for future migrations (recommended — Section 14)
 
 **Congratulations — you are at 100% adoption of v2.7.0. No missing pieces.**
 

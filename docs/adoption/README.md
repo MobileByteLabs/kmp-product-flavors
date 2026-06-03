@@ -75,6 +75,66 @@ Every section cites the corresponding file in `samples/kmp-project-template` (th
 
 Older versions (v2.6 and earlier) do not have adoption docs — the pattern starts at v2.7. Consumers on v2.6 should use [`MIGRATION_v2.6_TO_v2.7.md`](../MIGRATION_v2.6_TO_v2.7.md) to bump, then run the v2.7 adoption gate.
 
+## Three-tier source-of-truth chain
+
+The full adoption story spans three docs, each owned by a different tier and serving a different audience:
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│ Tier 1: Library (this repo: MobileByteLabs/kmp-product-flavors)          │
+│   docs/adoption/v{X.Y}/library.md  — "what we did + how we verify it"    │
+│   docs/adoption/v{X.Y}/consumer.md — "abstract verify gates for ANY      │
+│                                        consumer, AI-executable"          │
+└──────────────────────────────────────────────────────────────────────────┘
+                                 │
+                                 │ first-party canonical reference
+                                 ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│ Tier 2: Template (samples/kmp-project-template, openMF/kmp-project-…)    │
+│   docs/ADOPTION_KMP_PRODUCT_FLAVORS.md  — "concrete realization of every │
+│                                            library verify gate in OUR    │
+│                                            codebase, per version"        │
+│   ├── Files inventory (KMPFlavorsConventionPlugin.kt, AppFlavor.kt, …)   │
+│   ├── v2.7.0 section: bump, diff, why-safe, 14 concrete verify gates     │
+│   ├── v2.8.0 section (future): same shape, appended on bump              │
+│   └── "How future bumps work" + "How downstream forks structure theirs"  │
+└──────────────────────────────────────────────────────────────────────────┘
+                                 │
+                                 │ sync-dirs.sh + local overrides
+                                 ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│ Tier 3: Downstream app (mifos-mobile, mifos-pay, mifos-x-…)              │
+│   docs/ADOPTION_KMP_PRODUCT_FLAVORS.md  — "we inherit kmp-product-flavors│
+│                                            transitively via the template;│
+│                                            fork-specific deltas listed"  │
+│   ├── Inherited template SHA + version reference                         │
+│   ├── LocalFlavors.kt additions (fork-only flavors)                      │
+│   └── Fork-specific buildConfigPackage, codegen-host, etc.               │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+**Single source of truth per tier**: each doc IS the audit trail for its tier's adoption. No tier copies content from another — they cross-reference. Future migrations follow the same recursive update pattern: library publishes Tier 1 → template updates Tier 2 → forks update Tier 3.
+
+### Why this matters
+
+- **No duplicated content** — each doc owns exactly what its tier knows.
+- **Concrete + abstract pair** — library's `consumer.md` is the abstract spec; template's `ADOPTION_KMP_PRODUCT_FLAVORS.md` is the worked example. AI agents can paste both and have full context.
+- **Future-proof** — when v2.8 ships, the library publishes a new Tier 1 pair; the template appends a new version section to its existing Tier 2 doc; forks append to theirs. No fork-out from a single repo.
+- **AI-executable end-to-end** — Tier 1 verify gates + Tier 2 concrete paths/outputs = an agent can paste both and run the full adoption unattended.
+
+### Tier 2 reference: `samples/kmp-project-template`
+
+The canonical Tier 2 file lives at [`samples/kmp-project-template/docs/ADOPTION_KMP_PRODUCT_FLAVORS.md`](../../samples/kmp-project-template/docs/ADOPTION_KMP_PRODUCT_FLAVORS.md). It demonstrates:
+
+| What | Where |
+|---|---|
+| Files inventory of the convention-plugin adoption | top-of-doc table |
+| v2.7.0 adoption record | concrete §1–§14 verify gates citing kmp-project-template's actual paths and expected outputs |
+| "How future bumps work" recipe | 8-step process for adopting v2.8 / v3.0 — single living doc, version-stacked |
+| "How downstream forks structure theirs" | template for `mifos-mobile`/`mifos-pay`/etc. Tier 3 docs |
+
+When you fork or copy `kmp-project-template`, copy that doc too — fill in your fork's specifics and ship it. That's how the chain stays intact.
+
 ## Adding a new pair (release-time discipline)
 
 Every minor release MUST ship the pair before the GA promotion lands. Mechanically:

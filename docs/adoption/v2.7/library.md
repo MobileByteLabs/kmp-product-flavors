@@ -326,14 +326,15 @@ grep -E '"8\.2\.2"|"8\.5\.2"|"8\.10\.0"|"9\.2\.1"' .github/workflows/agp-matrix-
 
 ---
 
-## 14. `samples/kmp-project-template` is the first-party canonical consumer
+## 14. `samples/kmp-project-template` ships the Tier 2 adoption record
 
 ### What the library did
 
 - Owns `samples/kmp-project-template` as a git submodule pointing at `openMF/kmp-project-template` HEAD.
 - Bumped the submodule to AGP-9-compatible HEAD as part of v2.7 Phase 02 (samples-audit).
 - The kmp-project-template repo is owned by the Mifos Initiative — a real production consumer, not a synthetic sample.
-- Every section in consumer.md cites the exact file in kmp-project-template that demonstrates the corresponding verify gate.
+- The library publishes the **Tier 1 abstract spec** at `docs/adoption/v{X.Y}/consumer.md` (this doc's mirror); the template ships the **Tier 2 concrete realization** at `samples/kmp-project-template/docs/ADOPTION_KMP_PRODUCT_FLAVORS.md`. Together they form the [three-tier source-of-truth chain](../README.md#three-tier-source-of-truth-chain) every consumer should follow.
+- Every section in this library's `consumer.md` is realized concretely in the template's `ADOPTION_KMP_PRODUCT_FLAVORS.md` with that template's actual paths and expected outputs.
 - The CI workflow `.github/workflows/pr-check.yml` runs the canonical consumer's adoption gate against every PR to this library.
 
 ### Release-time check (CI)
@@ -349,6 +350,10 @@ test -f samples/kmp-project-template/build-logic/convention/src/main/kotlin/org/
 test -f samples/kmp-project-template/build-logic/convention/src/main/kotlin/LocalFlavorsLoader.kt
 test -f samples/kmp-project-template/gradle/libs.versions.toml
 test -f samples/kmp-project-template/cmp-navigation/build.gradle.kts
+
+# Tier 2 adoption record exists with a section for this version
+test -f samples/kmp-project-template/docs/ADOPTION_KMP_PRODUCT_FLAVORS.md
+grep -E '^## v2\.7\.0' samples/kmp-project-template/docs/ADOPTION_KMP_PRODUCT_FLAVORS.md
 
 # pr-check.yml validates against the submodule
 grep -E 'samples/kmp-project-template' .github/workflows/pr-check.yml | head -3
