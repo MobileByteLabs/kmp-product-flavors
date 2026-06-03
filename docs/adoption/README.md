@@ -104,23 +104,29 @@ The full adoption story spans three docs, each owned by a different tier and ser
                                  ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │ Tier 3: Downstream app (mifos-mobile, mifos-pay, mifos-x-…)              │
-│   docs/ADOPTION_KMP_PRODUCT_FLAVORS.md  — "we inherit kmp-product-flavors│
-│                                            transitively via the template;│
-│                                            fork-specific deltas listed"  │
-│   ├── Inherited template SHA + version reference                         │
-│   ├── LocalFlavors.kt additions (fork-only flavors)                      │
-│   └── Fork-specific buildConfigPackage, codegen-host, etc.               │
+│   build-logic/convention/src/main/kotlin/local/LocalFlavors.kt           │
+│                                          — ONLY file the fork owns.      │
+│                                            Adds use-case-specific flavors│
+│                                            (enterprise, regional, etc.). │
+│                                                                          │
+│   Everything else (convention plugin, AppFlavor, LocalFlavorsLoader,     │
+│   the adoption doc itself, build-logic/convention/* base) ALWAYS         │
+│   stays in kmp-project-template and arrives via sync-dirs.sh.            │
+│   Forks DO NOT ship their own ADOPTION_KMP_PRODUCT_FLAVORS.md — they     │
+│   inherit the Tier 2 doc from the template sync.                         │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Single source of truth per tier**: each doc IS the audit trail for its tier's adoption. No tier copies content from another — they cross-reference. Future migrations follow the same recursive update pattern: library publishes Tier 1 → template updates Tier 2 → forks update Tier 3.
+**Tier 3 is intentionally minimal**: a fork owns one file (`local/LocalFlavors.kt`). Every other adoption artefact lives in Tier 2 and arrives via the template sync. Forks don't think about adoption — they think about their flavors.
+
+**Single source of truth per tier**: each doc IS the audit trail for its tier's adoption. No tier copies content from another — they cross-reference. Future migrations follow the recursive pattern: library publishes Tier 1 → `/lib-sync` updates Tier 2 in `samples/kmp-project-template` → forks pull the updated Tier 2 via `sync-dirs.sh` and (rarely) tweak their `LocalFlavors.kt` if the bump exposed a new flavor-DSL feature they want.
 
 ### Why this matters
 
 - **No duplicated content** — each doc owns exactly what its tier knows.
 - **Concrete + abstract pair** — library's `consumer.md` is the abstract spec; template's `ADOPTION_KMP_PRODUCT_FLAVORS.md` is the worked example. AI agents can paste both and have full context.
-- **Future-proof** — when v2.8 ships, the library publishes a new Tier 1 pair; the template appends a new version section to its existing Tier 2 doc; forks append to theirs. No fork-out from a single repo.
-- **AI-executable end-to-end** — Tier 1 verify gates + Tier 2 concrete paths/outputs = an agent can paste both and run the full adoption unattended.
+- **Future-proof** — when v2.8 ships, the library publishes a new Tier 1 pair; the `/lib-sync` automation appends a new version section to the template's Tier 2 doc; forks inherit it on next sync. Zero manual coordination across N forks.
+- **Forks own exactly one file** — `local/LocalFlavors.kt`. Everything else flows top-down from library → template → fork.
 
 ### Tier 2 reference: `samples/kmp-project-template`
 
@@ -135,51 +141,94 @@ The canonical Tier 2 file lives at [`samples/kmp-project-template/docs/ADOPTION_
 
 When you fork or copy `kmp-project-template`, copy that doc too — fill in your fork's specifics and ship it. That's how the chain stays intact.
 
-## Drift gate (single source of truth enforcement)
+## `/lib-sync` — automated per-release Tier 2 migration
 
-Every `### Release-time check (CI)` and `### ✅ Verify` block in the adoption docs is a deterministic shell command that asserts a structural invariant of the codebase. CI runs every block on every PR via [`.github/workflows/adoption-doc-verify.yml`](../../.github/workflows/adoption-doc-verify.yml). If any block exits non-zero, the PR fails.
+When the library publishes a new version, the consumer-side migration is automated end-to-end via the `/lib-sync` slash-command (skill at [`.claude/skills/lib-sync/SKILL.md`](../../.claude/skills/lib-sync/SKILL.md), runtime at [`layers/lib/commands/lib-sync.md`](../../layers/lib/commands/lib-sync.md), bash driver at [`scripts/lib-sync.sh`](../../scripts/lib-sync.sh)).
 
-This makes the adoption doc the **single source of truth**: the doc's verify blocks ARE the contract; CI is the enforcement. If you rename a file, move an alias, remove a flavor, change a registration name — the corresponding verify breaks and the PR fails until either the implementation is reverted or the doc is updated to match.
+What it does:
 
-### How it works
+```
+/lib-sync                    # default: syncs samples/kmp-project-template to current library version
+/lib-sync <consumer-path>    # explicit consumer (rare — kmp-project-template is the only direct consumer)
+/lib-sync --target-version X.Y.Z
+/lib-sync --dry-run
+```
 
-| Component | Role |
-|---|---|
-| [`scripts/adoption-doc-verify.py`](../../scripts/adoption-doc-verify.py) | Parses every fenced `bash` block under a `### ✅ Verify` / `### Release-time check (CI)` / `#### [§N …]` header. Runs each. Reports PASS/FAIL with the offending block + output. |
-| [`.github/workflows/adoption-doc-verify.yml`](../../.github/workflows/adoption-doc-verify.yml) | PR gate. Triggers on changes to the doc OR any file the doc's verify blocks reference. |
-| `.github/PULL_REQUEST_TEMPLATE.md` | Checklist reminder telling contributors to run the gate locally before pushing. |
+Workflow:
 
-To run the gate locally:
+1. Reads the library's current version from `gradle.properties`.
+2. Locates the adoption recipe at `docs/adoption/v{X.Y}/consumer.md`.
+3. Resolves the consumer's default branch (probes `dev` / `development` / `main` in order) and creates `chore/sync-kmp-product-flavors-v{X.Y.Z}` on top of it.
+4. Applies the migration:
+   - Bumps `kmpProductFlavors = "X.Y.Z"` in the consumer's `gradle/libs.versions.toml`.
+   - Appends a new `## v{X.Y.Z} — adopted {YYYY-MM-DD}` section to `docs/ADOPTION_KMP_PRODUCT_FLAVORS.md` with the diff + a link to the library's migration doc.
+5. Runs the consumer's `scripts/adoption-doc-verify.py` against the updated record.
+6. Commits if green; bails clean (no partial commit) if any verify regresses.
+7. Prints push instructions — never auto-pushes.
+
+The forks (mifos-mobile / mifos-pay / mifos-x-field-officer-app / …) don't run `/lib-sync` directly. They run `sync-dirs.sh` against the template, which pulls in the bumped `gradle/libs.versions.toml` + updated convention plugin + new adoption-doc section. The only file the fork ever owns is `build-logic/convention/src/main/kotlin/local/LocalFlavors.kt` — and only if their use case needs extra flavors beyond the base demo/prod contract.
+
+### Mental model
+
+```
+Library publishes v2.8.0
+     │
+     │  cd kmp-product-flavors && /lib-sync
+     ▼
+Tier 2 (samples/kmp-project-template) gets:
+  - gradle/libs.versions.toml bumped
+  - docs/ADOPTION_KMP_PRODUCT_FLAVORS.md appended
+  - PR opened on chore/sync-kmp-product-flavors-v2.8.0
+     │
+     │  PR merges into kmp-project-template/dev
+     ▼
+Tier 3 (mifos-mobile, mifos-pay, mifos-x-…) get:
+  - ./sync-dirs.sh pulls the updated template
+  - No manual file edits needed UNLESS their LocalFlavors.kt
+    uses a DSL feature that changed (rare; library is additive)
+```
+
+### When the gate forces a doc update during `/lib-sync`
+
+If the library's new version structurally requires a change beyond a version-string bump (e.g. a renamed extension, a new required field, a removed alias), `/lib-sync` will:
+
+- Apply the version bump
+- Run the adoption-doc-verify against the Tier 2 record
+- Detect the failure
+- Bail with a clear message: "the new library version requires X — update the Tier 2 verify block + 'What you should have' section to match, then re-run `/lib-sync`."
+
+This means migration discipline lives in TWO places, mechanically enforced:
+1. **Library side**: the `consumer.md` for the new version MUST encode the structural deltas as verify-block diffs.
+2. **Tier 2 side**: when `/lib-sync` applies the bump, the gate immediately catches whether the existing Tier 2 record covers the deltas.
+
+There's no third place where a contributor has to "remember" to update something.
+
+## Drift detection (local tool)
+
+The single-source-of-truth property is enforced via a local script — no CI gate (we keep CI surface light). [`scripts/adoption-doc-verify.py`](../../scripts/adoption-doc-verify.py) parses every fenced `bash` block under a `### ✅ Verify` / `### Release-time check (CI)` / `#### [§N …]` header, runs each, and reports PASS/FAIL.
+
+Run before pushing any change to the convention plugin / extension / validator / DSL / toolchain:
 
 ```bash
 python3 scripts/adoption-doc-verify.py docs/adoption/v2.7/library.md
 ```
 
-Output:
+Expected output:
 
 ```
 ━━━ docs/adoption/v2.7/library.md ━━━
-  · 1. Plugin published as v2.7.0 with maven artifact + Gradle plugin id
-    ✓ PASS
-  · 2. Toolchain floors stated + built-against pinned
-    ✓ PASS
+  · 1. Plugin published as v2.7.0 with maven artifact + Gradle plugin id    ✓ PASS
+  · 2. Toolchain floors stated + built-against pinned                       ✓ PASS
   ...
-══════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════════════════════
 Total: 14   PASS: 14   FAIL: 0
 ```
 
-### Skip mechanism (sparingly)
+If anything fails, the script prints the offending block + output. The fix path is binary:
+1. Revert the implementation change (file rename, alias move, dimension removal) IF unintended.
+2. Update the verify block + corresponding section of the doc IF intentional.
 
-To skip an individual block without removing it, prefix the first line of the bash block with `# adoption-verify: skip`. The skipped block stays as documentation for humans/AI but is not executed. Use only for verifies that are transient (e.g. published-version checks during a release window) or platform-specific.
-
-### What this prevents
-
-- **Stealth file renames**: renaming `KMPFlavorsConventionPlugin.kt` → `KmpFlavorsConventionPlugin.kt` (case change) breaks the verify in §4b and §10 → PR fails until either the rename is reverted or the doc updated.
-- **Silent removal of validator codes**: dropping V25 from `KmpFlavorPluginValidator.kt` breaks the §9 verify loop → PR fails.
-- **AGP matrix changes**: removing a row from `agp-matrix-compat.yml` breaks the §12 verify (expects exactly 4 rows) → PR fails.
-- **Maven coordinate drift**: changing `groupId` from `io.github.mobilebytelabs.kmpflavors` to anything else breaks §1's Central check → PR fails.
-
-The gate forces the doc and implementation to evolve TOGETHER.
+To skip an individual block, prefix the first line of the bash block with `# adoption-verify: skip`.
 
 ## Adding a new pair (release-time discipline)
 
@@ -190,9 +239,7 @@ Every minor release MUST ship the pair before the GA promotion lands. Mechanical
 3. Mirror every NEW section: library claim → consumer verifier.
 4. Carry forward sections that are still active (DSL surface, validator codes — see v2.7 as the template).
 5. Update `docs/adoption/README.md` "Available versions" table.
-6. Update the `adoption-doc-verify.yml` workflow path matcher so it runs against the new version doc as well.
-7. Run `python3 scripts/adoption-doc-verify.py docs/adoption/v{X.Y}/library.md` locally — every block must pass before push.
-8. CI gate `adoption-doc-symmetry-check.yml` (TODO — v2.8) will additionally enforce that every library section has a matching consumer section.
+6. Run `python3 scripts/adoption-doc-verify.py docs/adoption/v{X.Y}/library.md` locally — every block must pass before push.
 
 ## Why this matters
 

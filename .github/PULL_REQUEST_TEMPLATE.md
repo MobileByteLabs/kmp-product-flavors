@@ -28,7 +28,6 @@ Fixes #
 - [ ] All new and existing tests passed
 - [ ] I have updated the documentation accordingly
 - [ ] I have added/updated KDoc comments for public APIs
-- [ ] **Adoption-doc drift check**: if I changed `KmpFlavorPlugin.kt`, `KmpFlavorExtension.kt`, `KmpFlavorPluginValidator.kt`, `libs.versions.toml`, `gradle.properties`, the AGP-matrix workflow, or any file the [adoption doc](../docs/adoption/v2.7/library.md) references, I ran `python3 scripts/adoption-doc-verify.py docs/adoption/v2.7/library.md` locally and either (a) the gate still passes or (b) I updated the doc's verify block + "What the library did" section to match the new reality.
 
 ## Testing
 

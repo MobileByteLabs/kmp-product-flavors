@@ -11,7 +11,7 @@
 
 | Tool | Minimum (v2.4 / v2.5 / v2.6) | Built against | Source |
 |---|---|---|---|
-| Gradle | **8.0** | 9.5 | `gradle/wrapper/gradle-wrapper.properties` |
+| Gradle | **8.0** | 9.5.1 | `gradle/wrapper/gradle-wrapper.properties` |
 | Kotlin / KGP | **2.0.21** | 2.3.21 | `gradle/libs.versions.toml` → `kotlin` |
 | Android Gradle Plugin (AGP) | **8.2** | 9.2.1 (matrix-tested against 8.2 / 8.5 / 8.10 / 9.2.1 since v2.7) | `AgpBridge.kt` reflection |
 | Compose Multiplatform | **1.7.0** | 1.10.3 | `ComposeResourcesConfigurator.kt#MIN_CMP_VERSION` |

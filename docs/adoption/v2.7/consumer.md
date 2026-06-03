@@ -77,13 +77,15 @@ grep -E 'kmp-product-flavors-plugin\s*=\s*\{\s*group\s*=' gradle/libs.versions.t
 
 ### What you should have
 
-| Tool | Minimum (floor) | Recommended (built-against) |
+| Tool | Minimum (floor) | Recommended / built-against (v2.7) |
 |---|---|---|
-| JDK | 17 | 17 or 21 |
-| Gradle | 8.0 | 8.5+ |
-| Kotlin Gradle Plugin (KGP) | 2.0.21 | 2.3.x |
-| AGP (if Android consumer) | 8.2 | 8.10+ or 9.2.1 |
+| JDK | 17 | 21 |
+| Gradle | 8.0 | **9.5.1+** |
+| Kotlin Gradle Plugin (KGP) | 2.0.21 | 2.3.21 |
+| AGP (if Android consumer) | 8.2 | **9.2.1** |
 | Compose Multiplatform (if CMP consumer) | 1.7.0 | 1.7+ |
+
+The plugin was built against Gradle 9.5.1 + AGP 9.2.1 + Kotlin 2.3.21. The reflective `AgpBridge.kt` preserves backward compatibility down to the floor row.
 
 ### ✅ Verify
 
