@@ -65,9 +65,13 @@ So `2.7.x` patches inherit `v2.7/`. When `2.8.0` ships, a new `v2.8/` pair lands
 
 ## Available versions
 
-| Version | Library claims | Consumer verifier |
-|---|---|---|
-| **v2.7** (current GA) | [library.md](v2.7/library.md) | [consumer.md](v2.7/consumer.md) |
+| Version | Library claims | Consumer verifier | Sections |
+|---|---|---|---:|
+| **v2.7** (current GA) | [library.md](v2.7/library.md) | [consumer.md](v2.7/consumer.md) | 14 |
+
+The v2.7 pair covers: plugin pinning via `libs.versions.toml` (both `[plugins]` alias + `[libraries]` artifact entries), toolchain compat, **both adoption patterns (direct-apply + convention-plugin)**, DSL surfaces, flavor/dimension registration, `buildConfigPackage` (with the canonical single-source-of-truth pattern via `[versions].appId`), default variant resolution, BuildKonfig codegen output + claim mechanism, validator codes V01–V30, **AGP-only-module `configureFlavors(CommonExtension)` helper**, **downstream extension hook `LocalFlavorsLoader` pattern**, AGP 9 landmines (conditional), end-to-end smoke test, and the `samples/kmp-project-template` reference implementation.
+
+Every section cites the corresponding file in `samples/kmp-project-template` (the first-party canonical consumer owned by the Mifos Initiative) so consumers can copy the exact reference shape rather than reading abstract instructions.
 
 Older versions (v2.6 and earlier) do not have adoption docs — the pattern starts at v2.7. Consumers on v2.6 should use [`MIGRATION_v2.6_TO_v2.7.md`](../MIGRATION_v2.6_TO_v2.7.md) to bump, then run the v2.7 adoption gate.
 
