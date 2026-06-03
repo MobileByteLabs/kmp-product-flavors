@@ -258,6 +258,10 @@ echo
 
 # ─── Consumer sync: branch + pull ──────────────────────────────────────
 BRANCH="chore/sync-kmp-product-flavors-v${TARGET_VERSION}"
+# Capture library repo cwd so the subshell (which cd's into the consumer)
+# can still reach the audit script + adoption doc.
+ORIG_CWD="$(pwd)"
+export ORIG_CWD
 
 (
     cd "$CONSUMER_PATH"
@@ -299,6 +303,36 @@ BRANCH="chore/sync-kmp-product-flavors-v${TARGET_VERSION}"
     else
         echo "→ creating $BRANCH from origin/$DEFAULT_BRANCH"
         git checkout -b "$BRANCH" "origin/$DEFAULT_BRANCH"
+    fi
+
+    # ─── Phase A: AUDIT — run library's Tier 1 verify blocks against consumer ──
+    if [ -f "../scripts/lib-sync-audit.py" ] || [ -f "$ORIG_CWD/scripts/lib-sync-audit.py" ]; then
+        AUDIT_SCRIPT="${ORIG_CWD}/scripts/lib-sync-audit.py"
+        [ -f "$AUDIT_SCRIPT" ] || AUDIT_SCRIPT="../scripts/lib-sync-audit.py"
+        LIBRARY_CONSUMER_DOC="${ORIG_CWD}/${ADOPTION_DOC}"
+        echo
+        echo "→ Phase A: running library's Tier 1 consumer.md gates against this consumer"
+        AUDIT_JSON_FILE=$(mktemp)
+        # stdout → JSON file; stderr → terminal (human-readable summary).
+        if python3 "$AUDIT_SCRIPT" \
+            --consumer "." \
+            --library-doc "$LIBRARY_CONSUMER_DOC" \
+            --target-version "$TARGET_VERSION" \
+            > "$AUDIT_JSON_FILE"; then
+            # Read summary from JSON via python (terse — already printed to stderr by audit)
+            AUDIT_MANUAL_COUNT=$(python3 -c "import json; print(json.load(open('$AUDIT_JSON_FILE'))['totals']['manual'])")
+            AUDIT_AUTOFIX_COUNT=$(python3 -c "import json; print(json.load(open('$AUDIT_JSON_FILE'))['totals']['auto_fix'])")
+            AUDIT_PASS_COUNT=$(python3 -c "import json; print(json.load(open('$AUDIT_JSON_FILE'))['totals']['pass'])")
+            echo "  Audit: ${AUDIT_PASS_COUNT} PASS · ${AUDIT_AUTOFIX_COUNT} AUTO_FIX · ${AUDIT_MANUAL_COUNT} MANUAL"
+        else
+            echo "⚠ audit failed — continuing with minimal version-bump migration only" >&2
+            AUDIT_MANUAL_COUNT=0
+            AUDIT_AUTOFIX_COUNT=0
+        fi
+    else
+        echo "ℹ audit script not found — skipping Phase A; doing minimal version-bump only"
+        AUDIT_MANUAL_COUNT=0
+        AUDIT_AUTOFIX_COUNT=0
     fi
 
     # ─── Migration: bump the plugin version in libs.versions.toml ──────
@@ -378,6 +412,45 @@ if new == src:
     new = src.replace("## v$TARGET_VERSION", section + "## v$TARGET_VERSION", 1) if "## v$TARGET_VERSION" in src else src + "\n\n" + section
 p.write_text(new)
 PY
+            fi
+        fi
+    fi
+
+    # ─── Phase B: post-migration AUDIT REPORT ──────────────────────────
+    # Re-run the audit against the post-migration state and surface any
+    # MANUAL gaps the contributor needs to fix beyond the auto-applied
+    # version-pin bump. We don't fail on MANUAL — the contributor decides.
+    if [ -n "${AUDIT_JSON_FILE:-}" ] && [ -f "$AUDIT_JSON_FILE" ]; then
+        echo
+        echo "→ Phase B: re-auditing post-migration state"
+        AUDIT_SCRIPT="${ORIG_CWD}/scripts/lib-sync-audit.py"
+        LIBRARY_CONSUMER_DOC="${ORIG_CWD}/${ADOPTION_DOC}"
+        POST_AUDIT_FILE=$(mktemp)
+        # stdout → JSON; stderr suppressed (already shown in Phase A).
+        if python3 "$AUDIT_SCRIPT" \
+            --consumer "." \
+            --library-doc "$LIBRARY_CONSUMER_DOC" \
+            --target-version "$TARGET_VERSION" \
+            > "$POST_AUDIT_FILE" 2>/dev/null; then
+            POST_MANUAL=$(python3 -c "import json; print(json.load(open('$POST_AUDIT_FILE'))['totals']['manual'])")
+            POST_PASS=$(python3 -c "import json; print(json.load(open('$POST_AUDIT_FILE'))['totals']['pass'])")
+            POST_TOTAL=$(python3 -c "import json; d=json.load(open('$POST_AUDIT_FILE')); print(d['totals']['pass']+d['totals']['auto_fix']+d['totals']['manual']+d['totals']['skip'])")
+            if [ "$POST_MANUAL" = "0" ]; then
+                echo "  ✓ all auditable sections PASS post-migration ($POST_PASS of $POST_TOTAL)"
+            else
+                echo "  ⚠ $POST_MANUAL section(s) still need manual contributor attention:"
+                python3 -c "
+import json, sys
+d = json.load(open('$POST_AUDIT_FILE'))
+for s in d['sections']:
+    if s['status'] == 'MANUAL':
+        first = (s['output'].split('\n', 1)[0] if s['output'] else '(no output)')[:100]
+        print(f\"    · {s['name']}\")
+        print(f\"      → {first}\")
+"
+                echo
+                echo "  These are NOT auto-fixed — they need human judgment (new DSL surfaces,"
+                echo "  convention plugin edits, fork-specific decisions). Address before pushing."
             fi
         fi
     fi

@@ -8,7 +8,7 @@ scope: project
 
 # /lib-sync
 
-**One command. Zero flags to remember.** Just type `/lib-sync` and the skill walks the full migration loop end-to-end with a confirmation prompt before any commit.
+**One command. Zero flags to remember.** Just type `/lib-sync` and the skill walks the full migration loop end-to-end — full audit, automatic safe fixes, manual-gap report, confirmation prompt, commit.
 
 ## What this skill does
 
@@ -17,16 +17,17 @@ Default behavior when invoked with NO arguments:
 1. **Detect active project.** Confirm cwd is the kmp-product-flavors library repo (presence of `gradle.properties` + `scripts/adoption-doc-verify.py`). If not, surface an error and exit.
 2. **Identify the consumer.** Default is `samples/kmp-project-template` (the first-party canonical consumer). If multiple consumers exist in the future, use AskUserQuestion to pick one.
 3. **Auto-scaffold library-side adoption doc if missing.** If `docs/adoption/v{X.Y}/library.md` doesn't exist for the target version, the script bootstraps it from the most-recent previous minor — copy `v{prev}/{library,consumer}.md` → `v{X.Y}/`, search-replace `v{prev}` → `v{X.Y}` and `{prev}.0` → `{X.Y}.0`, prepend a BOOTSTRAPPED banner with a TODO for the maintainer to add version-specific deltas. The drift gate runs against the bootstrapped `library.md` immediately so any search-replace breakage surfaces before the consumer migration starts.
-4. **Compute the plan.** Invoke `./scripts/lib-sync.sh --dry-run` against the chosen consumer. The script:
-   - Pulls the consumer's default branch (probes dev / development / main / master)
-   - Computes the diff (version bump + Tier 2 doc section append)
-   - Runs the drift gate against the post-migration state
-5. **Report status to user.** Three possible outcomes:
-   - **Already current** — consumer's pin matches library version + gate is green. No action needed.
-   - **Bump applicable, gate green** — consumer is behind; would apply N changes; gate is green after the migration. Show the diff summary.
-   - **Bump applicable, gate red** — consumer is behind BUT the new version's structural delta isn't captured in the Tier 2 doc. Surface the offending verify block + remediation guidance.
-6. **Confirm before commit.** If a bump applies AND the gate is green, use AskUserQuestion to ask "Apply now / Show full diff / Cancel". On "Apply now", re-invoke `./scripts/lib-sync.sh` WITHOUT `--dry-run` to commit the migration.
-7. **Print push instructions** at the end. NEVER auto-push.
+4. **Phase A — AUDIT against the library's Tier 1 contract.** Before doing any migration, run `scripts/lib-sync-audit.py` which extracts every `### ✅ Verify` block from `docs/adoption/v{X.Y}/consumer.md` and runs it against the consumer's working tree. Each block is classified:
+   - **PASS** — consumer already conforms; nothing to do for that section
+   - **AUTO_FIX** — failed, but the script knows how to repair it safely (currently: `version_pin` bumps in `libs.versions.toml` + `toolchain_floor` bumps in Gradle wrapper)
+   - **MANUAL** — failed and needs human judgment (new DSL surfaces, missing convention-plugin wiring, fork-specific business decisions)
+   - **SKIP** — conditional and inapplicable (e.g. §4a only applies on the direct-apply pattern; §12 only on AGP 9)
+5. **Phase B — APPLY auto-fixes + bump the version pin.** Edit `libs.versions.toml` (version-pin auto-fix) plus any other safe edits flagged by Phase A; the consumer-side Tier 2 record (`samples/kmp-project-template/docs/ADOPTION_KMP_PRODUCT_FLAVORS.md`) gets a new version section appended.
+6. **Phase C — POST-MIGRATION audit + drift gate.** Re-run the audit against the modified working tree:
+   - **MANUAL gaps remaining** → surface each gap (section name + first error line) so the contributor knows exactly what still needs human attention. We never block on these — they're informational.
+   - **Drift gate (consumer's `scripts/adoption-doc-verify.py` against the Tier 2 record)** → if any verify block regresses, HALT with the failing block + guidance. The migration stays in the working tree uncommitted for inspection.
+7. **Confirm before commit.** If audit is clean (or MANUAL gaps acknowledged) AND drift gate is green, use AskUserQuestion to ask "Apply now / Show full diff / Cancel". On "Apply now", re-invoke `./scripts/lib-sync.sh` WITHOUT `--dry-run` to commit the migration.
+8. **Print push instructions** at the end. NEVER auto-push.
 
 ### Auto-scaffold semantics
 
@@ -40,30 +41,39 @@ Pass `--no-bootstrap` to refuse the scaffold (e.g. you want to author the doc by
 User types: /lib-sync
      │
      ▼
-Skill: detect cwd is library repo? ─── no ──→ surface error + exit
+detect cwd is library repo? ─── no ──→ error + exit
      │ yes
      ▼
-Skill: resolve consumer (default samples/kmp-project-template)
+resolve consumer (default samples/kmp-project-template)
      │
      ▼
-Skill: run `./scripts/lib-sync.sh --dry-run <consumer>`
+bootstrap docs/adoption/v{X.Y}/ if missing (Phase 3)
      │
      ▼
-Skill: parse the script output, classify outcome
+Phase A — AUDIT: run library's Tier 1 verify blocks against consumer
+     │           emits {pass, auto_fix, manual, skip} counts
+     ▼
+run `./scripts/lib-sync.sh --dry-run <consumer>`
+   ├── bumps version pin (always)
+   ├── applies AUTO_FIX edits (toolchain bumps, etc.)
+   ├── re-audits → reports remaining MANUAL gaps to contributor
+   └── runs drift gate on the post-migration working tree
      │
-     ├── "no changes — already at X.Y.Z" ──→ report "✓ already current" + exit
+     ▼
+classify outcome:
      │
-     ├── "bump A.B.C → X.Y.Z, gate green" ──→ show summary + AskUserQuestion
-     │       │
-     │       ├── User: "Apply now" ──→ run `./scripts/lib-sync.sh <consumer>` (no --dry-run)
-     │       │                          → print push instructions + exit
-     │       │
-     │       ├── User: "Show full diff" ──→ `git -C <consumer> diff` + re-ask
-     │       │
-     │       └── User: "Cancel" ──→ clean up working tree + exit
+     ├── "already current" ──→ report ✓ + exit
      │
-     └── "gate red" ──→ surface failing verify block + remediation guidance + exit
-                        (DO NOT commit; the working-tree changes stay for manual inspection)
+     ├── "applied N edits, audit clean, gate green" ──→ AskUserQuestion
+     │       ├── Apply now → re-run without --dry-run → commit → push instructions
+     │       ├── Show full diff → `git -C <consumer> diff` → re-ask
+     │       └── Cancel → working tree preserved
+     │
+     ├── "applied N edits, MANUAL gaps surfaced" ──→ AskUserQuestion (same 3 options)
+     │       (contributor decides if they want to ship the partial migration
+     │        and address manual gaps in a follow-up, OR cancel + fix locally first)
+     │
+     └── "drift gate RED" ──→ surface failing verify block + halt (no commit)
 ```
 
 ## Argument forms

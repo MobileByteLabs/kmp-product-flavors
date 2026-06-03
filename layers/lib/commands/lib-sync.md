@@ -40,14 +40,20 @@ The consumer-path arg is positional. Flags can appear anywhere.
 
 ---
 
-## Workflow (8 phases)
+## Workflow (10 phases)
 
 ```
 PHASE 1   Pre-flight — verify cwd is library repo root + consumer path exists
 PHASE 2   Resolve target version — parse gradle.properties or use --target-version
 PHASE 3   Resolve adoption recipe path — docs/adoption/v{X.Y}/consumer.md
+          (auto-scaffold from previous minor if missing)
 PHASE 4   Consumer branch setup — fetch default, create chore/sync-… branch
-PHASE 5   Migration apply — bump libs.versions.toml + append Tier 2 doc section
+PHASE 4a  AUDIT — run library's Tier 1 verify blocks against consumer
+          classifies each into {PASS, AUTO_FIX, MANUAL, SKIP}
+PHASE 5   Migration apply — bump libs.versions.toml + apply AUTO_FIX edits
+          + append Tier 2 doc section
+PHASE 5a  POST-MIGRATION AUDIT — re-audit, surface remaining MANUAL gaps
+          (informational; does not block)
 PHASE 6   Drift gate — run consumer's scripts/adoption-doc-verify.py
 PHASE 7   Commit (or bail clean on gate failure)
 PHASE 8   Summary — print push + PR creation instructions
@@ -106,6 +112,36 @@ If the target branch already exists, reuse it + rebase onto fresh `origin/<defau
 
 ---
 
+## Phase 4a — AUDIT (run library's contract against this consumer)
+
+Before any edits are made, invoke `scripts/lib-sync-audit.py`:
+
+```bash
+python3 ../scripts/lib-sync-audit.py \
+    --consumer . \
+    --library-doc ../docs/adoption/v{X.Y}/consumer.md \
+    --target-version {X.Y.Z}
+```
+
+The audit extracts every `### ✅ Verify` / `### Release-time check` / `#### [§N` bash block from the library's Tier 1 `consumer.md` and runs it against the consumer working tree. Each section is classified:
+
+| Status | Meaning | Lib-sync action |
+|---|---|---|
+| **PASS** | Verify exited 0; consumer conforms | Nothing |
+| **AUTO_FIX** | Failed AND section title matches `AUTO_FIX_PATTERNS` (currently: "Plugin pinned to v…" → `version_pin`; "Toolchain compatibility" → `toolchain_floor`) | Apply the safe edit in Phase 5 |
+| **MANUAL** | Failed AND no known safe auto-fix | Surface in Phase 5a + Phase 8 summary; contributor decides |
+| **SKIP** | Section has a `CONDITIONAL_PATTERN` precondition that doesn't hold (e.g. AGP-9-only §12 when consumer is on AGP 8; §4a vs §4b mutex) | Ignored as inapplicable |
+
+Output: structured JSON on stdout (consumed by lib-sync.sh) + human-readable summary on stderr.
+
+The KEY insight: the library's `consumer.md` IS the contract. We don't need a parallel rule engine — running the contract against the consumer IS the audit.
+
+To add a new auto-fix kind: append a row to `AUTO_FIX_PATTERNS` in the audit script AND add the corresponding edit logic in Phase 5.
+
+To add a new precondition (e.g. "Section only applies on Gradle 9+"): append a row to `CONDITIONAL_PATTERNS` with a precondition lambda.
+
+---
+
 ## Phase 5 — Migration apply
 
 Two changes:
@@ -152,6 +188,27 @@ Run the §1–§14 verify suite (see Tier 1 [consumer.md](https://github.com/...
 ```
 
 The script does NOT auto-fill the "Why the bump is safe" prose beyond linking to the migration doc — that's the contributor's call to expand if structural changes happened.
+
+---
+
+## Phase 5a — POST-MIGRATION AUDIT REPORT
+
+Re-run `lib-sync-audit.py` against the post-migration working tree. For each section now classified MANUAL, print:
+
+```
+  ⚠ N section(s) still need manual contributor attention:
+    · 10. AGP-only modules: configureFlavors(CommonExtension) helper
+      → expected `configureFlavors(commonExtension)` call site not found in :app/build.gradle.kts
+    · 11. Downstream extension hook: LocalFlavorsLoader pattern (optional)
+      → expected LocalFlavorsLoader.kt absent
+```
+
+This is INFORMATIONAL — the script does NOT halt on MANUAL gaps. The version pin + auto-fixes have been applied; the contributor decides whether to:
+
+1. Ship the partial migration now (commit + open PR, address manual gaps in follow-ups).
+2. Cancel + fix locally first (`git checkout -- .` to revert, then hand-author the missing changes).
+
+The drift gate (Phase 6) IS the hard halt — that fires on regressions, not on pre-existing gaps that lib-sync can't auto-resolve.
 
 ---
 

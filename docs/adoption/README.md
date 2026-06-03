@@ -157,14 +157,47 @@ What it does:
 Workflow:
 
 1. Reads the library's current version from `gradle.properties`.
-2. Locates the adoption recipe at `docs/adoption/v{X.Y}/consumer.md`.
+2. Locates the adoption recipe at `docs/adoption/v{X.Y}/consumer.md`. If the doc pair for that minor doesn't exist yet, auto-scaffolds it from the previous minor (Phase H).
 3. Resolves the consumer's default branch (probes `dev` / `development` / `main` in order) and creates `chore/sync-kmp-product-flavors-v{X.Y.Z}` on top of it.
-4. Applies the migration:
-   - Bumps `kmpProductFlavors = "X.Y.Z"` in the consumer's `gradle/libs.versions.toml`.
+4. **AUDIT** (Phase A) — runs `scripts/lib-sync-audit.py` against the consumer. The audit extracts every `### ✅ Verify` block from the library's Tier 1 `consumer.md` and runs it inside the consumer's working tree, classifying each section:
+   - **PASS** → no action; the consumer already conforms.
+   - **AUTO_FIX** → safe to repair automatically (e.g. version pin bump, toolchain floor bump). Applied in Phase 5.
+   - **MANUAL** → contributor judgment required (new DSL surface, missing convention plugin, fork-specific decision). Surfaced after the migration.
+   - **SKIP** → conditional and inapplicable (e.g. AGP-9-only verify when the consumer is on AGP 8; mutually-exclusive pattern 3a vs 3b).
+5. **Apply** the migration (Phase 5):
+   - Bumps `kmpProductFlavors = "X.Y.Z"` in the consumer's `gradle/libs.versions.toml` (the always-on auto-fix).
+   - Applies any other AUTO_FIX edits flagged by Phase A.
    - Appends a new `## v{X.Y.Z} — adopted {YYYY-MM-DD}` section to `docs/ADOPTION_KMP_PRODUCT_FLAVORS.md` with the diff + a link to the library's migration doc.
-5. Runs the consumer's `scripts/adoption-doc-verify.py` against the updated record.
-6. Commits if green; bails clean (no partial commit) if any verify regresses.
-7. Prints push instructions — never auto-pushes.
+6. **Re-audit** (Phase B) — surfaces any MANUAL gaps still present after the migration. These are reported but do NOT block — they tell the contributor what they need to address by hand.
+7. **Drift gate** — runs the consumer's `scripts/adoption-doc-verify.py` against the updated Tier 2 record. Hard halt on regression.
+8. Commits if green; bails clean (no partial commit) if the drift gate regresses.
+9. Prints push instructions — never auto-pushes.
+
+### Adding a new auto-fix
+
+To teach `/lib-sync` to fix a new section automatically, edit `scripts/lib-sync-audit.py`:
+
+```python
+AUTO_FIX_PATTERNS: Dict[str, str] = {
+    r"Plugin pinned to v": "version_pin",        # ← already shipped
+    r"Toolchain compatibility": "toolchain_floor",  # ← already shipped
+    # r"Your new section title pattern": "your_fix_kind",
+}
+```
+
+Then add the corresponding edit logic in `scripts/lib-sync.sh` Phase 5. Sections without a matching pattern get classified as MANUAL on failure.
+
+### Adding a new precondition (mutex / skip)
+
+If a verify block is conditional (e.g. "only matters on AGP 9", "only matters when pattern 3a was chosen"), add a precondition to `CONDITIONAL_PATTERNS` in `lib-sync-audit.py`:
+
+```python
+def _my_precondition(consumer_path: Path) -> bool:
+    # return True iff this section applies to the consumer
+    ...
+
+CONDITIONAL_PATTERNS[r"section title regex"] = Precondition("name", _my_precondition)
+```
 
 The forks (mifos-mobile / mifos-pay / mifos-x-field-officer-app / …) don't run `/lib-sync` directly. They run `sync-dirs.sh` against the template, which pulls in the bumped `gradle/libs.versions.toml` + updated convention plugin + new adoption-doc section. The only file the fork ever owns is `build-logic/convention/src/main/kotlin/local/LocalFlavors.kt` — and only if their use case needs extra flavors beyond the base demo/prod contract.
 
