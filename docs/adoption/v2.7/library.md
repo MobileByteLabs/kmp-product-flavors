@@ -22,10 +22,11 @@
 ### Release-time check (CI)
 
 ```bash
-PUBLISHED=$(curl -s 'https://repo1.maven.org/maven2/io/github/mobilebytelabs/flavor-plugin/maven-metadata.xml' | \
-  grep -oE '<latest>[^<]+' | head -1 | sed 's/<latest>//')
-PINNED=$(grep '^kmpflavors\.version=' gradle.properties | cut -d= -f2)
-[ "$PUBLISHED" = "$PINNED" ] || { echo "drift: published=$PUBLISHED pinned=$PINNED"; exit 1; }
+# Confirm v2.7.0 is listed on Maven Central — the version this section claims.
+# Note: gradle.properties may be at 2.7.x (next dev cycle) after the auto-bump
+# PR following each release; we assert against Central, not gradle.properties.
+curl -sf 'https://repo1.maven.org/maven2/io/github/mobilebytelabs/kmpflavors/flavor-plugin/maven-metadata.xml' | \
+  grep -qE '<version>2\.7\.0</version>'
 ```
 
 ### Pairs with consumer
@@ -48,7 +49,8 @@ PINNED=$(grep '^kmpflavors\.version=' gradle.properties | cut -d= -f2)
 ```bash
 grep -E '^agp\s*=' gradle/libs.versions.toml | grep -q '9.2.1'
 grep -E '^kotlin\s*=' gradle/libs.versions.toml | grep -q '2.3.21'
-grep -E 'AGP 8.2' docs/COMPATIBILITY_MATRIX.md
+# The compat-matrix table row asserts AGP 8.2 is the floor.
+grep -qE '\|\s*Android Gradle Plugin \(AGP\)\s*\|\s*\*\*8\.2\*\*' docs/COMPATIBILITY_MATRIX.md
 ```
 
 ### Pairs with consumer
@@ -71,9 +73,12 @@ The `KmpFlavorPlugin` entry point registers the `KmpFlavorExtension` under the n
 ### Release-time check (CI)
 
 ```bash
-# Confirm the extension registration is named "kmpFlavors" — both DSL styles resolve to it.
-grep -E 'project\.extensions\.create.*"kmpFlavors"' \
-  build-logic/flavor-plugin/src/main/kotlin/com/mobilebytelabs/kmpflavors/KmpFlavorPlugin.kt
+# Confirm the extension is registered under the name "kmpFlavors" — both DSL
+# styles resolve to it. The registration spans multiple lines so grep both
+# the create call and the next line for the name literal.
+grep -A 2 'project\.extensions\.create' \
+  build-logic/flavor-plugin/src/main/kotlin/com/mobilebytelabs/kmpflavors/KmpFlavorPlugin.kt | \
+  grep -q '"kmpFlavors"'
 ```
 
 ### Pairs with consumer

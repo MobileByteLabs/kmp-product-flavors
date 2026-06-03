@@ -135,6 +135,52 @@ The canonical Tier 2 file lives at [`samples/kmp-project-template/docs/ADOPTION_
 
 When you fork or copy `kmp-project-template`, copy that doc too — fill in your fork's specifics and ship it. That's how the chain stays intact.
 
+## Drift gate (single source of truth enforcement)
+
+Every `### Release-time check (CI)` and `### ✅ Verify` block in the adoption docs is a deterministic shell command that asserts a structural invariant of the codebase. CI runs every block on every PR via [`.github/workflows/adoption-doc-verify.yml`](../../.github/workflows/adoption-doc-verify.yml). If any block exits non-zero, the PR fails.
+
+This makes the adoption doc the **single source of truth**: the doc's verify blocks ARE the contract; CI is the enforcement. If you rename a file, move an alias, remove a flavor, change a registration name — the corresponding verify breaks and the PR fails until either the implementation is reverted or the doc is updated to match.
+
+### How it works
+
+| Component | Role |
+|---|---|
+| [`scripts/adoption-doc-verify.py`](../../scripts/adoption-doc-verify.py) | Parses every fenced `bash` block under a `### ✅ Verify` / `### Release-time check (CI)` / `#### [§N …]` header. Runs each. Reports PASS/FAIL with the offending block + output. |
+| [`.github/workflows/adoption-doc-verify.yml`](../../.github/workflows/adoption-doc-verify.yml) | PR gate. Triggers on changes to the doc OR any file the doc's verify blocks reference. |
+| `.github/PULL_REQUEST_TEMPLATE.md` | Checklist reminder telling contributors to run the gate locally before pushing. |
+
+To run the gate locally:
+
+```bash
+python3 scripts/adoption-doc-verify.py docs/adoption/v2.7/library.md
+```
+
+Output:
+
+```
+━━━ docs/adoption/v2.7/library.md ━━━
+  · 1. Plugin published as v2.7.0 with maven artifact + Gradle plugin id
+    ✓ PASS
+  · 2. Toolchain floors stated + built-against pinned
+    ✓ PASS
+  ...
+══════════════════════════════════════════════════════════
+Total: 14   PASS: 14   FAIL: 0
+```
+
+### Skip mechanism (sparingly)
+
+To skip an individual block without removing it, prefix the first line of the bash block with `# adoption-verify: skip`. The skipped block stays as documentation for humans/AI but is not executed. Use only for verifies that are transient (e.g. published-version checks during a release window) or platform-specific.
+
+### What this prevents
+
+- **Stealth file renames**: renaming `KMPFlavorsConventionPlugin.kt` → `KmpFlavorsConventionPlugin.kt` (case change) breaks the verify in §4b and §10 → PR fails until either the rename is reverted or the doc updated.
+- **Silent removal of validator codes**: dropping V25 from `KmpFlavorPluginValidator.kt` breaks the §9 verify loop → PR fails.
+- **AGP matrix changes**: removing a row from `agp-matrix-compat.yml` breaks the §12 verify (expects exactly 4 rows) → PR fails.
+- **Maven coordinate drift**: changing `groupId` from `io.github.mobilebytelabs.kmpflavors` to anything else breaks §1's Central check → PR fails.
+
+The gate forces the doc and implementation to evolve TOGETHER.
+
 ## Adding a new pair (release-time discipline)
 
 Every minor release MUST ship the pair before the GA promotion lands. Mechanically:
@@ -144,7 +190,9 @@ Every minor release MUST ship the pair before the GA promotion lands. Mechanical
 3. Mirror every NEW section: library claim → consumer verifier.
 4. Carry forward sections that are still active (DSL surface, validator codes — see v2.7 as the template).
 5. Update `docs/adoption/README.md` "Available versions" table.
-6. CI gate `adoption-doc-symmetry-check.yml` (TODO — v2.8) will enforce that every library section has a matching consumer section.
+6. Update the `adoption-doc-verify.yml` workflow path matcher so it runs against the new version doc as well.
+7. Run `python3 scripts/adoption-doc-verify.py docs/adoption/v{X.Y}/library.md` locally — every block must pass before push.
+8. CI gate `adoption-doc-symmetry-check.yml` (TODO — v2.8) will additionally enforce that every library section has a matching consumer section.
 
 ## Why this matters
 
