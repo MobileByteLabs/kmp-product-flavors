@@ -85,6 +85,8 @@ These ship transparently; nothing to opt into.
 
 ## See also
 
+- [`adoption/v2.7/consumer.md`](adoption/v2.7/consumer.md) — **AI-executable end-to-end adoption gate** (10 sections, every step has a `✅ Verify` block). New in v2.7.
+- [`adoption/README.md`](adoption/README.md) — the adoption-doc pattern explainer (one mirrored pair per minor release).
 - [`MIGRATION_v2.5_TO_v2.6.md`](MIGRATION_v2.5_TO_v2.6.md) — predecessor cookbook (also opens "You do not need to migrate.")
 - [`AGP_9_MIGRATION_NOTES.md`](AGP_9_MIGRATION_NOTES.md) — consumer-side AGP 9 migration (independent of bumping this plugin)
 - [`COMPATIBILITY_MATRIX.md`](COMPATIBILITY_MATRIX.md) — version floor + Built-against table

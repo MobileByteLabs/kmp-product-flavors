@@ -55,7 +55,10 @@ kmpFlavors {
 > JDK 17+ / CMP 1.7.0+ — UNCHANGED across v2.4 → v2.5 → v2.6 → v2.7).
 > See [`docs/COMPATIBILITY_MATRIX.md`](docs/COMPATIBILITY_MATRIX.md)
 > + [`docs/MIGRATION_v2.6_TO_v2.7.md`](docs/MIGRATION_v2.6_TO_v2.7.md) (opens with
-> "You do not need to migrate.").
+> "You do not need to migrate.")
+> + **NEW**: [`docs/adoption/v2.7/consumer.md`](docs/adoption/v2.7/consumer.md) —
+> AI-executable end-to-end adoption gate (paste into Claude/Cursor → run the 10
+> `✅ Verify` blocks → confirm 100% adoption with no missing pieces).
 >
 > **v2.6 highlights (preserved)** — coverage gate (PR check via `koverVerify`) + AGP matrix CI
 > + **KMP↔AGP variantFilter parity** via reflective `beforeVariants` + 4 beyond-platform
