@@ -230,16 +230,29 @@ If anything fails, the script prints the offending block + output. The fix path 
 
 To skip an individual block, prefix the first line of the bash block with `# adoption-verify: skip`.
 
-## Adding a new pair (release-time discipline)
+## Adding a new pair — automated via `/lib-sync`
 
-Every minor release MUST ship the pair before the GA promotion lands. Mechanically:
+Every minor release MUST ship the pair before the GA promotion lands. With auto-scaffold wired into `/lib-sync` (since 2026-06-03), the maintainer flow collapses to:
 
 1. Bump `kmpflavors.version` in `gradle.properties` to the new minor (e.g. `2.8.0-alpha.1`).
-2. Create `docs/adoption/v{X.Y}/library.md` + `docs/adoption/v{X.Y}/consumer.md`.
-3. Mirror every NEW section: library claim → consumer verifier.
-4. Carry forward sections that are still active (DSL surface, validator codes — see v2.7 as the template).
-5. Update `docs/adoption/README.md` "Available versions" table.
-6. Run `python3 scripts/adoption-doc-verify.py docs/adoption/v{X.Y}/library.md` locally — every block must pass before push.
+2. Run `/lib-sync`.
+3. The skill detects `docs/adoption/v2.8/` is missing and auto-scaffolds:
+   - Copies `docs/adoption/v2.7/library.md` → `docs/adoption/v2.8/library.md`
+   - Copies `docs/adoption/v2.7/consumer.md` → `docs/adoption/v2.8/consumer.md`
+   - Search-replaces `v2.7` → `v2.8` and `2.7.0` → `2.8.0` (targeted; older `v2.6`-style floor refs left alone)
+   - Prepends a BOOTSTRAPPED banner with a TODO summarizing what was replaced
+   - Runs the drift gate against the new `v2.8/library.md` — any breakage from the search-replace surfaces immediately
+4. Maintainer reviews the two scaffolded files, fills in version-specific deltas (new sections for new capabilities, updated section content for changed contracts).
+5. Maintainer updates `docs/adoption/README.md` "Available versions" table.
+6. Maintainer commits + pushes the new pair.
+7. `/lib-sync` proceeds with the consumer-side migration on top of the now-present library docs.
+
+Power-user flags:
+
+- `/lib-sync --no-bootstrap` — refuse the scaffold; fail fast if the pair is missing (use when authoring by hand).
+- `/lib-sync --target-version X.Y.0` — explicitly target a version (e.g. to bootstrap the doc before bumping `gradle.properties`).
+
+This means the "Adding a new pair" discipline ISN'T a 10-step checklist anymore — it's `/lib-sync` + a maintainer review pass over the scaffolded diff.
 
 ## Why this matters
 

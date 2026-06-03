@@ -16,17 +16,23 @@ Default behavior when invoked with NO arguments:
 
 1. **Detect active project.** Confirm cwd is the kmp-product-flavors library repo (presence of `gradle.properties` + `scripts/adoption-doc-verify.py`). If not, surface an error and exit.
 2. **Identify the consumer.** Default is `samples/kmp-project-template` (the first-party canonical consumer). If multiple consumers exist in the future, use AskUserQuestion to pick one.
-3. **Compute the plan.** Invoke `./scripts/lib-sync.sh --dry-run` against the chosen consumer. The script:
-   - Detects the library's current version from gradle.properties
+3. **Auto-scaffold library-side adoption doc if missing.** If `docs/adoption/v{X.Y}/library.md` doesn't exist for the target version, the script bootstraps it from the most-recent previous minor — copy `v{prev}/{library,consumer}.md` → `v{X.Y}/`, search-replace `v{prev}` → `v{X.Y}` and `{prev}.0` → `{X.Y}.0`, prepend a BOOTSTRAPPED banner with a TODO for the maintainer to add version-specific deltas. The drift gate runs against the bootstrapped `library.md` immediately so any search-replace breakage surfaces before the consumer migration starts.
+4. **Compute the plan.** Invoke `./scripts/lib-sync.sh --dry-run` against the chosen consumer. The script:
    - Pulls the consumer's default branch (probes dev / development / main / master)
    - Computes the diff (version bump + Tier 2 doc section append)
    - Runs the drift gate against the post-migration state
-4. **Report status to user.** Three possible outcomes:
+5. **Report status to user.** Three possible outcomes:
    - **Already current** — consumer's pin matches library version + gate is green. No action needed.
    - **Bump applicable, gate green** — consumer is behind; would apply N changes; gate is green after the migration. Show the diff summary.
    - **Bump applicable, gate red** — consumer is behind BUT the new version's structural delta isn't captured in the Tier 2 doc. Surface the offending verify block + remediation guidance.
-5. **Confirm before commit.** If a bump applies AND the gate is green, use AskUserQuestion to ask "Apply now / Show full diff / Cancel". On "Apply now", re-invoke `./scripts/lib-sync.sh` WITHOUT `--dry-run` to commit the migration.
-6. **Print push instructions** at the end. NEVER auto-push.
+6. **Confirm before commit.** If a bump applies AND the gate is green, use AskUserQuestion to ask "Apply now / Show full diff / Cancel". On "Apply now", re-invoke `./scripts/lib-sync.sh` WITHOUT `--dry-run` to commit the migration.
+7. **Print push instructions** at the end. NEVER auto-push.
+
+### Auto-scaffold semantics
+
+Phase 3's auto-scaffold solves the "new release → adoption doc must exist" problem. When you bump `kmpflavors.version` from `2.7.x` to `2.8.0-alpha.1` and run `/lib-sync`, the skill notices `docs/adoption/v2.8/` is missing and scaffolds the pair from `v2.7/` before continuing. You review the scaffolded files (the banner TODO highlights any version-specific edits needed), commit them as the library-side adoption doc for the new minor, and the consumer migration proceeds on top.
+
+Pass `--no-bootstrap` to refuse the scaffold (e.g. you want to author the doc by hand).
 
 ## Workflow detail
 

@@ -24,7 +24,16 @@
 #   ./scripts/lib-sync.sh samples/kmp-project-template # explicit consumer path
 #   ./scripts/lib-sync.sh --target-version 2.7.0       # override the target version
 #   ./scripts/lib-sync.sh --dry-run                    # show plan, don't commit
+#   ./scripts/lib-sync.sh --no-bootstrap               # don't auto-scaffold missing adoption doc
 #   ./scripts/lib-sync.sh --help
+#
+# Auto-scaffold behavior:
+#   If docs/adoption/v{X.Y}/library.md doesn't exist for the target
+#   version, the script scaffolds it from the most-recent previous
+#   minor (e.g. for v2.8.0 target, copies v2.7/{library,consumer}.md →
+#   v2.8/, search-replaces version tokens, prepends a BOOTSTRAPPED
+#   banner, and runs the drift gate against the new v2.8/library.md).
+#   Pass --no-bootstrap to refuse the scaffold and fail-fast instead.
 #
 # Exit codes:
 #   0 — sync completed successfully (or --dry-run finished)
@@ -48,6 +57,130 @@ DEFAULT_CONSUMER="samples/kmp-project-template"
 CONSUMER_PATH="$DEFAULT_CONSUMER"
 TARGET_VERSION=""
 DRY_RUN=0
+NO_BOOTSTRAP=0
+
+# ─── bootstrap_library_adoption_doc ────────────────────────────────────
+# If docs/adoption/v{X.Y}/{library,consumer}.md don't exist for the target
+# version, scaffold them from the most-recent previous v{P.Q}/ — copy +
+# search-replace version tokens + prepend a BOOTSTRAPPED banner so the
+# maintainer knows to review.
+#
+# Args: $1 = target version (X.Y.Z)
+# Returns: 0 if doc exists or was successfully bootstrapped
+#          1 on error
+bootstrap_library_adoption_doc() {
+    local target_version="$1"
+    local target_minor
+    target_minor=$(echo "$target_version" | cut -d. -f1-2)
+    local target_dir="docs/adoption/v${target_minor}"
+
+    if [ -f "${target_dir}/library.md" ] && [ -f "${target_dir}/consumer.md" ]; then
+        return 0
+    fi
+
+    # Find most-recent previous version directory (semver-aware sort).
+    local prev_minor=""
+    for d in docs/adoption/v*/; do
+        [ -d "$d" ] || continue
+        local v
+        v=$(basename "$d" | sed 's/^v//')
+        # Skip if not strictly X.Y format
+        echo "$v" | grep -qE '^[0-9]+\.[0-9]+$' || continue
+        # Skip the target itself + any version >= target
+        if [ "$(printf '%s\n%s\n' "$v" "$target_minor" | sort -V | tail -1)" != "$target_minor" ]; then
+            continue
+        fi
+        [ "$v" = "$target_minor" ] && continue
+        # candidate is greatest seen so far?
+        if [ -z "$prev_minor" ] || [ "$(printf '%s\n%s\n' "$prev_minor" "$v" | sort -V | tail -1)" = "$v" ]; then
+            prev_minor="$v"
+        fi
+    done
+
+    if [ -z "$prev_minor" ]; then
+        echo "✗ no previous version directory found under docs/adoption/ — cannot bootstrap" >&2
+        echo "  Author docs/adoption/v${target_minor}/{library,consumer}.md manually." >&2
+        return 1
+    fi
+
+    echo
+    echo "→ adoption doc missing for v${target_minor} — bootstrapping from v${prev_minor}"
+    if [ "$NO_BOOTSTRAP" = 1 ]; then
+        echo "  (--no-bootstrap set; refusing to scaffold)"
+        return 1
+    fi
+
+    if [ "$DRY_RUN" = 1 ]; then
+        echo "  (dry-run — would copy + search-replace 2 files; skipping)"
+        return 0
+    fi
+
+    mkdir -p "$target_dir"
+    local banner_date
+    banner_date=$(date -u +%Y-%m-%d)
+    local banner_top
+    banner_top="<!-- BOOTSTRAPPED FROM v${prev_minor} by scripts/lib-sync.sh on ${banner_date} -->
+<!-- TODO: review against the v${prev_minor} → v${target_minor} migration doc + add any version-specific deltas before commit. -->
+<!-- Targeted search-replace applied: v${prev_minor} → v${target_minor}, ${prev_minor}.0 → ${target_version}. -->
+<!-- Other version literals (e.g. v2.6 floor references) were NOT touched. -->
+
+"
+
+    for f in library.md consumer.md; do
+        local src="docs/adoption/v${prev_minor}/${f}"
+        local dst="${target_dir}/${f}"
+        if [ ! -f "$src" ]; then
+            echo "  ⚠ source $src not found — skipping $f"
+            continue
+        fi
+        # Search-replace targeted patterns. Conservative — only the
+        # immediate-previous-minor tokens get touched. Older tokens
+        # (e.g. v2.6 floor references) are left alone for manual review.
+        python3 - "$src" "$dst" "$prev_minor" "$target_minor" "$target_version" "$banner_top" <<'PY'
+import sys, pathlib
+src_path, dst_path, prev, new_minor, new_version, banner = sys.argv[1:]
+src = pathlib.Path(src_path).read_text()
+new = src
+# v{prev}.0 → v{new_version} (e.g. v2.7.0 → v2.8.0)
+new = new.replace(f"v{prev}.0", f"v{new_version}")
+new = new.replace(f"v{prev}.x", f"v{new_minor}.x")
+# v{prev} → v{new_minor} only when followed by non-version char (avoid
+# v2.7.0 → v2.8.0 double-bump from already-replaced text)
+import re
+new = re.sub(
+    rf"v{re.escape(prev)}(?![0-9.])",
+    f"v{new_minor}",
+    new,
+)
+# {prev}.0 → {new_version}
+new = new.replace(f"{prev}.0", new_version)
+# Versioned headers in MIGRATION doc names: MIGRATION_v{prev}_TO_v{new} stays
+# manually-authored; we don't auto-create it.
+pathlib.Path(dst_path).write_text(banner + new)
+PY
+        echo "  ✓ wrote $dst"
+    done
+
+    # Verify gate against the bootstrapped library.md so the maintainer
+    # sees immediately whether the search-replace broke any assertions.
+    if [ -f "scripts/adoption-doc-verify.py" ]; then
+        echo
+        echo "→ running gate against bootstrapped ${target_dir}/library.md"
+        if python3 scripts/adoption-doc-verify.py "${target_dir}/library.md" >/dev/null 2>&1; then
+            echo "  ✓ gate green on bootstrapped doc"
+        else
+            echo "  ⚠ gate red — review which verify blocks reference v${prev_minor}-specific paths"
+            echo "    that need version-specific updates. Run the gate manually for details:"
+            echo "    python3 scripts/adoption-doc-verify.py ${target_dir}/library.md"
+        fi
+    fi
+
+    echo
+    echo "→ adoption doc pair scaffolded at $target_dir"
+    echo "  Review the two files, fill in version-specific deltas (if any), commit before publishing."
+    echo
+    return 0
+}
 
 # ─── CLI parsing ───────────────────────────────────────────────────────
 while [ $# -gt 0 ]; do
@@ -56,6 +189,8 @@ while [ $# -gt 0 ]; do
             TARGET_VERSION="$2"; shift 2 ;;
         --dry-run)
             DRY_RUN=1; shift ;;
+        --no-bootstrap)
+            NO_BOOTSTRAP=1; shift ;;
         -h|--help)
             sed -n '4,42p' "$0"; exit 0 ;;
         --)
@@ -96,10 +231,18 @@ fi
 
 LIB_MINOR=$(echo "$TARGET_VERSION" | cut -d. -f1-2)
 ADOPTION_DOC="docs/adoption/v${LIB_MINOR}/consumer.md"
-if [ ! -f "$ADOPTION_DOC" ]; then
-    echo "error: adoption doc not found: $ADOPTION_DOC" >&2
-    echo "       expected docs/adoption/v${LIB_MINOR}/consumer.md to exist for migration recipe" >&2
-    exit 2
+
+# If the library-side adoption doc pair doesn't exist for this minor,
+# offer to bootstrap from the most-recent previous minor. This closes
+# the loop on "new release → adoption doc must exist" without requiring
+# the maintainer to remember a separate scaffolding step.
+if [ ! -f "$ADOPTION_DOC" ] || [ ! -f "docs/adoption/v${LIB_MINOR}/library.md" ]; then
+    if ! bootstrap_library_adoption_doc "$TARGET_VERSION"; then
+        echo "error: adoption doc not found: $ADOPTION_DOC" >&2
+        echo "       expected docs/adoption/v${LIB_MINOR}/{library,consumer}.md to exist for migration recipe" >&2
+        echo "       bootstrap from previous version failed (or --no-bootstrap was set)" >&2
+        exit 2
+    fi
 fi
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
