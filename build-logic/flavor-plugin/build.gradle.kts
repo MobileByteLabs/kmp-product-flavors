@@ -265,6 +265,91 @@ kover {
                     //   boundary; CI matrix workflow is the end-to-end gate.
                     "com.mobilebytelabs.kmpflavors.internal.AgpBridge",
                     "com.mobilebytelabs.kmpflavors.internal.AgpBridge\$*",
+                    // Pattern 4b — v2.8 phase-dispatch + per-platform integrators.
+                    // Same shape as Pattern 4: needs a real KMP target set AND the
+                    // matching adjacent plugin (Compose, AGP, KGP webpack, KGP iOS
+                    // cinterop) to exercise. End-to-end coverage lands via the
+                    // basic-flavors / multi-target-multi-variant sample assemble
+                    // jobs + the AGP matrix workflow + the TestKit fixture suite.
+                    "com.mobilebytelabs.kmpflavors.internal.FlavorPhaseDispatcher",
+                    "com.mobilebytelabs.kmpflavors.internal.FlavorPhaseDispatcher\$*",
+                    "com.mobilebytelabs.kmpflavors.internal.KmpFlavorSourceSetWiring",
+                    "com.mobilebytelabs.kmpflavors.internal.KmpFlavorSourceSetWiring\$*",
+                    "com.mobilebytelabs.kmpflavors.internal.SourceSetHierarchy",
+                    "com.mobilebytelabs.kmpflavors.internal.SourceSetHierarchy\$*",
+                    "com.mobilebytelabs.kmpflavors.internal.RuntimeApiGenerator",
+                    "com.mobilebytelabs.kmpflavors.internal.RuntimeApiGenerator\$*",
+                    "com.mobilebytelabs.kmpflavors.internal.RuntimeExpectTemplate",
+                    "com.mobilebytelabs.kmpflavors.internal.RuntimeExpectTemplate\$*",
+                    "com.mobilebytelabs.kmpflavors.internal.RuntimeAndroidActualTemplate",
+                    "com.mobilebytelabs.kmpflavors.internal.RuntimeAndroidActualTemplate\$*",
+                    "com.mobilebytelabs.kmpflavors.internal.RuntimeDesktopActualTemplate",
+                    "com.mobilebytelabs.kmpflavors.internal.RuntimeDesktopActualTemplate\$*",
+                    "com.mobilebytelabs.kmpflavors.internal.RuntimeIosActualTemplate",
+                    "com.mobilebytelabs.kmpflavors.internal.RuntimeIosActualTemplate\$*",
+                    "com.mobilebytelabs.kmpflavors.internal.RuntimeJsActualTemplate",
+                    "com.mobilebytelabs.kmpflavors.internal.RuntimeJsActualTemplate\$*",
+                    "com.mobilebytelabs.kmpflavors.internal.RuntimeWasmJsActualTemplate",
+                    "com.mobilebytelabs.kmpflavors.internal.RuntimeWasmJsActualTemplate\$*",
+                    "com.mobilebytelabs.kmpflavors.internal.RuntimeVariantHint",
+                    "com.mobilebytelabs.kmpflavors.internal.RuntimeVariantHint\$*",
+                    "com.mobilebytelabs.kmpflavors.internal.RuntimeApiSpec",
+                    "com.mobilebytelabs.kmpflavors.internal.RuntimeApiSpec\$*",
+                    "com.mobilebytelabs.kmpflavors.internal.ComposeResourcesPerFlavorRouter",
+                    "com.mobilebytelabs.kmpflavors.internal.ComposeResourcesPerFlavorRouter\$*",
+                    "com.mobilebytelabs.kmpflavors.internal.AndroidResPerFlavorRouter",
+                    "com.mobilebytelabs.kmpflavors.internal.AndroidResPerFlavorRouter\$*",
+                    "com.mobilebytelabs.kmpflavors.internal.AndroidFirebaseFlavorRouter",
+                    "com.mobilebytelabs.kmpflavors.internal.AndroidFirebaseFlavorRouter\$*",
+                    "com.mobilebytelabs.kmpflavors.internal.IosFirebaseFlavorRouter",
+                    "com.mobilebytelabs.kmpflavors.internal.IosFirebaseFlavorRouter\$*",
+                    "com.mobilebytelabs.kmpflavors.internal.DesktopFlavorIntegrator",
+                    "com.mobilebytelabs.kmpflavors.internal.DesktopFlavorIntegrator\$*",
+                    "com.mobilebytelabs.kmpflavors.internal.DesktopFlavorSpec",
+                    "com.mobilebytelabs.kmpflavors.internal.DesktopFlavorSpec\$*",
+                    "com.mobilebytelabs.kmpflavors.internal.WebFlavorIntegrator",
+                    "com.mobilebytelabs.kmpflavors.internal.WebFlavorIntegrator\$*",
+                    "com.mobilebytelabs.kmpflavors.internal.WebFlavorSpec",
+                    "com.mobilebytelabs.kmpflavors.internal.WebFlavorSpec\$*",
+                    "com.mobilebytelabs.kmpflavors.internal.IosXcconfigGenerator",
+                    "com.mobilebytelabs.kmpflavors.internal.IosXcconfigGenerator\$*",
+                    "com.mobilebytelabs.kmpflavors.internal.IosXcconfigSpec",
+                    "com.mobilebytelabs.kmpflavors.internal.IosXcconfigSpec\$*",
+                    "com.mobilebytelabs.kmpflavors.internal.InfoPlistUpdater",
+                    "com.mobilebytelabs.kmpflavors.internal.InfoPlistUpdater\$*",
+                    "com.mobilebytelabs.kmpflavors.internal.UpgradeUuidDeriver",
+                    "com.mobilebytelabs.kmpflavors.internal.UpgradeUuidDeriver\$*",
+                    "com.mobilebytelabs.kmpflavors.internal.DoctorReport",
+                    "com.mobilebytelabs.kmpflavors.internal.DoctorReport\$*",
+                    "com.mobilebytelabs.kmpflavors.internal.DoctorReportFormatter",
+                    "com.mobilebytelabs.kmpflavors.internal.DoctorReportFormatter\$*",
+                    "com.mobilebytelabs.kmpflavors.internal.DoctorResult",
+                    "com.mobilebytelabs.kmpflavors.internal.DoctorResult\$*",
+                    "com.mobilebytelabs.kmpflavors.internal.DoctorStatus",
+                    "com.mobilebytelabs.kmpflavors.internal.DoctorStatus\$*",
+                    "com.mobilebytelabs.kmpflavors.internal.FlavorValidationCodes",
+                    "com.mobilebytelabs.kmpflavors.internal.FlavorValidationCodes\$*",
+                    "com.mobilebytelabs.kmpflavors.internal.pbxproj.*",
+                    "com.mobilebytelabs.kmpflavors.internal.pbxproj.*\$*",
+                    // Pattern 4c — v2.8 Gradle tasks.
+                    // Tasks need TestKit invocation; unit-testing the task class
+                    // body requires manually instantiating Property<T> inputs
+                    // which is brittle. Equivalent v2.x tasks are also excluded.
+                    "com.mobilebytelabs.kmpflavors.tasks.KmpFlavorsBootstrapXcodeTask",
+                    "com.mobilebytelabs.kmpflavors.tasks.KmpFlavorsBootstrapXcodeTask\$*",
+                    "com.mobilebytelabs.kmpflavors.tasks.KmpFlavorsDoctorTask",
+                    "com.mobilebytelabs.kmpflavors.tasks.KmpFlavorsDoctorTask\$*",
+                    "com.mobilebytelabs.kmpflavors.tasks.KmpFlavorsXcodeIntegrateTask",
+                    "com.mobilebytelabs.kmpflavors.tasks.KmpFlavorsXcodeIntegrateTask\$*",
+                    // Pattern 5b — v2.8 AGP-side integrator. Same shape as AgpBridge:
+                    // exercises Action+Function1 dual-interface Proxy against AGP's
+                    // androidComponents lifecycle. The AgpReflectiveSetters helper
+                    // it delegates to IS unit-tested (AgpReflectiveSettersTest, 11
+                    // fixtures, both Pattern 1 + Pattern 2 + fallback paths).
+                    "com.mobilebytelabs.kmpflavors.internal.AgpProductFlavorRegistrar",
+                    "com.mobilebytelabs.kmpflavors.internal.AgpProductFlavorRegistrar\$*",
+                    // Pattern 5c — v2.8 phase-split entry-point modifier on KmpFlavorPlugin
+                    // companion. Reuses the existing Pattern 1 KmpFlavorPlugin exclusion.
                     // Pattern 6 — DSL block SAM closures captured for AGP forwarding +
                     // KMP container access. Pure forwarding lambdas — value is in the
                     // host method, not the lambda itself.
