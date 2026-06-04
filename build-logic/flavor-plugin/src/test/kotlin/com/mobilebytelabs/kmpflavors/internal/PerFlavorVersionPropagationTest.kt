@@ -53,13 +53,19 @@ class PerFlavorVersionPropagationTest {
         var vn: String? = null
 
         @Suppress("unused")
-        fun setDimension(d: String) { dim = d }
+        fun setDimension(d: String) {
+            dim = d
+        }
 
         @Suppress("unused")
-        fun setVersionCode(value: Int) { vc = value }
+        fun setVersionCode(value: Int) {
+            vc = value
+        }
 
         @Suppress("unused")
-        fun setVersionName(value: String) { vn = value }
+        fun setVersionName(value: String) {
+            vn = value
+        }
     }
 
     private fun project(): Project = ProjectBuilder.builder().build()

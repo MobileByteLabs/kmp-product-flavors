@@ -56,10 +56,7 @@ import javax.inject.Inject
  * AND no `storePasswordFromEnv()` / `keyPasswordFromEnv()` resolution succeeded at apply time,
  * the validator fires a configuration-time error pointing at the missing env-var.
  */
-abstract class SigningConfig @Inject constructor(
-    private val configName: String,
-    objects: ObjectFactory,
-) : Named {
+abstract class SigningConfig @Inject constructor(private val configName: String, objects: ObjectFactory) : Named {
 
     /** AGP keystore path — resolved at apply time and assigned to `android.signingConfigs.create(name).storeFile`. */
     val storeFile: Property<File> = objects.property(File::class.java)

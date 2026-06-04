@@ -115,12 +115,7 @@ internal object SigningConfigBridge {
     }
 
     /** Resolve `android.productFlavors.getByName(flavorName).signingConfig = android.signingConfigs.getByName(ref)`. */
-    private fun assignSigningConfigToFlavor(
-        androidExt: Any,
-        flavorName: String,
-        signingConfigRef: String,
-        logger: Logger,
-    ) {
+    private fun assignSigningConfigToFlavor(androidExt: Any, flavorName: String, signingConfigRef: String, logger: Logger) {
         val productFlavorsContainer = androidExt.javaClass.methods
             .firstOrNull { it.name == "getProductFlavors" }
             ?.invoke(androidExt) ?: return

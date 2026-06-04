@@ -705,10 +705,7 @@ internal object KmpFlavorPluginValidator {
      * Returns an empty list when no version/signing issues are detected. Empty `flavors` or
      * empty `signingConfigs` is a valid no-op input.
      */
-    fun validateVersionAndSigning(
-        flavors: List<FlavorConfig>,
-        signingConfigs: List<SigningConfig> = emptyList(),
-    ): List<KmpFlavorValidationFinding> {
+    fun validateVersionAndSigning(flavors: List<FlavorConfig>, signingConfigs: List<SigningConfig> = emptyList()): List<KmpFlavorValidationFinding> {
         val findings = mutableListOf<KmpFlavorValidationFinding>()
         val signingByName: Map<String, SigningConfig> = signingConfigs.associateBy { it.name }
 

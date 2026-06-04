@@ -59,16 +59,24 @@ class SigningConfigBridgeTest {
         var kpw: String? = null
 
         @Suppress("unused")
-        fun setStoreFile(f: File?) { sf = f }
+        fun setStoreFile(f: File?) {
+            sf = f
+        }
 
         @Suppress("unused")
-        fun setStorePassword(p: String?) { spw = p }
+        fun setStorePassword(p: String?) {
+            spw = p
+        }
 
         @Suppress("unused")
-        fun setKeyAlias(a: String?) { ka = a }
+        fun setKeyAlias(a: String?) {
+            ka = a
+        }
 
         @Suppress("unused")
-        fun setKeyPassword(p: String?) { kpw = p }
+        fun setKeyPassword(p: String?) {
+            kpw = p
+        }
     }
 
     class FakeFlavorContainer {
@@ -88,7 +96,9 @@ class SigningConfigBridgeTest {
         var sc: Any? = null
 
         @Suppress("unused")
-        fun setSigningConfig(s: Any?) { sc = s }
+        fun setSigningConfig(s: Any?) {
+            sc = s
+        }
     }
 
     private fun project(): Project = ProjectBuilder.builder().build()
