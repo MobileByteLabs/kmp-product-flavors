@@ -1,34 +1,28 @@
-# Multi-version KGP CI matrix — v2.2 Phase 2B
+# Multi-version KGP CI matrix — v2.8 floor
 #
-# Version pins for the nightly `multi-kgp-matrix.yml` workflow that runs the
+# Version pins for the nightly multi-kgp-matrix.yml workflow that runs the
 # plugin's TestKit suite against multiple Kotlin Gradle Plugin versions.
 #
-# Update this file as new KGP minor versions ship — the workflow reads from it,
-# so a single TOML edit propagates the new pin through CI.
+# v2.8 raised the floor to AGP 9.2.1+ / Gradle 9.5.1+ / Kotlin 2.3.21+ per
+# the AGP 9.2.1+ floor policy. Pre-v2.8 KGP rows (2.1.x, 2.2.x) and
+# Gradle 9.0 are below the floor and were dropped.
+#
+# As new KGP minors ship on the 2.3.x line (and 2.4 when released), add rows
+# here — the workflow reads from this TOML, so a single edit propagates the
+# new pin through CI.
 #
 # Schema:
-#   - `versions` — array of KGP version strings the workflow exercises.
-#   - `gradle-version` — the Gradle version each row of the matrix runs against
-#     (held constant; varying both axes would be a 9-cell matrix and not worth
-#     the CI minutes).
-#   - `compose-multiplatform` — CMP version pinned per KGP row (CMP ↔ KGP have
+#   - versions — array of KGP version strings the workflow exercises.
+#   - gradle-version — the Gradle version each row of the matrix runs against
+#     (held constant; varying both axes would be a multi-cell matrix and not
+#     worth the CI minutes).
+#   - compose-multiplatform — CMP version pinned per KGP row (CMP <-> KGP have
 #     specific compat constraints; pinning per-row avoids muddying signal).
 
 [matrix]
-gradle-version = "9.0"
+gradle-version = "9.5.1"
 
 [[matrix.kgp]]
-version = "2.1.0"
-# CMP 1.6.x is the canonical CMP for KGP 2.1.x; 1.7+ requires KGP 2.2+.
-compose-multiplatform = "1.6.11"
-
-[[matrix.kgp]]
-version = "2.2.21"
-# CMP 1.7.x is the line that introduced composeResources/ auto-discovery on
-# custom source sets — the v2.1 happy-path version.
-compose-multiplatform = "1.7.3"
-
-[[matrix.kgp]]
-version = "2.3.0"
-# CMP 1.10.x is the latest as of v2.2 cut; tracks Kotlin 2.3 release line.
+version = "2.3.21"
+# CMP 1.10.3 tracks Kotlin 2.3.21 — the v2.8 floor line.
 compose-multiplatform = "1.10.3"

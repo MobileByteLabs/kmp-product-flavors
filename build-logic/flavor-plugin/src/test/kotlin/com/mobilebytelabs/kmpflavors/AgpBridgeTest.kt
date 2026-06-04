@@ -155,7 +155,7 @@ class AgpBridgeTest {
         verify {
             logger.warn(
                 match<String> {
-                    it.contains("KMP↔AGP parity") && it.contains("setEnabled() setter missing")
+                    it.contains("KMP↔AGP parity") && it.contains("neither setEnabled() nor setEnable() resolved")
                 },
             )
         }
