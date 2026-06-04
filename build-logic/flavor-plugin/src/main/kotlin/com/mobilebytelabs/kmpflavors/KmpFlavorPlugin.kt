@@ -241,6 +241,11 @@ class KmpFlavorPlugin : Plugin<Project> {
                     extension,
                     project.logger,
                 )
+                com.mobilebytelabs.kmpflavors.internal.SigningConfigBridge.apply(
+                    project,
+                    extension,
+                    project.logger,
+                )
             }.onFailure { e ->
                 project.logger.warn("[KMP Flavors] early AGP productFlavor registration failed: ${e.message}")
             }
@@ -248,6 +253,11 @@ class KmpFlavorPlugin : Plugin<Project> {
         project.pluginManager.withPlugin("com.android.library") {
             runCatching {
                 com.mobilebytelabs.kmpflavors.internal.AgpProductFlavorRegistrar.apply(
+                    project,
+                    extension,
+                    project.logger,
+                )
+                com.mobilebytelabs.kmpflavors.internal.SigningConfigBridge.apply(
                     project,
                     extension,
                     project.logger,

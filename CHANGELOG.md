@@ -39,6 +39,18 @@ See [`docs/AGP_SUPPORT.md`](docs/AGP_SUPPORT.md) for the 9.2.1+ floor contract a
 - **New samples** — `samples/pure-agp-app/`, `samples/ios-flavor-integration/`, `samples/desktop-flavor-integration/`, `samples/web-flavor-integration/`.
 - **`AgpReflectiveSettersTest`** — 11 fixtures (715 total, was 704) covering Pattern 1 / Pattern 2 / neither-found across String + Boolean + Int. 100% line coverage on the helper.
 
+### Added — v2.8 gap-fill Wave A1 (shipped 2026-06-05 alongside v2.8.0 GA tag)
+
+- **`signingConfigs {}` DSL block** — `kmpFlavors { signingConfigs { create("release") { storeFile / storePassword / keyAlias / keyPassword } } }` with `storePasswordFromEnv` / `keyPasswordFromEnv` helpers for CI-safe password resolution.
+- **`SigningConfigBridge`** — reflective wiring from `kmpFlavors.signingConfigs{}` to `android.signingConfigs{}` + flavor signing-config reference resolution via `productFlavors.setSigningConfig`. Pattern 1 + Pattern 2 reflective routing via `AgpReflectiveSetters`.
+- **`FlavorConfig.versionCode: Property<Int>`** + **`FlavorConfig.versionName: Property<String>`** — propagated to AGP `productFlavors.setVersionCode` / `setVersionName` reflectively by `AgpProductFlavorRegistrar`.
+- **V50_VERSION_CODE_PROPAGATED + V51_SIGNING_ENV_VAR_SET evaluator logic** — `KmpFlavorPluginValidator.validateVersionAndSigning()`: V50 fires on non-positive versionCode; V51 fires on dangling signingConfig reference or missing storePassword / keyPassword. 21 new tests across `SigningConfigBridgeTest` + `PerFlavorVersionPropagationTest`; coverage holds at 100%.
+
+### Plan-layer reconciliation (2026-06-05)
+
+- `v28-unified-flavor-api` epic (16 sub-plans, authored 2026-06-03) archived to `plan-layer/project-plans/mbs/kmp-product-flavors/archive/2026-06/v28-unified-flavor-api/` with Phase 19 mapping table documenting which class delivered each planned task. The plan and source diverged structurally when Phase 19 mega-commit (`de645bb`) absorbed ~70% of that work under a different decomposition.
+- `v28-gap-fill` follow-on epic (6 sub-plans) tracks v2.8.1 polish deliverables (Wave B: runtime-api snapshots, `:kmpFlavorsMigrateFromV27` task, 6 sample modules).
+
 ### Changed
 
 - **Floor: AGP 8.2 → AGP 9.2.1.** Single-floor design.

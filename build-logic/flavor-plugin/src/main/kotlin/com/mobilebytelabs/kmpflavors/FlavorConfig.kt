@@ -148,8 +148,32 @@ open class FlavorConfig @Inject constructor(private val flavorName: String, obje
 
     /**
      * The signing config name to use for Android builds with this flavor.
+     *
+     * Must reference a `SigningConfig` declared in `kmpFlavors.signingConfigs {}` (v2.8+).
+     * Resolved + assigned reflectively by
+     * [com.mobilebytelabs.kmpflavors.internal.SigningConfigBridge].
      */
     val signingConfig: Property<String> = objects.property(String::class.java)
+
+    /**
+     * v2.8 — Per-flavor versionCode propagated to AGP `productFlavor.versionCode` via
+     * reflective set during the AGP propagation phase.
+     *
+     * Unset (no `set(...)` call) — falls back to `android.defaultConfig.versionCode`.
+     * The V50_VERSION_CODE_PROPAGATED validator surfaces an error when this is set
+     * to a non-positive integer.
+     */
+    val versionCode: Property<Int> = objects.property(Int::class.java)
+
+    /**
+     * v2.8 — Per-flavor versionName propagated to AGP `productFlavor.versionName` via
+     * reflective set during the AGP propagation phase.
+     *
+     * Unset — falls back to `android.defaultConfig.versionName`.
+     * Note: this REPLACES the AGP versionName when set; use [versionNameSuffix] for
+     * additive overrides.
+     */
+    val versionName: Property<String> = objects.property(String::class.java)
 
     /**
      * Adds a custom build config field to this flavor.

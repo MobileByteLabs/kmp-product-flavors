@@ -146,6 +146,13 @@ internal object AgpProductFlavorRegistrar {
             flv.versionNameSuffix.orNull?.let { suffix ->
                 AgpReflectiveSetters.set(agpFlavor, "versionNameSuffix", suffix)
             }
+            // v2.8 — per-flavor versionCode + versionName reflective propagation.
+            flv.versionCode.orNull?.let { vc ->
+                AgpReflectiveSetters.set(agpFlavor, "versionCode", vc)
+            }
+            flv.versionName.orNull?.let { vn ->
+                AgpReflectiveSetters.set(agpFlavor, "versionName", vn)
+            }
             logger.info("[KMP Flavors] finalized AGP flavor '${flv.name}'")
         }.onFailure { e ->
             logger.warn("[KMP Flavors] failed to update AGP flavor '${flv.name}': ${e.message}")

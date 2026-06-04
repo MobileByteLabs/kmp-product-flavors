@@ -20,6 +20,7 @@ import com.mobilebytelabs.kmpflavors.BuildTypeConfig
 import com.mobilebytelabs.kmpflavors.FlavorConfig
 import com.mobilebytelabs.kmpflavors.FlavorDimension
 import com.mobilebytelabs.kmpflavors.FlavorVariant
+import com.mobilebytelabs.kmpflavors.SigningConfig
 
 /**
  * Severity of a validation finding.
@@ -678,6 +679,89 @@ internal object KmpFlavorPluginValidator {
         reservedName == "BUILD_TYPE" -> "APP_BUILD_TYPE"
         reservedName.startsWith("IS_") -> "TIER_" + reservedName.removePrefix("IS_")
         else -> "APP_$reservedName"
+    }
+
+    /**
+     * v2.8 — Validate per-flavor versionCode propagation + signing config password coverage.
+     *
+     * Two sub-checks:
+     *
+     * - **KMPF-V50** (ERROR) — a flavor declares `versionCode.set(n)` with `n <= 0`. AGP rejects
+     *   non-positive versionCodes at variant-materialization time; catch it earlier with a clear
+     *   actionable message instead of letting the build fail deep in the AGP machinery.
+     *
+     * - **KMPF-V51** (ERROR) — a flavor's `signingConfig.set("name")` references a signing config
+     *   whose `storePassword` OR `keyPassword` is unset AND no `*FromEnv()` resolution succeeded
+     *   (env-var was unset at configuration time). The bridge still emits the signing config slot
+     *   but AGP fails at signing time with a cryptic key-not-found error — better to surface the
+     *   missing env-var at configuration time so the consumer can `export KEYSTORE_PASSWORD=...`
+     *   and re-run.
+     *
+     * Decoupled from [validate] to keep the call surface stable for non-signing call-sites
+     * (existing tests + the v2.4 call shape). [KmpFlavorPlugin] invokes this from the same
+     * `afterEvaluate { }` block where [validate] runs, with the additional signing-config list
+     * supplied from the extension.
+     *
+     * Returns an empty list when no version/signing issues are detected. Empty `flavors` or
+     * empty `signingConfigs` is a valid no-op input.
+     */
+    fun validateVersionAndSigning(
+        flavors: List<FlavorConfig>,
+        signingConfigs: List<SigningConfig> = emptyList(),
+    ): List<KmpFlavorValidationFinding> {
+        val findings = mutableListOf<KmpFlavorValidationFinding>()
+        val signingByName: Map<String, SigningConfig> = signingConfigs.associateBy { it.name }
+
+        flavors.forEach { flavor ->
+            // KMPF-V50: per-flavor versionCode must be positive when set.
+            flavor.versionCode.orNull?.let { vc ->
+                if (vc <= 0) {
+                    findings += KmpFlavorValidationFinding(
+                        code = FlavorValidationCodes.V50_VERSION_CODE_PROPAGATED,
+                        severity = KmpFlavorValidationSeverity.ERROR,
+                        message = "Flavor '${flavor.name}' declares versionCode=$vc which is non-positive. " +
+                            "AGP rejects versionCodes <= 0 at variant materialization.",
+                        fix = "Set a positive integer: `kmpFlavors { flavors { register(\"${flavor.name}\") " +
+                            "{ versionCode.set(N) where N > 0 } } }`. Conventional values follow " +
+                            "semver-like math (e.g. 280 for 2.8.0).",
+                    )
+                }
+            }
+
+            // KMPF-V51: per-flavor signingConfig reference must point at a config with passwords resolved.
+            flavor.signingConfig.orNull?.let { ref ->
+                val sc = signingByName[ref] ?: run {
+                    findings += KmpFlavorValidationFinding(
+                        code = FlavorValidationCodes.V51_SIGNING_ENV_VAR_SET,
+                        severity = KmpFlavorValidationSeverity.ERROR,
+                        message = "Flavor '${flavor.name}' references signingConfig '$ref' which is not " +
+                            "declared in `kmpFlavors.signingConfigs {}`.",
+                        fix = "Declare it: `kmpFlavors { signingConfigs { create(\"$ref\") { " +
+                            "storeFile.set(...); storePasswordFromEnv(\"KEYSTORE_PASSWORD\"); " +
+                            "keyAlias.set(...); keyPasswordFromEnv(\"KEY_PASSWORD\") } } }`.",
+                    )
+                    return@let
+                }
+                val storeMissing = sc.storePassword.orNull.isNullOrEmpty()
+                val keyMissing = sc.keyPassword.orNull.isNullOrEmpty()
+                if (storeMissing || keyMissing) {
+                    val parts = mutableListOf<String>()
+                    if (storeMissing) parts.add("storePassword")
+                    if (keyMissing) parts.add("keyPassword")
+                    findings += KmpFlavorValidationFinding(
+                        code = FlavorValidationCodes.V51_SIGNING_ENV_VAR_SET,
+                        severity = KmpFlavorValidationSeverity.ERROR,
+                        message = "Flavor '${flavor.name}' uses signingConfig '$ref' which has missing " +
+                            "${parts.joinToString(" + ")}. AGP would fail at signing time with a cryptic " +
+                            "key-not-found error.",
+                        fix = "Resolve the missing password(s) via env-var lookup: " +
+                            "`signingConfigs { create(\"$ref\") { storePasswordFromEnv(\"KEYSTORE_PASSWORD\"); " +
+                            "keyPasswordFromEnv(\"KEY_PASSWORD\") } }`. Set the env-vars before running Gradle.",
+                    )
+                }
+            }
+        }
+        return findings
     }
 
     /**
