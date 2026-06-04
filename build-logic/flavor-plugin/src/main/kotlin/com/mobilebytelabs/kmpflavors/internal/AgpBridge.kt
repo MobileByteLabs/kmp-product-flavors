@@ -99,9 +99,13 @@ internal object AgpBridge {
                         }
                         null
                     }
+
                     "toString" -> "KmpFlavors.finalizeDsl"
+
                     "hashCode" -> System.identityHashCode(proxyInstance)
+
                     "equals" -> args[0] === proxyInstance
+
                     else -> null
                 }
             }
@@ -209,9 +213,13 @@ internal object AgpBridge {
                         }
                         null
                     }
+
                     "toString" -> "KmpFlavors.variantFilter"
+
                     "hashCode" -> System.identityHashCode(proxyInstance)
+
                     "equals" -> args[0] === proxyInstance
+
                     else -> null
                 }
             }

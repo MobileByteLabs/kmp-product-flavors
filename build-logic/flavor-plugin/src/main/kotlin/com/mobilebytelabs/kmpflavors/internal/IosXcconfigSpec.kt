@@ -14,12 +14,7 @@ import com.mobilebytelabs.kmpflavors.KmpFlavorExtension
  * Phase 2 — typed model of per-variant xcconfig payload.
  * Includes KMPF_* runtime identity vars consumed by Phase 6's iOS actual.
  */
-internal data class IosXcconfigSpec(
-    val variantName: String,
-    val bundleId: String,
-    val xcconfigVars: Map<String, String>,
-    val googleServiceFile: String? = null,
-) {
+internal data class IosXcconfigSpec(val variantName: String, val bundleId: String, val xcconfigVars: Map<String, String>, val googleServiceFile: String? = null) {
     companion object {
         fun from(
             flavor: FlavorConfig,

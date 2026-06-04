@@ -10,12 +10,7 @@ package com.mobilebytelabs.kmpflavors.internal
  */
 internal enum class DoctorStatus { PASS, WARN, ERROR, SKIP }
 
-internal data class DoctorResult(
-    val code: String,
-    val description: String,
-    val status: DoctorStatus,
-    val message: String? = null,
-)
+internal data class DoctorResult(val code: String, val description: String, val status: DoctorStatus, val message: String? = null)
 
 internal data class DoctorReport(val results: List<DoctorResult>) {
     val passes: List<DoctorResult> get() = results.filter { it.status == DoctorStatus.PASS }
@@ -65,7 +60,7 @@ internal object DoctorReportFormatter {
         appendLine()
         appendLine(
             "  Totals: ${report.passes.size} PASS · ${report.errors.size} FAIL · " +
-                "${report.warnings.size} WARN · ${report.skips.size} SKIP"
+                "${report.warnings.size} WARN · ${report.skips.size} SKIP",
         )
     }
 

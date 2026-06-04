@@ -39,7 +39,7 @@ internal object FlavorPhaseDispatcher {
         registerToolingTasks(project)
 
         val hasAgp = project.plugins.hasPlugin("com.android.application") ||
-                project.plugins.hasPlugin("com.android.library")
+            project.plugins.hasPlugin("com.android.library")
         val kmp = project.extensions.findByType(KotlinMultiplatformExtension::class.java)
         val hasKmp = kmp != null
         val hasCompose = project.pluginManager.hasPlugin("org.jetbrains.compose")
@@ -132,11 +132,7 @@ internal object FlavorPhaseDispatcher {
         logger.info("[KMP Flavors] registered iOS bootstrap + integrate tasks")
     }
 
-    private fun generateIosXcconfigs(
-        project: Project,
-        ext: KmpFlavorExtension,
-        logger: Logger,
-    ): Int {
+    private fun generateIosXcconfigs(project: Project, ext: KmpFlavorExtension, logger: Logger): Int {
         val flavors = ext.flavors.toList()
         val buildTypes = ext.buildTypes.toList().ifEmpty { return 0 }
         val outDir = project.layout.buildDirectory
@@ -145,23 +141,25 @@ internal object FlavorPhaseDispatcher {
         val appDisplayName = project.rootProject.name
         val appVersion = project.version.toString()
         var count = 0
-        for (flavor in flavors) for (buildType in buildTypes) {
-            val spec = IosXcconfigSpec.from(
-                flavor, buildType, baseBundleId, appDisplayName, appVersion, ext
-            )
-            IosXcconfigGenerator.generate(spec, outDir)
-            count++
+        for (flavor in flavors) {
+            for (buildType in buildTypes) {
+                val spec = IosXcconfigSpec.from(
+                    flavor,
+                    buildType,
+                    baseBundleId,
+                    appDisplayName,
+                    appVersion,
+                    ext,
+                )
+                IosXcconfigGenerator.generate(spec, outDir)
+                count++
+            }
         }
         logger.lifecycle("[KMP Flavors] generated $count xcconfig files")
         return count
     }
 
-    private fun generateRuntimeApi(
-        project: Project,
-        ext: KmpFlavorExtension,
-        kmp: KotlinMultiplatformExtension,
-        logger: Logger,
-    ): Int {
+    private fun generateRuntimeApi(project: Project, ext: KmpFlavorExtension, kmp: KotlinMultiplatformExtension, logger: Logger): Int {
         val packageName =
             (project.findProperty("kmpFlavorsRuntimePackage") as? String)
                 ?: ext.flavors.firstOrNull()?.buildConfigFields?.orNull?.get("PACKAGE")?.value?.trim('"')
@@ -182,11 +180,11 @@ internal object FlavorPhaseDispatcher {
             if (project.path < existing) {
                 rootExtras.set(claimKey, project.path)
                 logger.info(
-                    "[KMP Flavors] ${project.path} taking over RuntimeApi codegen from $existing"
+                    "[KMP Flavors] ${project.path} taking over RuntimeApi codegen from $existing",
                 )
             } else {
                 logger.info(
-                    "[KMP Flavors] ${project.path} skipping RuntimeApi codegen — already by $existing"
+                    "[KMP Flavors] ${project.path} skipping RuntimeApi codegen — already by $existing",
                 )
                 return 0
             }
@@ -205,16 +203,14 @@ internal object FlavorPhaseDispatcher {
             if (srcDir.exists()) ss.kotlin.srcDir(srcDir)
         }
         logger.lifecycle(
-            "[KMP Flavors] ${project.path} generated ${files.size} runtime API files (package=$packageName)"
+            "[KMP Flavors] ${project.path} generated ${files.size} runtime API files (package=$packageName)",
         )
         return files.size
     }
 
-    private fun hasAnyAppleTarget(kmp: KotlinMultiplatformExtension): Boolean =
-        kmp.targets.any { it.platformType.name.lowercase() == "native" && it.name.startsWith("ios") }
+    private fun hasAnyAppleTarget(kmp: KotlinMultiplatformExtension): Boolean = kmp.targets.any { it.platformType.name.lowercase() == "native" && it.name.startsWith("ios") }
 
-    private fun hasJsOrWasmTarget(kmp: KotlinMultiplatformExtension): Boolean =
-        kmp.targets.any {
-            it.platformType.name.lowercase().let { p -> p == "js" || p == "wasm" }
-        }
+    private fun hasJsOrWasmTarget(kmp: KotlinMultiplatformExtension): Boolean = kmp.targets.any {
+        it.platformType.name.lowercase().let { p -> p == "js" || p == "wasm" }
+    }
 }

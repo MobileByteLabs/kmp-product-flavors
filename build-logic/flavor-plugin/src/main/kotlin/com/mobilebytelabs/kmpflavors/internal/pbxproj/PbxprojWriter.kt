@@ -15,16 +15,23 @@ internal class PbxprojWriter(private val document: PbxprojDocument) {
     fun write(): String {
         sb.append("// !$*UTF8*$!\n")
         sb.append("{\n")
-        indent(1); sb.append("archiveVersion = ${document.archiveVersion};\n")
-        indent(1); sb.append("classes = {\n")
-        indent(1); sb.append("};\n")
-        indent(1); sb.append("objectVersion = ${document.objectVersion};\n")
-        indent(1); sb.append("objects = {\n")
+        indent(1)
+        sb.append("archiveVersion = ${document.archiveVersion};\n")
+        indent(1)
+        sb.append("classes = {\n")
+        indent(1)
+        sb.append("};\n")
+        indent(1)
+        sb.append("objectVersion = ${document.objectVersion};\n")
+        indent(1)
+        sb.append("objects = {\n")
         for ((id, obj) in document.objects.toSortedMap()) {
             writeObject(id, obj, 2)
         }
-        indent(1); sb.append("};\n")
-        indent(1); sb.append("rootObject = ${document.rootObject};\n")
+        indent(1)
+        sb.append("};\n")
+        indent(1)
+        sb.append("rootObject = ${document.rootObject};\n")
         sb.append("}\n")
         return sb.toString()
     }
@@ -40,12 +47,14 @@ internal class PbxprojWriter(private val document: PbxprojDocument) {
             writeValue(v, level + 1)
             sb.append(";\n")
         }
-        indent(level); sb.append("};\n")
+        indent(level)
+        sb.append("};\n")
     }
 
     private fun writeValue(v: Any?, level: Int) {
         when (v) {
             null -> sb.append("\"\"")
+
             is Map<*, *> -> {
                 sb.append("{\n")
                 @Suppress("UNCHECKED_CAST")
@@ -56,8 +65,10 @@ internal class PbxprojWriter(private val document: PbxprojDocument) {
                     writeValue(vv, level + 1)
                     sb.append(";\n")
                 }
-                indent(level); sb.append("}")
+                indent(level)
+                sb.append("}")
             }
+
             is List<*> -> {
                 sb.append("(\n")
                 for (item in v) {
@@ -65,8 +76,10 @@ internal class PbxprojWriter(private val document: PbxprojDocument) {
                     writeValue(item, level + 1)
                     sb.append(",\n")
                 }
-                indent(level); sb.append(")")
+                indent(level)
+                sb.append(")")
             }
+
             else -> sb.append(formatScalar(v.toString()))
         }
     }

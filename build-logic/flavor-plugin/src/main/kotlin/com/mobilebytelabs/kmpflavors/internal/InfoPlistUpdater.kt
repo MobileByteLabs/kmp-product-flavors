@@ -16,17 +16,19 @@ import java.nio.file.StandardCopyOption
 internal object InfoPlistUpdater {
     private const val BUNDLE_INTERP = "\$(PRODUCT_BUNDLE_IDENTIFIER)"
     private val BUNDLE_ID_REGEX = Regex(
-        """<key>CFBundleIdentifier</key>\s*<string>[^<]*</string>"""
+        """<key>CFBundleIdentifier</key>\s*<string>[^<]*</string>""",
     )
 
     fun setBundleIdInterpolation(file: File): Boolean {
         val text = file.readText()
         if (Regex("""<key>CFBundleIdentifier</key>\s*<string>\$\(PRODUCT_BUNDLE_IDENTIFIER\)</string>""")
                 .containsMatchIn(text)
-        ) return false
+        ) {
+            return false
+        }
         val updated = text.replace(
             BUNDLE_ID_REGEX,
-            "<key>CFBundleIdentifier</key>\n\t<string>$BUNDLE_INTERP</string>"
+            "<key>CFBundleIdentifier</key>\n\t<string>$BUNDLE_INTERP</string>",
         )
         writeAtomic(file, updated)
         return true
@@ -47,7 +49,8 @@ internal object InfoPlistUpdater {
             |	<string>${'$'}(KMPF_IS_DEBUG)</string>
             |	<key>KMPFIsDemo</key>
             |	<string>${'$'}(KMPF_IS_DEMO)</string>
-            |""".trimMargin()
+            |
+        """.trimMargin()
         val updated = text.replace("</dict>\n</plist>", "$additions</dict>\n</plist>")
         writeAtomic(file, updated)
         return true
@@ -60,7 +63,7 @@ internal object InfoPlistUpdater {
             tempFile.toPath(),
             file.toPath(),
             StandardCopyOption.REPLACE_EXISTING,
-            StandardCopyOption.ATOMIC_MOVE
+            StandardCopyOption.ATOMIC_MOVE,
         )
     }
 }

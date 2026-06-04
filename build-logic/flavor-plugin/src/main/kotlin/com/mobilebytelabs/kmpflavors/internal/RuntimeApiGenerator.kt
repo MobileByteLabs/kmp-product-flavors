@@ -54,7 +54,7 @@ public expect object KmpFlavorsRuntime {
     public val isDemo: Boolean
     public fun get(key: String): String?
 }
-""".trimIndent() + "\n"
+    """.trimIndent() + "\n"
 }
 
 internal object RuntimeAndroidActualTemplate {
@@ -103,7 +103,7 @@ public actual object KmpFlavorsRuntime {
         else -> null
     }
 }
-""".trimIndent() + "\n"
+    """.trimIndent() + "\n"
 }
 
 internal object RuntimeIosActualTemplate {
@@ -133,7 +133,7 @@ public actual object KmpFlavorsRuntime {
         else -> null
     }
 }
-""".trimIndent() + "\n"
+    """.trimIndent() + "\n"
 }
 
 internal object RuntimeDesktopActualTemplate {
@@ -166,7 +166,7 @@ public actual object KmpFlavorsRuntime {
     public actual val isDemo: Boolean = attr("KMPF-IsDemo").equals("true", ignoreCase = true) || flavorName == "demo"
     public actual fun get(key: String): String? = attr("KMPF-${'$'}key").takeIf { it.isNotEmpty() }
 }
-""".trimIndent() + "\n"
+    """.trimIndent() + "\n"
 }
 
 internal object RuntimeJsActualTemplate {
@@ -206,7 +206,7 @@ public actual object KmpFlavorsRuntime {
         else -> null
     }
 }
-""".trimIndent() + "\n"
+    """.trimIndent() + "\n"
 }
 
 internal object RuntimeWasmJsActualTemplate {

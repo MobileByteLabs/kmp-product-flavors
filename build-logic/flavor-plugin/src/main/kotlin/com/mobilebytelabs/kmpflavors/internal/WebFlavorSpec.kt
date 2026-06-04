@@ -27,13 +27,7 @@ internal data class WebFlavorSpec(
     val isDemo: Boolean,
 ) {
     companion object {
-        fun from(
-            flavor: FlavorConfig,
-            buildType: BuildTypeConfig,
-            appDisplayName: String,
-            bundleIdBase: String,
-            iconDir: File,
-        ): WebFlavorSpec {
+        fun from(flavor: FlavorConfig, buildType: BuildTypeConfig, appDisplayName: String, bundleIdBase: String, iconDir: File): WebFlavorSpec {
             val title = flavor.webTitleSuffix.orNull?.let { "$appDisplayName$it" }
                 ?: "$appDisplayName (${flavor.name})"
             val favicon = iconDir.resolve("${flavor.name}.favicon.ico").takeIf { it.exists() }

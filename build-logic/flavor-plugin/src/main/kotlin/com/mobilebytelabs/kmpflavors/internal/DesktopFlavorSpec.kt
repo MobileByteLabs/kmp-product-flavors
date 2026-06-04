@@ -22,12 +22,7 @@ internal data class DesktopFlavorSpec(
     val manifestEntries: Map<String, String>,
 ) {
     companion object {
-        fun from(
-            flavor: FlavorConfig,
-            buildType: BuildTypeConfig,
-            appDisplayName: String,
-            iconDir: File,
-        ): DesktopFlavorSpec {
+        fun from(flavor: FlavorConfig, buildType: BuildTypeConfig, appDisplayName: String, iconDir: File): DesktopFlavorSpec {
             val name = flavor.desktopWindowTitleSuffix.orNull?.let { "$appDisplayName$it" }
                 ?: "$appDisplayName-${flavor.name}"
             val bundle = flavor.bundleIdSuffix.orNull?.let { suffix ->

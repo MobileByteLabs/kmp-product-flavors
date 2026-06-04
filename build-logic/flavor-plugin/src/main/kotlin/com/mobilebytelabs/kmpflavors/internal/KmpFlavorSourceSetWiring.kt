@@ -20,7 +20,10 @@ internal object KmpFlavorSourceSetWiring {
 
     fun apply(project: Project, ext: KmpFlavorExtension, logger: Logger): Int {
         val kmp = project.extensions.findByType(KotlinMultiplatformExtension::class.java)
-            ?: run { logger.info("[KMP Flavors] KMP not applied; skipping source set wiring"); return 0 }
+            ?: run {
+                logger.info("[KMP Flavors] KMP not applied; skipping source set wiring")
+                return 0
+            }
 
         val flavors = ext.flavors.toList().map { it.name }
         if (flavors.isEmpty()) return 0
@@ -70,7 +73,7 @@ internal object KmpFlavorSourceSetWiring {
 
         logger.lifecycle(
             "[KMP Flavors] wired ${hierarchy.flavorSourceSets.size + hierarchy.perTargetPerFlavor.size} per-flavor source sets " +
-                "(${hierarchy.flavorSourceSets.size} flavor + ${hierarchy.perTargetPerFlavor.size} per-target-flavor)"
+                "(${hierarchy.flavorSourceSets.size} flavor + ${hierarchy.perTargetPerFlavor.size} per-target-flavor)",
         )
         return hierarchy.flavorSourceSets.size + hierarchy.perTargetPerFlavor.size
     }

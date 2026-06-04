@@ -68,18 +68,13 @@ internal object AgpProductFlavorRegistrar {
         })
 
         logger.lifecycle(
-            "[KMP Flavors] ${project.path}: AGP propagation wired via whenObjectAdded"
+            "[KMP Flavors] ${project.path}: AGP propagation wired via whenObjectAdded",
         )
         return 1
     }
 
     /** Phase 1: create the AGP slot synchronously when consumer registers the flavor. */
-    private fun createAgpFlavorEarly(
-        androidExt: Any,
-        flv: FlavorConfig,
-        ext: KmpFlavorExtension,
-        logger: Logger,
-    ) {
+    private fun createAgpFlavorEarly(androidExt: Any, flv: FlavorConfig, ext: KmpFlavorExtension, logger: Logger) {
         runCatching {
             val productFlavors = androidExt.javaClass.methods
                 .firstOrNull { it.name == "getProductFlavors" }
@@ -96,6 +91,7 @@ internal object AgpProductFlavorRegistrar {
                 val getFlavorDims = androidExt.javaClass.methods.firstOrNull {
                     it.name == "getFlavorDimensions"
                 }
+
                 @Suppress("UNCHECKED_CAST")
                 val existingDims = getFlavorDims?.invoke(androidExt) as? MutableList<String>
                 if (existingDims != null && firstDim !in existingDims) {
@@ -115,7 +111,7 @@ internal object AgpProductFlavorRegistrar {
                 AgpReflectiveSetters.set(agpFlavor, "dimension", firstDim)
             }
             logger.info(
-                "[KMP Flavors] propagated flavor '${flv.name}' to AGP (dim=${firstDim ?: "<none>"})"
+                "[KMP Flavors] propagated flavor '${flv.name}' to AGP (dim=${firstDim ?: "<none>"})",
             )
         }.onFailure { e ->
             logger.warn("[KMP Flavors] failed to create AGP flavor '${flv.name}': ${e.message}")
@@ -138,6 +134,7 @@ internal object AgpProductFlavorRegistrar {
                 val getFlavorDims = androidExt.javaClass.methods.firstOrNull {
                     it.name == "getFlavorDimensions"
                 }
+
                 @Suppress("UNCHECKED_CAST")
                 val existingDims = getFlavorDims?.invoke(androidExt) as? MutableList<String>
                 if (existingDims != null && dim !in existingDims) existingDims.add(dim)

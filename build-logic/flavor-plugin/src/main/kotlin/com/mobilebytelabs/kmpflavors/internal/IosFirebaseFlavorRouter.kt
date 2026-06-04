@@ -29,26 +29,28 @@ internal object IosFirebaseFlavorRouter {
         val flavors = ext.flavors.toList()
         val buildTypes = ext.buildTypes.toList()
         var count = 0
-        for (flavor in flavors) for (buildType in buildTypes) {
-            val plist = brandingDir.resolve("${flavor.name}/GoogleService-Info.plist")
-            if (!plist.exists()) {
-                logger.warn(
-                    "[KMP Flavors] missing branding/firebase/${flavor.name}/GoogleService-Info.plist"
-                )
-                continue
-            }
-            val variantName = "${flavor.name}${buildType.name.replaceFirstChar { it.uppercase() }}"
-            val xcconfig = xcconfigDir.resolve("$variantName.xcconfig")
-            if (!xcconfig.exists()) {
-                logger.warn("[KMP Flavors] xcconfig $variantName missing — Phase 2 not generated")
-                continue
-            }
-            val line =
-                "\nKMPF_FIREBASE_CONFIG_FILE = branding/firebase/${flavor.name}/GoogleService-Info.plist\n"
-            if (!xcconfig.readText().contains("KMPF_FIREBASE_CONFIG_FILE")) {
-                xcconfig.appendText(line)
-                count++
-                logger.info("[KMP Flavors] injected KMPF_FIREBASE_CONFIG_FILE into ${xcconfig.name}")
+        for (flavor in flavors) {
+            for (buildType in buildTypes) {
+                val plist = brandingDir.resolve("${flavor.name}/GoogleService-Info.plist")
+                if (!plist.exists()) {
+                    logger.warn(
+                        "[KMP Flavors] missing branding/firebase/${flavor.name}/GoogleService-Info.plist",
+                    )
+                    continue
+                }
+                val variantName = "${flavor.name}${buildType.name.replaceFirstChar { it.uppercase() }}"
+                val xcconfig = xcconfigDir.resolve("$variantName.xcconfig")
+                if (!xcconfig.exists()) {
+                    logger.warn("[KMP Flavors] xcconfig $variantName missing — Phase 2 not generated")
+                    continue
+                }
+                val line =
+                    "\nKMPF_FIREBASE_CONFIG_FILE = branding/firebase/${flavor.name}/GoogleService-Info.plist\n"
+                if (!xcconfig.readText().contains("KMPF_FIREBASE_CONFIG_FILE")) {
+                    xcconfig.appendText(line)
+                    count++
+                    logger.info("[KMP Flavors] injected KMPF_FIREBASE_CONFIG_FILE into ${xcconfig.name}")
+                }
             }
         }
         return count

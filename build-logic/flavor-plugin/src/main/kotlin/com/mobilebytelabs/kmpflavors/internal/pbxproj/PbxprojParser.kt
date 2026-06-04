@@ -24,11 +24,13 @@ internal class PbxprojParser(private val text: String) {
     fun parse(): PbxprojDocument {
         val header = readHeader()
         val root = parseValue() as? Map<*, *> ?: error("pbxproj root must be a dictionary")
+
         @Suppress("UNCHECKED_CAST")
         val rootMap = root as Map<String, Any?>
         val rootObject = rootMap["rootObject"]?.toString() ?: error("pbxproj missing rootObject")
         val archiveVersion = rootMap["archiveVersion"]?.toString() ?: "1"
         val objectVersion = rootMap["objectVersion"]?.toString() ?: "56"
+
         @Suppress("UNCHECKED_CAST")
         val objectsRaw = (rootMap["objects"] as? Map<String, Any?>) ?: emptyMap()
         val objects = mutableMapOf<String, PbxObject>()
@@ -47,6 +49,7 @@ internal class PbxprojParser(private val text: String) {
                     name = value["name"]?.toString() ?: "",
                     baseConfigurationReference = value["baseConfigurationReference"]?.toString(),
                 )
+
                 "PBXFileReference" -> PbxObject.PBXFileReference(
                     id = id,
                     raw = mutable,
@@ -54,6 +57,7 @@ internal class PbxprojParser(private val text: String) {
                     path = value["path"]?.toString(),
                     sourceTree = value["sourceTree"]?.toString(),
                 )
+
                 "PBXGroup" -> PbxObject.PBXGroup(
                     id = id,
                     raw = mutable,
@@ -63,6 +67,7 @@ internal class PbxprojParser(private val text: String) {
                     name = value["name"]?.toString(),
                     path = value["path"]?.toString(),
                 )
+
                 else -> PbxObject.Raw(id, mutable, annotation, isa)
             }
             objects[id] = obj
@@ -100,7 +105,10 @@ internal class PbxprojParser(private val text: String) {
         while (true) {
             skipWhitespaceAndComments()
             if (pos >= len) error("unexpected EOF in dictionary")
-            if (text[pos] == '}') { pos++; break }
+            if (text[pos] == '}') {
+                pos++
+                break
+            }
             val key = parseValue()?.toString() ?: error("expected key at $pos")
             skipWhitespaceAndComments()
             expect('=')
@@ -118,7 +126,10 @@ internal class PbxprojParser(private val text: String) {
         while (true) {
             skipWhitespaceAndComments()
             if (pos >= len) error("unexpected EOF in array")
-            if (text[pos] == ')') { pos++; break }
+            if (text[pos] == ')') {
+                pos++
+                break
+            }
             val value = parseValue()
             result += value
             skipWhitespaceAndComments()
@@ -138,7 +149,10 @@ internal class PbxprojParser(private val text: String) {
                 pos++
                 continue
             }
-            if (c == '"') { pos++; return sb.toString() }
+            if (c == '"') {
+                pos++
+                return sb.toString()
+            }
             sb.append(c)
             pos++
         }
@@ -162,12 +176,14 @@ internal class PbxprojParser(private val text: String) {
             val c = text[pos]
             when {
                 c.isWhitespace() -> pos++
+
                 c == '/' && pos + 1 < len && text[pos + 1] == '*' -> {
                     // block comment
                     pos += 2
                     while (pos + 1 < len && !(text[pos] == '*' && text[pos + 1] == '/')) pos++
                     pos += 2
                 }
+
                 else -> return
             }
         }

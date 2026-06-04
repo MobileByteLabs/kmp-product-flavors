@@ -33,11 +33,13 @@ internal object DesktopFlavorIntegrator {
         val appDisplayName = project.rootProject.name
 
         var count = 0
-        for (flavor in flavors) for (buildType in buildTypes) {
-            val spec = DesktopFlavorSpec.from(flavor, buildType, appDisplayName, iconDir)
-            registerVariantTask(project, spec, logger)
-            injectManifestEntries(project, spec, logger)
-            count++
+        for (flavor in flavors) {
+            for (buildType in buildTypes) {
+                val spec = DesktopFlavorSpec.from(flavor, buildType, appDisplayName, iconDir)
+                registerVariantTask(project, spec, logger)
+                injectManifestEntries(project, spec, logger)
+                count++
+            }
         }
         logger.lifecycle("[KMP Flavors] DesktopFlavorIntegrator registered $count variants")
         return count
@@ -47,19 +49,22 @@ internal object DesktopFlavorIntegrator {
         val cap = spec.variantName.replaceFirstChar { it.uppercase() }
         val taskName = "packageReleaseDmg$cap"
         if (project.tasks.findByName(taskName) != null) return
-        project.tasks.register(taskName, object : Action<Task> {
-            override fun execute(task: Task) {
-                task.group = "kmp flavors desktop"
-                task.description = "Package release distribution for ${spec.variantName}"
-                task.doFirst(object : Action<Task> {
-                    override fun execute(t: Task) {
-                        logger.lifecycle(
-                            "[KMP Flavors] desktop variant ${spec.variantName} packageName=${spec.packageName}"
-                        )
-                    }
-                })
-            }
-        })
+        project.tasks.register(
+            taskName,
+            object : Action<Task> {
+                override fun execute(task: Task) {
+                    task.group = "kmp flavors desktop"
+                    task.description = "Package release distribution for ${spec.variantName}"
+                    task.doFirst(object : Action<Task> {
+                        override fun execute(t: Task) {
+                            logger.lifecycle(
+                                "[KMP Flavors] desktop variant ${spec.variantName} packageName=${spec.packageName}",
+                            )
+                        }
+                    })
+                }
+            },
+        )
     }
 
     /** Phase 6 audit gap-fix — inject JAR Manifest entries consumed by RuntimeDesktopActualTemplate. */

@@ -31,10 +31,12 @@ internal object WebFlavorIntegrator {
         for (targetType in listOf("js", "wasm")) {
             val overlayDir = project.layout.buildDirectory
                 .dir("$targetType/packages/$module-webpack.config.d").get().asFile
-            for (flavor in flavors) for (buildType in buildTypes) {
-                val spec = WebFlavorSpec.from(flavor, buildType, appDisplayName, bundleIdBase, iconDir)
-                writeOverlay(overlayDir, spec, logger)
-                count++
+            for (flavor in flavors) {
+                for (buildType in buildTypes) {
+                    val spec = WebFlavorSpec.from(flavor, buildType, appDisplayName, bundleIdBase, iconDir)
+                    writeOverlay(overlayDir, spec, logger)
+                    count++
+                }
             }
         }
         logger.lifecycle("[KMP Flavors] WebFlavorIntegrator wrote $count overlay files")

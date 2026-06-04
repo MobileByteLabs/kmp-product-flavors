@@ -35,7 +35,7 @@ abstract class KmpFlavorsDoctorTask : DefaultTask() {
 
         // Sample: light-weight checks for phase wirings
         val hasAgp = project.plugins.hasPlugin("com.android.application") ||
-                project.plugins.hasPlugin("com.android.library")
+            project.plugins.hasPlugin("com.android.library")
         val hasKmp = project.plugins.hasPlugin("org.jetbrains.kotlin.multiplatform")
         val hasCompose = project.plugins.hasPlugin("org.jetbrains.compose")
 
@@ -74,13 +74,16 @@ abstract class KmpFlavorsDoctorTask : DefaultTask() {
         jsonFile.parentFile.mkdirs()
         jsonFile.writeText(DoctorReportFormatter.toJson(report))
 
-        val text = if (jsonMode) DoctorReportFormatter.toJson(report)
-        else DoctorReportFormatter.toHuman(report)
+        val text = if (jsonMode) {
+            DoctorReportFormatter.toJson(report)
+        } else {
+            DoctorReportFormatter.toHuman(report)
+        }
         println(text)
 
         if (report.errors.isNotEmpty()) {
             throw org.gradle.api.GradleException(
-                "kmp-flavors Doctor: ${report.errors.size} errors. See $jsonFile"
+                "kmp-flavors Doctor: ${report.errors.size} errors. See $jsonFile",
             )
         }
     }

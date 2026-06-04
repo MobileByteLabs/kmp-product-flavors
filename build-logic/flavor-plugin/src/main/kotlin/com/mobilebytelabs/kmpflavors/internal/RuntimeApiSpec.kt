@@ -13,16 +13,9 @@ import com.mobilebytelabs.kmpflavors.FlavorConfig
  * Note: the emitted source files are VARIANT-AGNOSTIC at codegen time — they read
  * platform-native sources at compile/runtime to get the per-variant values.
  */
-internal data class RuntimeApiSpec(
-    val packageName: String,
-)
+internal data class RuntimeApiSpec(val packageName: String)
 
-internal data class RuntimeVariantHint(
-    val flavorName: String,
-    val buildTypeName: String,
-    val isDemo: Boolean,
-    val isDebug: Boolean,
-) {
+internal data class RuntimeVariantHint(val flavorName: String, val buildTypeName: String, val isDemo: Boolean, val isDebug: Boolean) {
     companion object {
         fun from(flavor: FlavorConfig, buildType: BuildTypeConfig): RuntimeVariantHint {
             val isDemoField =

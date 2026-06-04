@@ -40,8 +40,10 @@ internal object AgpReflectiveSetters {
         runCatching {
             val setter = target.javaClass.methods.firstOrNull {
                 it.name == "set$cap" && it.parameterCount == 1 &&
-                    (value == null || it.parameterTypes[0].isAssignableFrom(value.javaClass) ||
-                        it.parameterTypes[0].isPrimitive)
+                    (
+                        value == null || it.parameterTypes[0].isAssignableFrom(value.javaClass) ||
+                            it.parameterTypes[0].isPrimitive
+                        )
             }
             if (setter != null) {
                 setter.invoke(target, value)

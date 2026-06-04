@@ -23,13 +23,8 @@ internal sealed class PbxObject {
         var baseConfigurationReference: String?,
     ) : PbxObject()
 
-    data class PBXFileReference(
-        override val id: String,
-        override val raw: MutableMap<String, Any>,
-        override val annotation: String?,
-        val path: String?,
-        val sourceTree: String?,
-    ) : PbxObject()
+    data class PBXFileReference(override val id: String, override val raw: MutableMap<String, Any>, override val annotation: String?, val path: String?, val sourceTree: String?) :
+        PbxObject()
 
     data class PBXGroup(
         override val id: String,
@@ -40,10 +35,5 @@ internal sealed class PbxObject {
         val path: String?,
     ) : PbxObject()
 
-    data class Raw(
-        override val id: String,
-        override val raw: MutableMap<String, Any>,
-        override val annotation: String?,
-        val isa: String,
-    ) : PbxObject()
+    data class Raw(override val id: String, override val raw: MutableMap<String, Any>, override val annotation: String?, val isa: String) : PbxObject()
 }

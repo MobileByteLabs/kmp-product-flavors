@@ -9,7 +9,7 @@ package com.mobilebytelabs.kmpflavors.internal
  * Phase 7 — typed model of per-flavor + per-(target × flavor) source set graph.
  */
 internal data class SourceSetHierarchy(
-    val flavorSourceSets: List<String>,            // "demoMain", "prodMain"
+    val flavorSourceSets: List<String>, // "demoMain", "prodMain"
     val perTargetPerFlavor: Map<Pair<String, String>, String>, // (target, flavor) -> "androidDemoMain"
     val dependsOnEdges: List<Pair<String, String>>, // (child, parent)
 ) {
