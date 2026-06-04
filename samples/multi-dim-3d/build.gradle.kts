@@ -20,7 +20,6 @@
  *
  * Documentation:
  *   docs/MULTI_DIM_GUIDE.md — variant-filter discipline, combinatorial-cost guidance
- *   docs/MIGRATION_v2.4_TO_v2.5.md — opt-in cookbook (opens with "You do not need to migrate.")
  */
 
 plugins {

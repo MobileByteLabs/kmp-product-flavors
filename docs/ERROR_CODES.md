@@ -213,7 +213,7 @@ To grep CI output for a specific code:
 | **Severity** | ERROR |
 | **Since** | v2.5.0 (Phase 4 — v1.x shim removal; cannot ship before 2026-11-14 per RFC §3 Q15 deprecation contract) |
 | **Message** | `kmpFlavors.activeFlavor` was the v1.x DSL surface. The 6-month deprecation window from v2.0 GA (2026-05-14) expired on 2026-11-14; the shim has been removed. |
-| **Fix** | Migrate to the v2.x DSL: `kmpFlavors { flavors { register("free") { isDefault.set(true) } } }`. See `docs/MIGRATION_v1_to_v2.md`. |
+| **Fix** | Use the v2.x DSL: `kmpFlavors { flavors { register("free") { isDefault.set(true) } } }`. See [`REFERENCE.md`](REFERENCE.md). |
 | **When fires** | Reserved for v2.5.0. The constant is registered in v2.4.0 so consumers can grep for KMPF-V21 references early. The actual runtime emission happens after the v1.x shim is removed; on v2.4.x, this code is never emitted. |
 
 ---
@@ -249,7 +249,7 @@ To grep CI output for a specific code:
 | **Severity** | ERROR |
 | **Since** | v2.5.0 (Phase 1 — multi-dim DSL ergonomic sugar + AGP cross-product bridge) |
 | **Message** | `kmpFlavors {}` cannot mix the v2.5 `dimensions { }` sugar with the legacy `flavorDimensions { } + flavors { }` blocks. Pick one style per project: either `dimensions { dimension("tier") { flavor("free") } }` OR `flavorDimensions { register("tier") } + flavors { register("free") { dimension.set("tier") } }`. |
-| **Fix** | Pick one DSL style per project. See [`docs/MIGRATION_v2.4_TO_v2.5.md`](MIGRATION_v2.4_TO_v2.5.md) (opens with "You do not need to migrate." — flat DSL is fully supported in v2.5+) for the migration cookbook. |
+| **Fix** | Pick one DSL style per project. See [`REFERENCE.md`](REFERENCE.md) for the canonical `dimensions { … }` shape. |
 | **When fires** | At plugin-apply time. The validator's `validate()` function receives `dimensionsDslUsed` + `legacyFlatDslUsed` flags wired from `KmpFlavorExtension`; when both are true, V24 fires. Strict-additive contract preserved — v2.4 consumers using only the flat DSL never see V24. |
 
 ---

@@ -211,8 +211,8 @@ internal object KmpFlavorPluginValidator {
                     "legacy `flavorDimensions { } + flavors { }` blocks. Pick one style per " +
                     "project: either `dimensions { dimension(\"tier\") { flavor(\"free\") } }` " +
                     "OR `flavorDimensions { register(\"tier\") } + flavors { register(\"free\") { dimension.set(\"tier\") } }`.",
-                fix = "See docs/MIGRATION_v2.4_TO_v2.5.md for the migration cookbook (opens with " +
-                    "\"You do not need to migrate.\" — flat DSL is fully supported in v2.5+).",
+                fix = "Pick one DSL style. See `docs/REFERENCE.md` (kmpFlavors {} block) or " +
+                    "`docs/PRODUCT_FLAVORS.md` for the canonical dimensions/flavors shape.",
             )
         }
 

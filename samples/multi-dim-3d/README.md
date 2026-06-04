@@ -46,6 +46,5 @@ Final buildable variants (6):
 ## See also
 
 - `docs/MULTI_DIM_GUIDE.md` — variant-filter discipline + combinatorial-cost guidance for arbitrary-N dimensions (authored in Phase 4 of the v2.5 epic)
-- `docs/MIGRATION_v2.4_TO_v2.5.md` — voluntary migration cookbook (opens with **"You do not need to migrate."** — the v2.4 flat DSL is fully supported in v2.5+)
 - `samples/matrix-mode/` — 2-dimension (flavors × buildTypes) reference using the v2.4 flat DSL
 - `samples/multi-target-multi-variant/` — target rotation reference (12 KMP targets × 9 variants = 108 compilations)

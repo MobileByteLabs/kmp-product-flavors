@@ -302,7 +302,7 @@ abstract val activeFlavor: Property<String>
 
 **Status**: Workaround / CMP-API-WAITING. **Deprecation cutoff**: 2026-11-14 per RFC §3 Q15. After that date the v1.x compat shim is removed and assigning `activeFlavor.set(...)` triggers `KMPF-V21` ERROR + `GradleException`.
 
-The v1.x DSL — set the active variant by name. Replaced in v2.x by `register("name") { isDefault.set(true) }` inside `flavors { … }`. See [`MIGRATION_v1_to_v2.md`](MIGRATION_v1_to_v2.md) for the migration path.
+The v1.x DSL — set the active variant by name. Replaced in v2.x by `register("name") { isDefault.set(true) }` inside `flavors { … }`.
 
 For active-variant override at the CLI, use `-PkmpFlavor=<variant>` instead — that path is Stable and survives the cutoff.
 
@@ -523,4 +523,3 @@ Quick reference; full catalogue + fix steps in [`ERROR_CODES.md`](ERROR_CODES.md
 - [`COMPOSE_HOT_RELOAD.md`](COMPOSE_HOT_RELOAD.md) — Compose Multiplatform hot-reload.
 - [`ERROR_CODES.md`](ERROR_CODES.md) — full KMPF-Vxx catalogue.
 - [`RELEASE.md`](RELEASE.md) — release flow + cascade reference.
-- [`MIGRATION_v1_to_v2.md`](MIGRATION_v1_to_v2.md) — v1.x → v2.x migration.

@@ -437,7 +437,7 @@ Each case: integration test in W1.
 
 ### Q26 — Migration tooling — codemod for v1.x → v2.0 consumers (NEW)
 
-- A: Just `MIGRATION_v1_to_v2.md` — manual upgrade.
+- A: Manual upgrade — switch from v1.x flat DSL to v2.x `register("name") { isDefault.set(true) }`.
 - B: `./gradlew kmpFlavorsMigrateToV2 --dry-run` task printing the exact consumer diff.
 - C: A separate `migrate-kmp-flavors-v2.sh` script in `scripts/`.
 - **Provisional answer**: **B + A**. Code-driven migration check (B) catches long-tail issues; doc (A) covers conceptual changes.
@@ -490,7 +490,7 @@ Code volume estimate: ~2000 LoC. Coverage acceptance: ≥85% of plugin source by
 
 | Doc | Path | Format | Status |
 |---|---|---|---|
-| Migration guide v1→v2 | `docs/MIGRATION_v1_to_v2.md` | Markdown + concrete diff blocks | New |
+| Migration guide v1→v2 | retired in v2.8 — single-version doc set | Markdown + concrete diff blocks | Historical |
 | Matrix Mode reference | `docs/MATRIX_MODE.md` | Markdown + screenshots (Q9) + DSL examples | New |
 | Error codes catalog | `docs/ERROR_CODES.md` | `KMPF-Vxx` → message → fix | New |
 | Adjacent-plugin compat | embedded in `docs/MATRIX_MODE.md` | Compatibility table | New |
@@ -597,7 +597,7 @@ W1 → core plugin + integration tests
 | W3 | JS + WasmJs + iOS target support; build-time benchmarks (Q8); telemetry surfaces (Q13) incl. `--scan` integration; aggregate tasks (Q18); variant API (Q19); variant filter (Q20) | `2.0.0-alpha.3` mavenLocal | W2 generator design locked | tbd |
 | W4 | Sample expansion — new `samples/matrix-mode/`; verify in `samples/kmp-project-template`; per-variant publishing mechanism (Q21); adjacent-plugin compat verifications (Q24) | `2.0.0-beta.1` published to Maven Central | W3 API surface frozen | tbd |
 | W5 | Compat shim (Q5 / Q16) — `buildMatrix.set(true)` opt-in API; migration codemod (Q26); IDE screenshots (Q9); error code catalog (Q23 `docs/ERROR_CODES.md`); ADRs for top-3 design Qs | `2.0.0-beta.2` | W4 publishing mechanism stable | tbd |
-| W6 | Bug fixes from canary; final docs (README "Matrix mode" section, `MATRIX_MODE.md`, `MIGRATION_v1_to_v2.md`); CI updates (G20) | `2.0.0` GA | W5 doc complete + canary green | tbd |
+| W6 | Bug fixes from canary; final docs (README "Matrix mode" section, `MATRIX_MODE.md`); CI updates (G20) | `2.0.0` GA | W5 doc complete + canary green | historical |
 
 ### Release cadence — gate criteria
 
@@ -663,7 +663,7 @@ W1 → core plugin + integration tests
 - [ ] Matrix build time ≤2× single-variant build time (Q8) — measured in CI.
 - [ ] Telemetry surfaces in place (Q13).
 - [ ] `kmpFlavors variants` task group populated (Q9).
-- [ ] `MIGRATION_v1_to_v2.md` documents the upgrade path.
+- [x] v1→v2 upgrade documented (collapsed into single-version doc set in v2.8).
 - [ ] README has a "Matrix mode" section with at least one screenshot of IDE integration.
 - [ ] `KmpFlavorPlugin.apply()` fails fast on unsupported KGP / AGP / Gradle versions (Q14).
 - [ ] Compat matrix published in README and CHANGELOG.

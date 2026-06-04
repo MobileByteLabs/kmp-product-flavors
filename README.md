@@ -1,6 +1,7 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/Kotlin-2.2+-7F52FF?logo=kotlin&logoColor=white" alt="Kotlin">
-  <img src="https://img.shields.io/badge/Gradle-8.0+-02303A?logo=gradle&logoColor=white" alt="Gradle">
+  <img src="https://img.shields.io/badge/Kotlin-2.3.21+-7F52FF?logo=kotlin&logoColor=white" alt="Kotlin">
+  <img src="https://img.shields.io/badge/Gradle-9.5.1+-02303A?logo=gradle&logoColor=white" alt="Gradle">
+  <img src="https://img.shields.io/badge/AGP-9.2.1+-3DDC84?logo=android&logoColor=white" alt="AGP">
 </p>
 
 # KMP Product Flavors
@@ -19,7 +20,6 @@ A Gradle plugin that brings Android-style product flavors to **every Kotlin Mult
   <a href="docs/QUICKSTART.md">Quickstart</a> •
   <a href="docs/README.md">Docs</a> •
   <a href="docs/REFERENCE.md">Reference</a> •
-  <a href="docs/MIGRATION_v1_to_v2.md">Migration</a> •
   <a href="#samples">Samples</a>
 </p>
 
@@ -30,7 +30,7 @@ A Gradle plugin that brings Android-style product flavors to **every Kotlin Mult
 ```kotlin
 plugins {
     kotlin("multiplatform")
-    id("io.github.mobilebytelabs.kmp-product-flavors") version "2.5.0-alpha.1"
+    id("io.github.mobilebytelabs.kmp-product-flavors") version "2.8.0"
 }
 
 kmpFlavors {
@@ -45,33 +45,7 @@ kmpFlavors {
 }
 ```
 
-> **v2.7 highlights** — AGP **9.2.1** matrix-CI certification (matrix-tested against
-> 8.2.2 / 8.5.2 / 8.10.0 / 9.2.1) + Kotlin **2.3.21** build alignment + line-coverage
-> gate ramp (25 → **100**, empirical **100.00%** from +423 tests across +47 classes) +
-> **704 tests across 92 test classes** (was 281 / 45 at v2.6 GA) +
-> `docs/AGP_9_MIGRATION_NOTES.md` consumer cookbook +
-> `docs/COVERAGE_DEEP_DIVE.md` contributor playbook.
-> **v2.7 does not raise the v2.4 version floor** (Gradle 8.0+ / KGP 2.0.21+ / AGP 8.2+ /
-> JDK 17+ / CMP 1.7.0+ — UNCHANGED across v2.4 → v2.5 → v2.6 → v2.7).
-> See [`docs/COMPATIBILITY_MATRIX.md`](docs/COMPATIBILITY_MATRIX.md)
-> + [`docs/MIGRATION_v2.6_TO_v2.7.md`](docs/MIGRATION_v2.6_TO_v2.7.md) (opens with
-> "You do not need to migrate.")
-> + **NEW**: [`docs/adoption/v2.7/consumer.md`](docs/adoption/v2.7/consumer.md) —
-> AI-executable end-to-end adoption gate (paste into Claude/Cursor → run the 10
-> `✅ Verify` blocks → confirm 100% adoption with no missing pieces).
->
-> **v2.6 highlights (preserved)** — coverage gate (PR check via `koverVerify`) + AGP matrix CI
-> + **KMP↔AGP variantFilter parity** via reflective `beforeVariants` + 4 beyond-platform
-> capabilities: per-variant **Koin DI module** selection (`di { koin { variantModule() } }`),
-> cross-platform **analytics tags** (`analytics { customTag() }`), conditional
-> **KMP target sets** per variant (`variantFilter { excludeTargets() }`), and
-> variant-aware **Ktor base URL** constants (`buildKonfig { network { baseUrl() } }`).
->
-> **v2.5 highlights (preserved)** — `dimensions { dimension("tier") { flavor("free") } }`
-> ergonomic DSL, expanded sample/CI coverage for 9 KMP targets, and
-> `buildKonfig { secret(); enum(); customField(); perTarget {} }` codegen.
-
-That's a 4-variant matrix (`freeDebug`, `freeRelease`, `paidDebug`, `paidRelease`) on every KMP target you declare. Source-set conventions are `src/commonFree/kotlin/`, `src/commonPaid/kotlin/`, etc. Switch active variant via `-PkmpFlavor=paidRelease`.
+`kmpFlavors {}` is the SINGLE API consumers ever use to declare product flavors across every KMP target — build-time AND runtime AND resources. Apply the plugin, declare flavors, ship.
 
 Full walkthrough: **[`docs/QUICKSTART.md`](docs/QUICKSTART.md)** (5 minutes).
 
@@ -79,12 +53,13 @@ Full walkthrough: **[`docs/QUICKSTART.md`](docs/QUICKSTART.md)** (5 minutes).
 
 - **Multi-dimensional flavors** with automatic 2^n variant matrix and per-flavor `BuildKonfig` codegen.
 - **Matrix mode** (`buildMatrix.set(true)`) — compile every variant × every target in one Gradle invocation.
+- **Runtime API** — `KmpFlavorsRuntime` `expect` + 5 actuals (Android / iOS / Desktop / JS / WasmJs) reading from platform-native sources (BuildConfig / NSBundle / JAR Manifest / DefinePlugin externals).
+- **Per-platform routers** — AGP Firebase + Android res + Compose Resources + iOS Firebase + iOS xcconfig + Desktop nativeDistributions + Webpack overlay + DefinePlugin.
+- **iOS zero-setup** — `:kmpFlavorsBootstrapXcode` seeds `pbxproj` configurations + `xcconfig` includes + `Info.plist` keys idempotently.
 - **Per-variant publishing** to Maven Central (JVM classifier-tagged), iOS XCFramework, SPM, npm, Sonatype Snapshots.
-- **Adjacent-plugin helpers** — Detekt-per-variant, Spotless-exclusion, dependency-guard baselines, Compose hot-reload variant switching.
-- **AGP bridge** — `kmpFlavors.flavors` forwards into Android's `productFlavors { … }` block automatically.
-- **Auto-detection** — `autoEnable=true` (default) flips matrix mode + adjacent helpers on when the shape is detected; opt out via `kmpFlavors.autoEnable.set(false)`.
-- **Structured validator** — `KMPF-V01` … `KMPF-V22` codes catch misconfigurations at apply time; full catalogue in [`docs/ERROR_CODES.md`](docs/ERROR_CODES.md).
-- **API stability buckets** — Stable / `@KmpFlavorsExperimental` / `CMP-API-WAITING`. Stable surfaces are locked for the 2.x cycle; full reference in [`docs/REFERENCE.md`](docs/REFERENCE.md).
+- **AGP bridge** — `kmpFlavors.flavors` forwards into Android's `productFlavors { … }` block automatically via reflective AGP 9 dispatch.
+- **Auto-detection** — `autoEnable=true` (default) flips matrix mode + adjacent helpers on when the shape is detected.
+- **Structured validator** — `KMPF-V01` … `KMPF-V53` codes catch misconfigurations at apply time; full catalogue in [`docs/ERROR_CODES.md`](docs/ERROR_CODES.md). Run `:kmpFlavorsDoctor` for the per-project report.
 - **IDE plugin** — [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31779-kmp-product-flavors) gives project-view decoration, status-bar variant switcher, and Gradle-tool-window task grouping.
 
 ## Documentation
@@ -94,11 +69,12 @@ Curated index: **[`docs/README.md`](docs/README.md)**. Most-visited:
 | Doc | Topic |
 |---|---|
 | [`docs/QUICKSTART.md`](docs/QUICKSTART.md) | 5-min onboarding |
-| [`docs/REFERENCE.md`](docs/REFERENCE.md) | Full DSL with stability buckets |
+| [`docs/REFERENCE.md`](docs/REFERENCE.md) | Full `kmpFlavors {}` DSL reference |
 | [`docs/MATRIX_MODE.md`](docs/MATRIX_MODE.md) | Per-variant compilation matrix |
 | [`docs/PUBLISHING.md`](docs/PUBLISHING.md) | Maven Central, XCFramework, SPM, npm, Snapshots |
 | [`docs/ERROR_CODES.md`](docs/ERROR_CODES.md) | `KMPF-V<NN>` catalogue |
-| [`docs/MIGRATION_v1_to_v2.md`](docs/MIGRATION_v1_to_v2.md) | v1.x → v2.x (critical pre-2026-11-14) |
+| [`docs/AGP_SUPPORT.md`](docs/AGP_SUPPORT.md) | AGP 9.2.1+ floor contract |
+| [`docs/LEARNINGS.md`](docs/LEARNINGS.md) | Locked architectural learnings L1–L6 |
 | [`CHANGELOG.md`](CHANGELOG.md) | What's new per release |
 
 ## Samples
@@ -112,19 +88,17 @@ Curated index: **[`docs/README.md`](docs/README.md)**. Most-visited:
 | [`samples/matrix-mode/`](samples/matrix-mode/) | Every matrix-mode consumer surface exercised end-to-end. |
 | [`samples/multi-target-multi-variant/`](samples/multi-target-multi-variant/) | 3 flavors × 3 buildTypes × 6 targets = 54-compilation stress test. |
 
-## Compatibility
-
-| `kmp-product-flavors` | Kotlin | Compose Multiplatform | AGP (Android consumers) | Gradle | JDK |
-|---|---|---|---|---|---|
-| `2.4.x` | `2.0.21`+ (built against `2.2.21`) | `1.7`+ (samples on `1.9.x`) | `8.0`+ (built against `8.7.x`) | `8.0`+ | `17`+ |
-
-The plugin tests its full KGP × CMP × Gradle matrix nightly. Combinations outside the tested matrix may work but are not actively verified. See [`docs/REFERENCE.md` → "Compatibility windows"](docs/REFERENCE.md) for the per-property version-introduced trail.
-
 ## Requirements
 
-- Kotlin Multiplatform plugin applied
-- JDK 17+
-- One of: Maven Central, Gradle Plugin Portal, or Sonatype Snapshots in `pluginManagement.repositories`
+| Tool | v2.8.0+ floor |
+|---|---|
+| Android Gradle Plugin | **9.2.1+** |
+| Gradle wrapper | **9.5.1+** |
+| Kotlin | **2.3.21+** |
+| Compose Multiplatform | **1.10.3+** |
+| JVM toolchain | **17+** |
+
+Kotlin Multiplatform plugin must be applied. Plugin coordinates available via Maven Central, Gradle Plugin Portal, or Sonatype Snapshots in `pluginManagement.repositories`.
 
 ## Contributing
 

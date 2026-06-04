@@ -85,7 +85,7 @@ variants — failure mode is "build looks broken; KMP and AGP disagree".
 | AGP version    | Status                                                 |
 |----------------|--------------------------------------------------------|
 | ≥ 8.0          | Full parity (`beforeVariants` + `setEnabled` stable)   |
-| 7.0 – 7.4      | Untested — plugin floor is 8.0 per COMPATIBILITY_MATRIX |
+| 7.0 – 7.4      | Unsupported — plugin floor is AGP 9.2.1 (see [`AGP_SUPPORT.md`](AGP_SUPPORT.md)) |
 | < 7.0          | `beforeVariants` not available → bridge logs WARN, no-op |
 
 The bridge uses reflection (`Class.getMethods` lookup) for both

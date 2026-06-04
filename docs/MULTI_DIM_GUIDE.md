@@ -191,7 +191,7 @@ For consumer projects, the CI cost rule of thumb:
   (`propagateFlavorsCrossProduct` for ≥2-dim configs)
 - **Validator codes for multi-dim issues:** `KMPF-V02`, `KMPF-V03`, `KMPF-V04`,
   `KMPF-V24`, `KMPF-V25` — see [`ERROR_CODES.md`](ERROR_CODES.md)
-- **Migration:** [`MIGRATION_v2.4_TO_v2.5.md`](MIGRATION_v2.4_TO_v2.5.md)
+
   (opens with "You do not need to migrate.")
 - **BuildKonfig DSL** (when runtime values are the right tool):
   [`SECRETS_INTEGRATION.md`](SECRETS_INTEGRATION.md)

@@ -17,11 +17,25 @@ Curated entry point. Find the right doc per topic instead of crawling the full `
 | [`PUBLISHING.md`](PUBLISHING.md) | Per-variant publishing — Maven Central, classifier-tagged artefacts, XCFramework, SPM, npm, Sonatype Snapshots channel. |
 | [`PRODUCT_FLAVORS.md`](PRODUCT_FLAVORS.md) | Flavor + flavor-dimension semantics. |
 | [`BUILD_VARIANTS.md`](BUILD_VARIANTS.md) | Build-type axis + variant resolution. |
+| [`MULTI_DIM_GUIDE.md`](MULTI_DIM_GUIDE.md) | Multi-dimensional flavor authoring + 2^n variant matrix. |
 | [`VARIANT_FILTERS.md`](VARIANT_FILTERS.md) | `variantFilter { … }` DSL — AGP-shaped filtering. |
 | [`VARIANT_DEPENDENCY_EXCLUDES.md`](VARIANT_DEPENDENCY_EXCLUDES.md) | Variant-conditional `dependencies { exclude(...) }`. |
 | [`COMPOSE_HOT_RELOAD.md`](COMPOSE_HOT_RELOAD.md) | Per-variant Compose hot-reload (Option A shipped; Option B-workaround via `switchVariantAndReload`). |
+| [`CONDITIONAL_TARGETS.md`](CONDITIONAL_TARGETS.md) | Conditional KMP target sets per variant via `variantFilter { excludeTargets() }`. |
 | [`IOS_DISTRIBUTION.md`](IOS_DISTRIBUTION.md) | iOS framework distribution patterns. |
+| [`SUPPORTED_TARGETS.md`](SUPPORTED_TARGETS.md) | Per-target coverage matrix. |
+| [`SOURCE_SET_DISCIPLINE.md`](SOURCE_SET_DISCIPLINE.md) | Single-axis `{F}Main` source set model + KGP rationale. |
+| [`KMP_AGP_PARITY.md`](KMP_AGP_PARITY.md) | KMP↔AGP variantFilter parity contract. |
 | [`KMP_PROJECT_TEMPLATE_INTEGRATION.md`](KMP_PROJECT_TEMPLATE_INTEGRATION.md) | Integration guide for `openMF/kmp-project-template` adopters. |
+
+## Integration guides
+
+| Doc | What it covers |
+|---|---|
+| [`ANALYTICS_INTEGRATION.md`](ANALYTICS_INTEGRATION.md) | `analytics { customTag() }` per-variant tags. |
+| [`DI_INTEGRATION.md`](DI_INTEGRATION.md) | `di { koin { variantModule() } }` per-variant Koin modules. |
+| [`NETWORK_CONFIG.md`](NETWORK_CONFIG.md) | `buildKonfig { network { baseUrl() } }` per-variant Ktor base URLs. |
+| [`SECRETS_INTEGRATION.md`](SECRETS_INTEGRATION.md) | Per-variant secrets via `buildKonfig { secret() }`. |
 
 ## Operational guides
 
@@ -30,27 +44,16 @@ Curated entry point. Find the right doc per topic instead of crawling the full `
 | [`RELEASE.md`](RELEASE.md) | End-to-end release cascade. SemVer-pre-release-aware bumping, pre-release flag auto-detection, cron auto-merge safety-net. |
 | [`ROLLBACK.md`](ROLLBACK.md) | Plugin version rollback procedure. |
 | [`ERROR_CODES.md`](ERROR_CODES.md) | Complete `KMPF-V<NN>` catalogue with severity + fix steps. |
-| [`v2.4-BETA-TESTING.md`](v2.4-BETA-TESTING.md) | One-page guide for piloting `2.4.0-beta` on a real consumer project. Required path to `v2.4.0` GA. |
-
-## Migration
-
-| Doc | What it covers |
-|---|---|
-| [`MIGRATION_v1_to_v2.md`](MIGRATION_v1_to_v2.md) | v1.x → v2.x migration. **Critical pre-2026-11-14**: v1.x compat shim removal expires after that date per RFC §3 Q15. |
-| [`MIGRATION_v2.0_to_v2.4.md`](MIGRATION_v2.0_to_v2.4.md) | Point-release diffs across the 2.x cycle. |
-| [`MIGRATION_v2.4_TO_v2.5.md`](MIGRATION_v2.4_TO_v2.5.md) | Multi-dim DSL + 9-target coverage + BuildKonfig expansion. |
-| [`MIGRATION_v2.5_TO_v2.6.md`](MIGRATION_v2.5_TO_v2.6.md) | KMP↔AGP variantFilter parity + stability tier reshuffle. |
-| [`MIGRATION_v2.6_TO_v2.7.md`](MIGRATION_v2.6_TO_v2.7.md) | AGP 9.2.1 support + 100% coverage. Opens with "You do not need to migrate." |
-| [`MIGRATION_v2.7_TO_v2.8.md`](MIGRATION_v2.7_TO_v2.8.md) | **AGP 9.2.1+ floor cut.** AGP 8.x consumers MUST migrate. Step-by-step + validator codes + rollback. |
+| [`COVERAGE_GUIDE.md`](COVERAGE_GUIDE.md) | Kover line-coverage gate operating manual. |
+| [`COVERAGE_DEEP_DIVE.md`](COVERAGE_DEEP_DIVE.md) | Tier E sealed exclusion list rationale (contributor playbook). |
 
 ## Design context
 
 | Doc | What it covers |
 |---|---|
 | [`RFC-v2.0-per-variant-compilation.md`](RFC-v2.0-per-variant-compilation.md) | v2.0 RFC — per-variant Kotlin compilation matrix design. |
-| [`AGP_SUPPORT.md`](AGP_SUPPORT.md) | AGP 9.2.1+ floor contract. Rationale, version table, retired `agp-matrix-compat.yml` workflow. |
-| [`LEARNINGS.md`](LEARNINGS.md) | Execution-discovered locked contracts L1–L5 — AGP propagation timing / reflective setter contract / RuntimeApi codegen-host election / KGP single-axis source set / reflection-safe Android template. AGP 9 breaking-change index. |
-| [`AGP_9_MIGRATION_NOTES.md`](AGP_9_MIGRATION_NOTES.md) | Consumer-side AGP 9 cookbook — `CommonExtension` type-param drop, dataBinding deprecation, `com.android.kotlin.multiplatform.library` adoption, dependencyGuard workaround. |
+| [`AGP_SUPPORT.md`](AGP_SUPPORT.md) | AGP 9.2.1+ floor contract. Rationale + version table. |
+| [`LEARNINGS.md`](LEARNINGS.md) | Execution-discovered locked contracts L1–L6 — AGP propagation timing / reflective setter contract / RuntimeApi codegen-host election / KGP single-axis source set / reflection-safe Android template / Phase 6 ↔ Phase 7 wiring ordering. |
 
 ## Quick lookup
 
@@ -61,4 +64,4 @@ Curated entry point. Find the right doc per topic instead of crawling the full `
 - **…strip a dep from one variant only?** → [`VARIANT_DEPENDENCY_EXCLUDES.md`](VARIANT_DEPENDENCY_EXCLUDES.md)
 - **…understand a `KMPF-V…` warning?** → [`ERROR_CODES.md`](ERROR_CODES.md)
 - **…cut a v2.x.0 release?** → [`RELEASE.md`](RELEASE.md)
-- **…migrate from v1.x?** → [`MIGRATION_v1_to_v2.md`](MIGRATION_v1_to_v2.md)
+- **…check why coverage dropped?** → [`COVERAGE_DEEP_DIVE.md`](COVERAGE_DEEP_DIVE.md)

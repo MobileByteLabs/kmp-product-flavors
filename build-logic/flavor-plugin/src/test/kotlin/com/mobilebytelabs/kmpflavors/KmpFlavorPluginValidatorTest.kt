@@ -462,7 +462,7 @@ class KmpFlavorPluginValidatorTest {
         assertEquals(KmpFlavorValidationSeverity.ERROR, v24!!.severity)
         assertTrue(v24.message.contains("dimensions"), "message must mention dimensions block")
         assertTrue(v24.message.contains("flavorDimensions"), "message must mention legacy flat DSL")
-        assertTrue(v24.fix.contains("MIGRATION_v2.4_TO_v2.5"), "fix must link to migration cookbook")
+        assertTrue(v24.fix.contains("REFERENCE.md") || v24.fix.contains("PRODUCT_FLAVORS.md"), "fix must point at DSL reference docs")
     }
 
     @Test

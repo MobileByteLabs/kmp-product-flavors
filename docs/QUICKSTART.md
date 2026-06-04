@@ -129,7 +129,6 @@ BuildKonfig.VARIANT_NAME  // "freeDebug" / "paidRelease" / etc.
 | Strip dep from one variant only | [`VARIANT_DEPENDENCY_EXCLUDES.md`](VARIANT_DEPENDENCY_EXCLUDES.md) — `variants.matching { … }.configureEach { dependencies { exclude(...) } }`. |
 | Run per-target Detekt | [`MATRIX_MODE.md` "detektPerVariant"](MATRIX_MODE.md). |
 | Switch variants without restart | [`COMPOSE_HOT_RELOAD.md`](COMPOSE_HOT_RELOAD.md) + `./gradlew switchVariantAndReload --to=<variant>`. |
-| Migrate from v1.x DSL | [`MIGRATION_v1_to_v2.md`](MIGRATION_v1_to_v2.md). |
 
 ---
 

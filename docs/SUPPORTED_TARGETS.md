@@ -110,7 +110,7 @@ The actual discovery on each target family is verified end-to-end via the
 | BuildKonfig | (pinned in `libs.versions.toml`) | |
 
 **No new floor required for v2.5.** v2.4 consumers can drop in v2.5 without any
-toolchain bump. See `docs/COMPATIBILITY_MATRIX.md` (authored in v2.5 Phase 4) for the full
+toolchain bump. See [`AGP_SUPPORT.md`](AGP_SUPPORT.md) for the v2.8 floor +
 explanation.
 
 ---
