@@ -13,6 +13,7 @@ import org.gradle.api.Action
 import org.gradle.api.Project
 import org.gradle.api.logging.Logger
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
+import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 
 /**
  * Phase dispatcher — composes per-platform integrators based on which
@@ -196,11 +197,42 @@ internal object FlavorPhaseDispatcher {
             .dir("generated/kmpflavors-runtime").get().asFile
         val spec = RuntimeApiSpec(packageName = packageName)
         val files = RuntimeApiGenerator.generate(spec, outDir)
-        // Wire generated source dirs into KMP source sets
+        // Wire generated source dirs into KMP source sets — canonical first.
         listOf("commonMain", "androidMain", "iosMain", "desktopMain", "jsMain", "wasmJsMain").forEach { ssName ->
             val ss = kmp.sourceSets.findByName(ssName) ?: return@forEach
             val srcDir = outDir.resolve(ssName)
             if (srcDir.exists()) ss.kotlin.srcDir(srcDir)
+        }
+        // Also replay platform-specific actual srcDirs into each per-variant
+        // compilation's defaultSourceSet. CompilationRegistrar.register runs
+        // at KMP-plugin-apply (via `plugins.withId`) and snapshots target
+        // main's srcDirs BEFORE this generator runs in afterEvaluate, so
+        // per-variant compilations miss the runtime API actuals without
+        // this second wiring pass. Without it, `compilePaidKotlinDesktop`
+        // sees the `expect KmpFlavorsRuntime` from commonMain but no
+        // `actual` from desktopMain.
+        // Mapping: target.name -> source set name (e.g., "desktop" -> "desktopMain",
+        // "iosX64" -> "iosMain" via apple intermediate fallback).
+        kmp.targets.forEach { target ->
+            val ssName = when {
+                target.name == "android" -> "androidMain"
+                target.name.startsWith("ios") -> "iosMain"
+                target.name == "js" -> "jsMain"
+                target.name == "wasmJs" -> "wasmJsMain"
+                target.platformType.name.lowercase() == "jvm" -> "${target.name}Main"
+                else -> return@forEach
+            }
+            val platformSrcDir = outDir.resolve(ssName)
+            if (!platformSrcDir.exists()) return@forEach
+            target.compilations
+                .matching { c ->
+                    c.name != KotlinCompilation.MAIN_COMPILATION_NAME &&
+                        c.name != KotlinCompilation.TEST_COMPILATION_NAME &&
+                        !c.name.endsWith("Test")
+                }
+                .configureEach {
+                    defaultSourceSet.kotlin.srcDir(platformSrcDir)
+                }
         }
         logger.lifecycle(
             "[KMP Flavors] ${project.path} generated ${files.size} runtime API files (package=$packageName)",
