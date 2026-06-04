@@ -77,21 +77,33 @@ internal object AgpBridge {
                 ?: return@runCatching false
             val finalizeDsl = componentsClass.methods.firstOrNull { it.name == "finalizeDsl" && it.parameterCount == 1 }
                 ?: return@runCatching false
-            // finalizeDsl(action: Action<CommonExtension<*,*,*,*,*,*>>) — pass a Java
-            // Action implementation that invokes our reflective propagators.
+            // AGP < 9: finalizeDsl(action: Action<CommonExtension<*,*,*,*,*,*>>)
+            // AGP 9.x: DslLifecycle.finalizeDsl(action: Function1<CommonExtension<...>, Unit>)
+            // The Proxy implements BOTH interfaces so the same instance dispatches
+            // for either signature. Method-name routing handles "execute" (Action)
+            // and "invoke" (Function1). See GOAL.md D42.
             val actionClass = Class.forName("org.gradle.api.Action")
+            val function1Class = Class.forName("kotlin.jvm.functions.Function1")
             val proxy = java.lang.reflect.Proxy.newProxyInstance(
                 actionClass.classLoader,
-                arrayOf(actionClass),
-            ) { _, _, args ->
-                val androidExt = args[0]
-                if (bridgeProductFlavors) {
-                    propagateFlavors(androidExt, kmpDimensions, kmpFlavors, logger)
+                arrayOf(actionClass, function1Class),
+            ) { proxyInstance, method, args ->
+                when (method.name) {
+                    "execute", "invoke" -> {
+                        val androidExt = args[0]
+                        if (bridgeProductFlavors) {
+                            propagateFlavors(androidExt, kmpDimensions, kmpFlavors, logger)
+                        }
+                        if (bridgeBuildTypes) {
+                            propagateBuildTypes(androidExt, kmpBuildTypes, logger)
+                        }
+                        null
+                    }
+                    "toString" -> "KmpFlavors.finalizeDsl"
+                    "hashCode" -> System.identityHashCode(proxyInstance)
+                    "equals" -> args[0] === proxyInstance
+                    else -> null
                 }
-                if (bridgeBuildTypes) {
-                    propagateBuildTypes(androidExt, kmpBuildTypes, logger)
-                }
-                null
             }
             finalizeDsl.invoke(components, proxy)
             // v2.6 Phase 2 — forward KMP-side variantFilter exclusions to AGP variants
@@ -159,32 +171,49 @@ internal object AgpBridge {
                 )
                 return@runCatching
             }
+            // AGP < 9: beforeVariants(action: Action<VariantBuilder>)
+            // AGP 9.x: beforeVariants(action: Function1<VariantBuilder, Unit>)
+            // Dual-interface proxy — same dispatch contract as the finalizeDsl proxy
+            // above. See GOAL.md D42.
             val actionClass = Class.forName("org.gradle.api.Action")
+            val function1Class = Class.forName("kotlin.jvm.functions.Function1")
             val proxy = java.lang.reflect.Proxy.newProxyInstance(
                 actionClass.classLoader,
-                arrayOf(actionClass),
-            ) { _, _, args ->
-                val variantBuilder = args[0]
-                val getName = variantBuilder.javaClass.methods.firstOrNull { it.name == "getName" }
-                val setEnabled = variantBuilder.javaClass.methods.firstOrNull {
-                    it.name == "setEnabled" && it.parameterCount == 1
-                }
-                val variantName = getName?.invoke(variantBuilder) as? String
-                if (variantName != null && variantName !in allowedVariantNames) {
-                    if (setEnabled != null) {
-                        setEnabled.invoke(variantBuilder, false)
-                        logger.lifecycle(
-                            "[KMP Flavors] Disabled AGP variant '$variantName' " +
-                                "(excluded by kmpFlavors.variantFilter).",
-                        )
-                    } else {
-                        logger.warn(
-                            "[KMP Flavors] KMP↔AGP parity: variant '$variantName' should be " +
-                                "disabled but setEnabled() setter missing on this AGP version.",
-                        )
+                arrayOf(actionClass, function1Class),
+            ) { proxyInstance, method, args ->
+                when (method.name) {
+                    "execute", "invoke" -> {
+                        val variantBuilder = args[0]
+                        val getName = variantBuilder.javaClass.methods.firstOrNull { it.name == "getName" }
+                        val variantName = getName?.invoke(variantBuilder) as? String
+                        if (variantName != null && variantName !in allowedVariantNames) {
+                            // AGP < 9: ComponentBuilder.setEnabled(boolean)
+                            // AGP 9.x: ComponentBuilder.enabled → .enable (Property<Boolean>).
+                            // AgpReflectiveSetters tries setEnabled then setEnable; on
+                            // AGP 9 the Property-of-T pattern routes via getter.set(false).
+                            // See GOAL.md D43.
+                            val applied = AgpReflectiveSetters.set(variantBuilder, "enabled", false) ||
+                                AgpReflectiveSetters.set(variantBuilder, "enable", false)
+                            if (applied) {
+                                logger.lifecycle(
+                                    "[KMP Flavors] Disabled AGP variant '$variantName' " +
+                                        "(excluded by kmpFlavors.variantFilter).",
+                                )
+                            } else {
+                                logger.warn(
+                                    "[KMP Flavors] KMP↔AGP parity: variant '$variantName' should be " +
+                                        "disabled but neither setEnabled() nor setEnable() resolved " +
+                                        "on this AGP version.",
+                                )
+                            }
+                        }
+                        null
                     }
+                    "toString" -> "KmpFlavors.variantFilter"
+                    "hashCode" -> System.identityHashCode(proxyInstance)
+                    "equals" -> args[0] === proxyInstance
+                    else -> null
                 }
-                null
             }
             // beforeVariants(selector = null, action = proxy) — null selector matches every variant.
             beforeVariants.invoke(components, null, proxy)
@@ -452,9 +481,9 @@ internal object AgpBridge {
         } ?: return
         val agpFlavor = maybeCreate.invoke(container, kmp.name) ?: return
 
-        kmp.dimension.orNull?.let { setProperty(agpFlavor, "setDimension", it) }
-        kmp.applicationIdSuffix.orNull?.let { setProperty(agpFlavor, "setApplicationIdSuffix", it) }
-        kmp.versionNameSuffix.orNull?.let { setProperty(agpFlavor, "setVersionNameSuffix", it) }
+        kmp.dimension.orNull?.let { AgpReflectiveSetters.set(agpFlavor, "dimension", it) }
+        kmp.applicationIdSuffix.orNull?.let { AgpReflectiveSetters.set(agpFlavor, "applicationIdSuffix", it) }
+        kmp.versionNameSuffix.orNull?.let { AgpReflectiveSetters.set(agpFlavor, "versionNameSuffix", it) }
 
         // matchingFallbacks: Gradle's getMatchingFallbacks() returns a mutable list — we
         // append to it so AGP defaults are preserved.
@@ -483,28 +512,8 @@ internal object AgpBridge {
         } ?: return
         val agpBuildType = maybeCreate.invoke(container, kmp.name) ?: return
 
-        kmp.isDebuggable.orNull?.let { setBooleanProperty(agpBuildType, "setDebuggable", it) }
-        kmp.isMinifyEnabled.orNull?.let { setBooleanProperty(agpBuildType, "setMinifyEnabled", it) }
-        kmp.applicationIdSuffix.orNull?.let { setProperty(agpBuildType, "setApplicationIdSuffix", it) }
-    }
-
-    private fun setProperty(target: Any, setter: String, value: String) {
-        runCatching {
-            val method = target.javaClass.methods.firstOrNull {
-                it.name == setter && it.parameterCount == 1 && it.parameterTypes[0] == String::class.java
-            }
-            method?.invoke(target, value)
-        }
-    }
-
-    private fun setBooleanProperty(target: Any, setter: String, value: Boolean) {
-        runCatching {
-            val method = target.javaClass.methods.firstOrNull {
-                it.name == setter &&
-                    it.parameterCount == 1 &&
-                    (it.parameterTypes[0] == java.lang.Boolean.TYPE || it.parameterTypes[0] == Boolean::class.javaObjectType)
-            }
-            method?.invoke(target, value)
-        }
+        kmp.isDebuggable.orNull?.let { AgpReflectiveSetters.set(agpBuildType, "debuggable", it) }
+        kmp.isMinifyEnabled.orNull?.let { AgpReflectiveSetters.set(agpBuildType, "minifyEnabled", it) }
+        kmp.applicationIdSuffix.orNull?.let { AgpReflectiveSetters.set(agpBuildType, "applicationIdSuffix", it) }
     }
 }

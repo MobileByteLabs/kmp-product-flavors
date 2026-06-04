@@ -38,12 +38,19 @@ Curated entry point. Find the right doc per topic instead of crawling the full `
 |---|---|
 | [`MIGRATION_v1_to_v2.md`](MIGRATION_v1_to_v2.md) | v1.x → v2.x migration. **Critical pre-2026-11-14**: v1.x compat shim removal expires after that date per RFC §3 Q15. |
 | [`MIGRATION_v2.0_to_v2.4.md`](MIGRATION_v2.0_to_v2.4.md) | Point-release diffs across the 2.x cycle. |
+| [`MIGRATION_v2.4_TO_v2.5.md`](MIGRATION_v2.4_TO_v2.5.md) | Multi-dim DSL + 9-target coverage + BuildKonfig expansion. |
+| [`MIGRATION_v2.5_TO_v2.6.md`](MIGRATION_v2.5_TO_v2.6.md) | KMP↔AGP variantFilter parity + stability tier reshuffle. |
+| [`MIGRATION_v2.6_TO_v2.7.md`](MIGRATION_v2.6_TO_v2.7.md) | AGP 9.2.1 support + 100% coverage. Opens with "You do not need to migrate." |
+| [`MIGRATION_v2.7_TO_v2.8.md`](MIGRATION_v2.7_TO_v2.8.md) | **AGP 9.2.1+ floor cut.** AGP 8.x consumers MUST migrate. Step-by-step + validator codes + rollback. |
 
 ## Design context
 
 | Doc | What it covers |
 |---|---|
 | [`RFC-v2.0-per-variant-compilation.md`](RFC-v2.0-per-variant-compilation.md) | v2.0 RFC — per-variant Kotlin compilation matrix design. |
+| [`AGP_SUPPORT.md`](AGP_SUPPORT.md) | AGP 9.2.1+ floor contract. Rationale, version table, retired `agp-matrix-compat.yml` workflow. |
+| [`LEARNINGS.md`](LEARNINGS.md) | Execution-discovered locked contracts L1–L5 — AGP propagation timing / reflective setter contract / RuntimeApi codegen-host election / KGP single-axis source set / reflection-safe Android template. AGP 9 breaking-change index. |
+| [`AGP_9_MIGRATION_NOTES.md`](AGP_9_MIGRATION_NOTES.md) | Consumer-side AGP 9 cookbook — `CommonExtension` type-param drop, dataBinding deprecation, `com.android.kotlin.multiplatform.library` adoption, dependencyGuard workaround. |
 
 ## Quick lookup
 

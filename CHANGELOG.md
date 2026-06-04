@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.8.0] - 2026-06-04 — Truly End-to-End Single `kmpFlavors {}` API + AGP 9.2.1+ Floor
+
+**Breaking release.** v2.8 raises the floor to **AGP 9.2.1 / Gradle 9.5.1 / Kotlin 2.3.21** and ships the v2.4 promise: `kmpFlavors {}` is now the SINGLE API consumers ever use to declare product flavors across every KMP target — build-time AND runtime AND resources. Consumers on AGP 8.x must migrate via [`docs/MIGRATION_v2.7_TO_v2.8.md`](docs/MIGRATION_v2.7_TO_v2.8.md).
+
+See [`docs/AGP_SUPPORT.md`](docs/AGP_SUPPORT.md) for the 9.2.1+ floor contract and [`docs/LEARNINGS.md`](docs/LEARNINGS.md) for the execution-discovered locked contracts (L1–L5) driving the architecture.
+
+### Added
+
+- **Pure-`com.android.application` runtime path** — `kmpFlavors {}` works without a KMP target. Obsoletes the consumer-side `AppFlavor.kt` boilerplate that v2.7 adoption doc §10 documented as a known gap. Phase 1.
+- **iOS xcconfig codegen** — `IosXcconfigGenerator` emits per-variant xcconfig with `KMPF_*` runtime identity vars under `build/generated/iosFlavorConfigs/`. Phase 2.
+- **`:kmpFlavorsXcodeIntegrate` task** — writes umbrella `kmp-flavors.xcconfig` with consumer-configurable output dir. Phase 3.
+- **Compose Desktop per-flavor integration** — `DesktopFlavorIntegrator` sets `nativeDistributions.packageName` + `macOS.bundleID` + injects JAR Manifest `KMPF-*` entries for runtime actual. Phase 4 + Phase 14 OS expansion (windows.upgradeUuid / linux.appCategory / vendor / description / copyright).
+- **Kotlin/JS + Wasm per-flavor webpack overlay** — `WebFlavorIntegrator` writes per-flavor `webpack.config.d/` overlays including `__KMPF_*__` DefinePlugin constants for runtime actual. Phase 5.
+- **`KmpFlavorsRuntime` commonMain API** — expect + 5 actuals (androidMain / iosMain / desktopMain / jsMain / wasmJsMain) auto-generated reading from platform-native sources (BuildConfig / NSBundle / JAR Manifest / Webpack DefinePlugin). Reflection-safe Android template handles `com.android.library` modules without `BuildConfig` (D40). Phase 6.
+- **Cross-module RuntimeApi codegen-host election** — `rootProject.extraProperties["kmpFlavors.runtimeApiClaim:$package"]` with lex-lowest path winning; prevents dex-merge duplicate-class errors in multi-module KMP consumers (D38). Phase 6.
+- **Per-flavor KMP source set fan-out** — `{F}Main` cross-cutting source sets with single-axis discipline per KGP `applyDefaultHierarchyTemplate` rule (D39). Phase 7.
+- **Per-flavor Compose Resources routing** — `ComposeResourcesPerFlavorRouter` routes `composeResources/{F}/`. Phase 8.
+- **Per-flavor Android res routing** — `AndroidResPerFlavorRouter` routes `src/{F}/res/` for Android. Phase 8.
+- **Per-flavor Firebase wiring** — `AndroidFirebaseFlavorRouter` copies per-flavor `google-services.json`; `IosFirebaseFlavorRouter` appends `KMPF_FIREBASE_CONFIG_FILE` to xcconfigs. Opt-in via `googleServiceConfig(…)`. Phase 9.
+- **iOS pbxproj zero-setup bootstrap** — `:kmpFlavorsBootstrapXcode` task with vendored Kotlin OpenStep ASCII property-list parser; idempotent; no consumer pbxproj hand-edits required. Phase 12.
+- **`:kmpFlavorsDoctor` task** — runs all V01–V53 validators and emits JSON + human report. Phase 13.
+- **Per-flavor versioning** — `versionCode` / `versionName` per `FlavorConfig{}`. Phase 14.
+- **`signingConfigs {}` DSL block** — env-var indirection + `SigningConfigBridge` propagation to AGP. Phase 14.
+- **`AgpReflectiveSetters` helper** — two-pattern reflective setter (`setX(T)` then `getX(): Property<T>.set(T)`) supporting both AGP 8.x bean-style and AGP 9.x `Property<T>` surface conversions. Routes through `AgpProductFlavorRegistrar` + `AgpBridge` 7 setter sites. Phase 18 + Phase 19. See L2 / D37.
+- **AGP 9 dual-interface finalizeDsl proxy** — `Proxy.newProxyInstance` implements BOTH `org.gradle.api.Action` (AGP <9 legacy) AND `kotlin.jvm.functions.Function1` (AGP 9 `DslLifecycle.finalizeDsl(Function1)`). Method-name dispatch on `"execute"` (Action) and `"invoke"` (Function1). Same treatment for `beforeVariants` proxy. Phase 19. See D42.
+- **`ComponentBuilder.enable` rename fallback** — `AgpReflectiveSetters.set` tries `setEnabled` (legacy) then `setEnable` (AGP 9 rename). Phase 19. See D43.
+- **`docs/LEARNINGS.md`** — execution-discovered locked contracts (L1 propagation timing / L2 reflective setter contract / L3 codegen-host election / L4 single source-set axis / L5 reflection-safe Android template).
+- **`docs/AGP_SUPPORT.md`** — 9.2.1+ floor contract with breaking-change checklist.
+- **`docs/MIGRATION_v2.7_TO_v2.8.md`** — consumer migration cookbook (versions, breaking changes, step-by-step, validator codes, rollback).
+- **New samples** — `samples/pure-agp-app/`, `samples/ios-flavor-integration/`, `samples/desktop-flavor-integration/`, `samples/web-flavor-integration/`.
+- **`AgpReflectiveSettersTest`** — 11 fixtures (715 total, was 704) covering Pattern 1 / Pattern 2 / neither-found across String + Boolean + Int. 100% line coverage on the helper.
+
+### Changed
+
+- **Floor: AGP 8.2 → AGP 9.2.1.** Single-floor design.
+- **Floor: Gradle 8.x → Gradle 9.5.1.**
+- **Floor: Kotlin 2.3.0 → Kotlin 2.3.21.**
+- **`configurePlugin` split into 5 phases** — `phaseAgp` / `phaseKmp` / `phaseIos` / `phaseDesktop` / `phaseWeb`. Each phase composes its own integrators in deterministic order; cross-phase ordering documented in PLAN.md "Intra-phase invocation order" table.
+- **AGP propagation timing** — `pluginManager.withPlugin("com.android.application")` callback registered SYNCHRONOUSLY in `KmpFlavorPlugin.apply()` drives `AgpProductFlavorRegistrar.whenObjectAdded` + `configureEach`. Replaces afterEvaluate-registered `finalizeDsl` callback (which AGP silently dropped — see L1 / D36).
+
+### Removed
+
+- **`.github/workflows/agp-matrix-compat.yml`** — per-version AGP matrix CI workflow retired with the AGP 9.2.1+ floor decision. Single supported floor.
+- **AGP < 8.2 fallback code paths in `AgpBridge.kt`** — version-shim reflective fallbacks no longer needed.
+- **Private `setProperty` / `setBooleanProperty` helpers in `AgpBridge.kt`** — replaced with the canonical `AgpReflectiveSetters.set(target, propertyName, value)` pathway.
+- **`V27ToV28MigrationScanner` / `MigrationPlan` / `MigrationApplier` / `KmpFlavorsMigrateFromV27Task`** — streamline-only implementation per user directive ("no deprecated or legacy or backward compat"). v2.7 → v2.8 migration steps live in [`docs/MIGRATION_v2.7_TO_v2.8.md`](docs/MIGRATION_v2.7_TO_v2.8.md) as the consumer-side cookbook.
+
+### Fixed
+
+- **Cross-module dex-merge duplicate-class error** on multi-module KMP consumers — `Type kmp.project.template.kmpflavors.KmpFlavorsRuntime is defined multiple times`. Resolved via codegen-host election (D38).
+- **`Unresolved reference 'BuildConfig'`** in `com.android.library` KMP modules — Generated Android actual now uses reflection-safe `Class.forName("$pkg.BuildConfig").getField(name).get(null)` with String/Boolean fallback (D40).
+- **KGP "Kotlin Source Set 'iosSimulatorArm64ProdMain' can't depend on 'iosSimulatorArm64Main' which is a default source set"** — Removed dual-axis (per-target × flavor) source set creation; only `{F}Main` cross-cutting source sets created (D39).
+- **AGP 9 finalizeDsl silent no-op** — Proxy now implements `Function1` alongside `Action` so the AGP 9.x `DslLifecycle.finalizeDsl(Function1)` signature dispatches correctly (D42).
+- **AGP 9 `ComponentBuilder.enabled` → `.enable` rename** — `AgpReflectiveSetters` tries both setter names (D43).
+
 ## [2.7.0] - 2026-06-02 — AGP 9.2.1 Support + 100% Coverage (GA)
 
 **Stable release.** Direct promotion of the `2.7.0-alpha.1` content (no behavioural deltas, no code changes between the prepared alpha and this GA). Skipped the documented `2.7.0-rc.0` soak window because the project has a single active consumer (kmp-project-template) which has already exercised every v2.7 capability via the same source tree, and PR #115 ships with 704 tests at 100.00% line coverage + full CI matrix (4 AGP rows × 7 platform targets × Maven Local roundtrip + Kover floor 100 + kmp-project-template sample build — all green).

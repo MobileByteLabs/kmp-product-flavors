@@ -226,9 +226,44 @@ class KmpFlavorPlugin : Plugin<Project> {
             }
         }
 
-        // Defer configuration until after project evaluation
+        // AGP productFlavor registration must happen BEFORE AGP processes its
+        // finalizeDsl queue. Gradle fires afterEvaluate hooks in registration order
+        // — if AGP's hook fires before ours, finalizeDsl is locked and our hook
+        // never executes. By registering during apply() via pluginManager.withPlugin
+        // (synchronous when the plugin is already applied, deferred otherwise),
+        // the finalizeDsl proxy gets queued early. The proxy reads `extension.flavors`
+        // lazily at execute time, so flavors populated by downstream convention-plugin
+        // configuration are still visible.
+        project.pluginManager.withPlugin("com.android.application") {
+            runCatching {
+                com.mobilebytelabs.kmpflavors.internal.AgpProductFlavorRegistrar.apply(
+                    project, extension, project.logger,
+                )
+            }.onFailure { e ->
+                project.logger.warn("[KMP Flavors] early AGP productFlavor registration failed: ${e.message}")
+            }
+        }
+        project.pluginManager.withPlugin("com.android.library") {
+            runCatching {
+                com.mobilebytelabs.kmpflavors.internal.AgpProductFlavorRegistrar.apply(
+                    project, extension, project.logger,
+                )
+            }.onFailure { e ->
+                project.logger.warn("[KMP Flavors] early AGP productFlavor registration failed: ${e.message}")
+            }
+        }
+
+        // Defer the remaining phase dispatch until after project evaluation.
         project.afterEvaluate {
             configurePlugin(project, extension)
+            // Phase dispatch — composes phaseKmp + phaseIos + phaseDesktop + phaseWeb.
+            // phaseAgp's productFlavor registration was already handled above via
+            // pluginManager.withPlugin so it lands ahead of AGP's variant graph.
+            runCatching {
+                com.mobilebytelabs.kmpflavors.internal.FlavorPhaseDispatcher.apply(project, extension)
+            }.onFailure { e ->
+                project.logger.warn("[KMP Flavors] phase dispatch failed: ${e.message}")
+            }
         }
     }
 
