@@ -41,6 +41,8 @@ spotless {
             "**/.gradle/**/*.kt",
             // Exclude git subtree samples (external code we don't control)
             "**/samples/kmp-project-template/**/*.kt",
+            // Exclude golden snapshot fixtures in test resources (generated content, not source)
+            "**/src/test/resources/**/*.kt",
         )
         ktlint(libs.versions.ktlint.get())
             .editorConfigOverride(

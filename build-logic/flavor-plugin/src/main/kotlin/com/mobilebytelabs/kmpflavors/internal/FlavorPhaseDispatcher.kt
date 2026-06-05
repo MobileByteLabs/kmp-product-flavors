@@ -8,6 +8,7 @@ package com.mobilebytelabs.kmpflavors.internal
 import com.mobilebytelabs.kmpflavors.KmpFlavorExtension
 import com.mobilebytelabs.kmpflavors.tasks.KmpFlavorsBootstrapXcodeTask
 import com.mobilebytelabs.kmpflavors.tasks.KmpFlavorsDoctorTask
+import com.mobilebytelabs.kmpflavors.tasks.KmpFlavorsMigrateFromV27Task
 import com.mobilebytelabs.kmpflavors.tasks.KmpFlavorsXcodeIntegrateTask
 import org.gradle.api.Action
 import org.gradle.api.Project
@@ -91,6 +92,9 @@ internal object FlavorPhaseDispatcher {
     private fun registerToolingTasks(project: Project) {
         if (project.tasks.findByName("kmpFlavorsDoctor") == null) {
             project.tasks.register("kmpFlavorsDoctor", KmpFlavorsDoctorTask::class.java)
+        }
+        if (project.tasks.findByName("kmpFlavorsMigrateFromV27") == null) {
+            project.tasks.register("kmpFlavorsMigrateFromV27", KmpFlavorsMigrateFromV27Task::class.java)
         }
     }
 

@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.8.1] - 2026-06-05 — v2.8 Polish: Runtime-API Snapshots + Migration Task + 6 Educational Samples
+
+**Patch release.** No breaking changes. All new APIs are additive; v2.8.0 consumers can upgrade in-place.
+
+### Added
+
+- **`RuntimeApiGeneratorSnapshotTest`** — 7 snapshot tests (6 per-file golden fixtures + 1 count check) for `RuntimeApiGenerator.generate()`. Golden resource files at `src/test/resources/runtime-api-snapshots/`. Locks in the expect/actual codegen shape so regressions surface as a diff rather than a compile error.
+- **`:kmpFlavorsMigrateFromV27` task** — `KmpFlavorsMigrateFromV27Task` with dry-run default (`--apply` to mutate). `V27MigrationDetector.scan()` detects two v2.7 telltales: `AppFlavor.kt` in `cmp-android` paths + `fun configureFlavors(` in `KMPFlavorsConventionPlugin.kt`. Run `./gradlew :kmpFlavorsMigrateFromV27` to audit; add `--apply` to apply. 3 TestKit tests via `KmpFlavorsMigrateFromV27TaskTest`.
+- **6 educational sample modules** (all wired into root `settings.gradle.kts` + CI):
+  - `samples/pure-agp-app/` — Android-only (`com.android.library`) with v2.8 `signingConfigs{}` + `versionCode`/`versionName` DSL.
+  - `samples/ios-flavor-integration/` — iOS + commonMain with per-flavor `expect` source sets.
+  - `samples/desktop-flavor-integration/` — Desktop JVM, two env flavors, per-flavor API URLs.
+  - `samples/web-flavor-integration/` — JS (IR) + WasmJs with Webpack `DefinePlugin` `__KMPF_*__` globals.
+  - `samples/runtime-api-integration/` — `KmpFlavorsRuntime` expect/actual consumed from commonMain.
+  - `samples/dsl-completeness-integration/` — "kitchen sink": multi-dimensional flavors × `signingConfigs{}` × `versionCode`/`versionName` × `buildConfigField` × `applicationIdSuffix` × `createIntermediateSourceSets`.
+- **`.github/workflows/sample-v28-features.yml`** — CI workflow compiling the Linux-compilable v2.8 samples (Desktop + JS + WasmJs; 8 Gradle tasks).
+- **`docs/MIGRATION_v2.7_TO_v2.8.md`** — consumer migration cookbook: automated (`:kmpFlavorsMigrateFromV27`) + manual steps for `AppFlavor.kt` deletion, `KMPFlavorsConventionPlugin` rewrite, `signingConfigs{}` upgrade, and `versionCode`/`versionName` adoption. No breaking changes from v2.8.0 → v2.8.1.
+
+### Fixed
+
+- **Spotless formatting** — `SigningConfigBridge.kt`, `PerFlavorVersionPropagationTest.kt`, `SigningConfigBridgeTest.kt` brought into conformance; `./gradlew spotlessCheck` passes clean.
+
 ## [2.8.0] - 2026-06-04 — Truly End-to-End Single `kmpFlavors {}` API + AGP 9.2.1+ Floor
 
 **Breaking release.** v2.8 raises the floor to **AGP 9.2.1 / Gradle 9.5.1 / Kotlin 2.3.21** and ships the v2.4 promise: `kmpFlavors {}` is now the SINGLE API consumers ever use to declare product flavors across every KMP target — build-time AND runtime AND resources. Consumers on AGP 8.x must migrate via [`docs/MIGRATION_v2.7_TO_v2.8.md`](docs/MIGRATION_v2.7_TO_v2.8.md).

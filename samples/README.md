@@ -10,6 +10,12 @@ This directory contains sample projects demonstrating the KMP Product Flavors pl
 | [compose-multiplatform](compose-multiplatform) | Full Compose Multiplatform app | Android, iOS, Desktop, WASM |
 | [kmp-project-template](kmp-project-template) | Production KMP template from openMF | All platforms |
 | [convention-integration](convention-integration) | Standalone convention plugin demo | JVM, iOS |
+| [pure-agp-app](pure-agp-app) | Android-only (AGP) with v2.8 signingConfigs + versionCode/Name | Android |
+| [ios-flavor-integration](ios-flavor-integration) | iOS + commonMain expect/actual flavor consumption | iOS, Desktop |
+| [desktop-flavor-integration](desktop-flavor-integration) | Desktop JVM with per-flavor API URLs | Desktop |
+| [web-flavor-integration](web-flavor-integration) | JS + WasmJs with Webpack DefinePlugin globals | JS, WasmJs |
+| [runtime-api-integration](runtime-api-integration) | `KmpFlavorsRuntime` expect/actual from commonMain | Desktop, iOS |
+| [dsl-completeness-integration](dsl-completeness-integration) | "Kitchen sink" — all v2.8 DSL surfaces in one module | Desktop, iOS, JS, WasmJs |
 
 ## Capability Matrix
 
