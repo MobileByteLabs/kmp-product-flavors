@@ -37,7 +37,7 @@ class KmpFlavorsMigrateFromV27TaskTest {
 
     @BeforeEach
     fun setup() {
-        copyFixtureDir("v27-migration-fixtures/before", projectDir)
+        copyFixtureDir("migration-fixtures/before", projectDir)
 
         File(projectDir, "settings.gradle.kts").writeText(
             """
@@ -115,7 +115,7 @@ class KmpFlavorsMigrateFromV27TaskTest {
             projectDir,
             "build-logic/convention/src/main/kotlin/KMPFlavorsConventionPlugin.kt",
         )
-        conventionFile.writeText(loadFixture("v27-migration-fixtures/after/build-logic/convention/src/main/kotlin/KMPFlavorsConventionPlugin.kt"))
+        conventionFile.writeText(loadFixture("migration-fixtures/after/build-logic/convention/src/main/kotlin/KMPFlavorsConventionPlugin.kt"))
 
         val result = GradleRunner.create()
             .withProjectDir(projectDir)

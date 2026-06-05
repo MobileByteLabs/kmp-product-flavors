@@ -22,7 +22,7 @@ import java.io.File
 /**
  * v2.8 Wave B1 — Golden snapshot tests for [RuntimeApiGenerator].
  *
- * Fixtures at `src/test/resources/runtime-api-snapshots/` (6 `.kt` files). A synthetic spec
+ * Fixtures at `src/test/resources/platform-api-snapshots/` (6 `.kt` files). A synthetic spec
  * with package `com.example.snapshot` drives generation; each of the 6 emitted
  * files is compared byte-equal (trimmed trailing whitespace) against its golden.
  *
@@ -38,9 +38,9 @@ class RuntimeApiGeneratorSnapshotTest {
     private val spec = RuntimeApiSpec("com.example.snapshot")
 
     private fun loadSnapshot(name: String): String = javaClass.classLoader
-        .getResourceAsStream("runtime-api-snapshots/$name")
+        .getResourceAsStream("platform-api-snapshots/$name")
         ?.bufferedReader()?.readText()
-        ?: error("Missing snapshot fixture: runtime-api-snapshots/$name")
+        ?: error("Missing snapshot fixture: platform-api-snapshots/$name")
 
     @Test
     fun `expect commonMain file matches golden snapshot`() {
