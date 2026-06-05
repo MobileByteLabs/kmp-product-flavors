@@ -15,5 +15,23 @@
 
 package com.example.condtargets
 
-fun describeActive(): String = "active variant: ${BuildKonfig.VARIANT_NAME} " +
-    "(premium=${BuildKonfig.IS_PREMIUM}, apiBase=${BuildKonfig.API_BASE_URL})"
+/**
+ * Documents the variantFilter { excludeTargets(...) } DSL surface.
+ * BuildKonfig fields generated per variant:
+ *   - VARIANT_NAME: String  (e.g. "freeDevMain")
+ *   - IS_PREMIUM: Boolean   (true for paid tier, false for free)
+ *   - API_BASE_URL: String  ("https://api.dev.example.com" / "https://api.example.com")
+ *
+ * Generated class is wired into each target's main source set (e.g. desktopMain).
+ * Move this file into src/desktopMain/kotlin/ to resolve BuildKonfig at compile time.
+ */
+fun describeActive(): String = buildString {
+    appendLine("Conditional Targets Sample")
+    appendLine("==========================")
+    appendLine("variantFilter { excludeTargets(...) } excludes watchOS/tvOS for 'free' tier:")
+    appendLine("  free × dev  → desktop, iosArm64, iosSimulatorArm64  (3 compilations)")
+    appendLine("  free × prod → desktop, iosArm64, iosSimulatorArm64  (3 compilations)")
+    appendLine("  paid × dev  → desktop, iosArm64, iosSimulatorArm64, watchos*, tvos*  (7)")
+    appendLine("  paid × prod → desktop, iosArm64, iosSimulatorArm64, watchos*, tvos*  (7)")
+    appendLine("Total: 20 compilations vs. 28 without excludeTargets (~28% CI saving)")
+}

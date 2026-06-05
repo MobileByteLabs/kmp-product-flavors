@@ -341,6 +341,12 @@ kover {
                     "com.mobilebytelabs.kmpflavors.tasks.KmpFlavorsDoctorTask\$*",
                     "com.mobilebytelabs.kmpflavors.tasks.KmpFlavorsXcodeIntegrateTask",
                     "com.mobilebytelabs.kmpflavors.tasks.KmpFlavorsXcodeIntegrateTask\$*",
+                    // v2.8.1 Wave B2 — KmpFlavorsMigrateFromV27Task runs in the
+                    // TestKit daemon; the @TaskAction body is covered end-to-end by
+                    // KmpFlavorsMigrateFromV27TaskTest (dry-run + apply + no-op cases)
+                    // but Kover can't instrument cross-daemon execution.
+                    "com.mobilebytelabs.kmpflavors.tasks.KmpFlavorsMigrateFromV27Task",
+                    "com.mobilebytelabs.kmpflavors.tasks.KmpFlavorsMigrateFromV27Task\$*",
                     // Pattern 5b — v2.8 AGP-side integrator. Same shape as AgpBridge:
                     // exercises Action+Function1 dual-interface Proxy against AGP's
                     // androidComponents lifecycle. The AgpReflectiveSetters helper
@@ -348,6 +354,14 @@ kover {
                     // fixtures, both Pattern 1 + Pattern 2 + fallback paths).
                     "com.mobilebytelabs.kmpflavors.internal.AgpProductFlavorRegistrar",
                     "com.mobilebytelabs.kmpflavors.internal.AgpProductFlavorRegistrar\$*",
+                    // v28-gap-fill sub-plan 01 — Per-flavor signing bridge. Reflective
+                    // AGP wiring; same category as AgpBridge / AgpProductFlavorRegistrar
+                    // — cannot be exercised without real AGP classpath. Logic is
+                    // covered by SigningConfigBridgeTest via FakeAndroidExtension test
+                    // double, but Gradle Action SAM closures captured at apply-time
+                    // aren't measurable by Kover the same way.
+                    "com.mobilebytelabs.kmpflavors.internal.SigningConfigBridge",
+                    "com.mobilebytelabs.kmpflavors.internal.SigningConfigBridge\$*",
                     // Pattern 5c — v2.8 phase-split entry-point modifier on KmpFlavorPlugin
                     // companion. Reuses the existing Pattern 1 KmpFlavorPlugin exclusion.
                     // Pattern 6 — DSL block SAM closures captured for AGP forwarding +

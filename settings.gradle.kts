@@ -46,5 +46,14 @@ include(":samples:buildkonfig-rich")
 // discipline (free tier skips watchOS/tvOS). See samples/conditional-targets/README.md.
 include(":samples:conditional-targets")
 
+// v2.8 Wave B — educational samples for new DSL surfaces
+// Linux-compilable (Desktop + JS + WasmJs); iOS/Android samples are reference-only.
+include(":samples:pure-agp-app")
+include(":samples:ios-flavor-integration")
+include(":samples:desktop-flavor-integration")
+include(":samples:web-flavor-integration")
+include(":samples:runtime-api-integration")
+include(":samples:dsl-completeness-integration")
+
 // Note: samples/kmp-project-template is a standalone project with its own build
 // Build it separately: cd samples/kmp-project-template && ./gradlew build

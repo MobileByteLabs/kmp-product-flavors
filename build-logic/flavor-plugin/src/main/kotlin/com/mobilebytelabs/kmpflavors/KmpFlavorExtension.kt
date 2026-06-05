@@ -189,6 +189,17 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
         objects.domainObjectContainer(BuildTypeConfig::class.java)
 
     /**
+     * v2.8 — Container for per-flavor signing configs. Reflectively bridged into
+     * `android.signingConfigs {}` by [com.mobilebytelabs.kmpflavors.internal.SigningConfigBridge]
+     * during the AGP propagation phase. See [SigningConfig] for the DSL shape.
+     *
+     * No-op when the consumer module doesn't apply `com.android.application` /
+     * `com.android.library` — non-Android targets ignore signing.
+     */
+    val signingConfigs: NamedDomainObjectContainer<SigningConfig> =
+        objects.domainObjectContainer(SigningConfig::class.java)
+
+    /**
      * v2.0 public variant API (RFC §3 Q19-B). One [KmpFlavorVariant]
      * element is populated per matrix-mode variant after
      * `CompilationRegistrar` runs. Consumers customise variants via
@@ -697,6 +708,27 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
      */
     fun buildTypes(action: Action<NamedDomainObjectContainer<BuildTypeConfig>>) {
         action.execute(buildTypes)
+    }
+
+    /**
+     * v2.8 — Configure per-flavor signing configs using a DSL block.
+     *
+     * Example:
+     * ```kotlin
+     * kmpFlavors {
+     *     signingConfigs {
+     *         create("release") {
+     *             storeFile.set(file("keystore/release.jks"))
+     *             storePasswordFromEnv("KEYSTORE_PASSWORD")
+     *             keyAlias.set("kmpflavors")
+     *             keyPasswordFromEnv("KEY_PASSWORD")
+     *         }
+     *     }
+     * }
+     * ```
+     */
+    fun signingConfigs(action: Action<NamedDomainObjectContainer<SigningConfig>>) {
+        action.execute(signingConfigs)
     }
 
     /**
