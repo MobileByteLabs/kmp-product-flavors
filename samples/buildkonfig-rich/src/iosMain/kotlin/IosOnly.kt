@@ -17,10 +17,12 @@
 
 package com.example.buildkonfigrich
 
-import com.example.buildkonfigrich.BuildKonfig
-
 /**
- * iOS-only API that reads the iosMain-scoped BUNDLE_ID_SUFFIX field generated
- * by `perTarget("iosMain") { field("BUNDLE_ID_SUFFIX", ...) }` in the DSL.
+ * Documents the perTarget("iosMain") { field(...) } DSL feature.
+ * Generated field (resolve at compile time by moving to iosMain in a non-matrix build):
+ *   BuildKonfig.PerTarget.IosMain.BUNDLE_ID_SUFFIX: String  (value: ".dev")
+ *
+ * In matrix mode, generated sources land in per-variant target source sets —
+ * iosMain/kotlin cannot resolve BuildKonfig from commonMain generated output.
  */
-fun iosBundleIdSuffix(): String = BuildKonfig.PerTarget.IosMain.BUNDLE_ID_SUFFIX
+fun iosBundleIdSuffix(): String = "<perTarget.IosMain.BUNDLE_ID_SUFFIX — see DSL docs>"
