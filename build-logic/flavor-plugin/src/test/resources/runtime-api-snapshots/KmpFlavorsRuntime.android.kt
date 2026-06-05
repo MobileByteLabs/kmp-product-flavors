@@ -7,16 +7,12 @@ package com.example.snapshot
 public actual object KmpFlavorsRuntime {
     private fun readStringField(className: String, fieldName: String): String? = try {
         Class.forName(className).getField(fieldName).get(null) as? String
-    } catch (_: Throwable) {
-        null
-    }
+    } catch (_: Throwable) { null }
 
     private fun readBooleanField(className: String, fieldName: String): Boolean? = try {
         val f = Class.forName(className).getField(fieldName)
         (f.get(null) as? Boolean)
-    } catch (_: Throwable) {
-        null
-    }
+    } catch (_: Throwable) { null }
 
     private val buildConfigClass: String = "com.example.snapshot.BuildConfig"
 

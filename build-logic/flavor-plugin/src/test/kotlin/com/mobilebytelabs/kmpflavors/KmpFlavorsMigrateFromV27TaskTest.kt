@@ -76,7 +76,7 @@ class KmpFlavorsMigrateFromV27TaskTest {
         )
         assertTrue(
             File(projectDir, "build-logic/convention/src/main/kotlin/KMPFlavorsConventionPlugin.kt")
-                .readText().contains("fun configureFlavors("),
+                .readText().contains("configureFlavors"),
             "KMPFlavorsConventionPlugin.kt should NOT be rewritten in dry-run",
         )
     }
@@ -99,8 +99,8 @@ class KmpFlavorsMigrateFromV27TaskTest {
             "build-logic/convention/src/main/kotlin/KMPFlavorsConventionPlugin.kt",
         )
         assertFalse(
-            conventionFile.readText().contains("fun configureFlavors("),
-            "configureFlavors function must be removed after --apply",
+            conventionFile.readText().contains("configureFlavors"),
+            "configureFlavors must be removed after --apply",
         )
         assertFalse(
             conventionFile.readText().contains("v2.7"),

@@ -341,6 +341,12 @@ kover {
                     "com.mobilebytelabs.kmpflavors.tasks.KmpFlavorsDoctorTask\$*",
                     "com.mobilebytelabs.kmpflavors.tasks.KmpFlavorsXcodeIntegrateTask",
                     "com.mobilebytelabs.kmpflavors.tasks.KmpFlavorsXcodeIntegrateTask\$*",
+                    // v2.8.1 Wave B2 — KmpFlavorsMigrateFromV27Task runs in the
+                    // TestKit daemon; the @TaskAction body is covered end-to-end by
+                    // KmpFlavorsMigrateFromV27TaskTest (dry-run + apply + no-op cases)
+                    // but Kover can't instrument cross-daemon execution.
+                    "com.mobilebytelabs.kmpflavors.tasks.KmpFlavorsMigrateFromV27Task",
+                    "com.mobilebytelabs.kmpflavors.tasks.KmpFlavorsMigrateFromV27Task\$*",
                     // Pattern 5b — v2.8 AGP-side integrator. Same shape as AgpBridge:
                     // exercises Action+Function1 dual-interface Proxy against AGP's
                     // androidComponents lifecycle. The AgpReflectiveSetters helper

@@ -55,10 +55,10 @@ internal object V27MigrationDetector {
             .forEach { findings += DeleteFile(it) }
 
         // Telltale 2 — KMPFlavorsConventionPlugin.kt that contains the v2.7
-        // `configureFlavors(CommonExtension)` extension function.
+        // `configureFlavors` extension function (matches both regular and extension fun syntax).
         projectRoot.walk()
             .filter { it.isFile && it.name == "KMPFlavorsConventionPlugin.kt" }
-            .filter { it.readText().contains("fun configureFlavors(") }
+            .filter { it.readText().contains("configureFlavors(") }
             .forEach { file ->
                 val rewritten = rewriteConventionPlugin(file.readText())
                 findings += RewriteFile(file, rewritten, "drop v2.7 configureFlavors extension")
@@ -68,12 +68,16 @@ internal object V27MigrationDetector {
     }
 
     private fun rewriteConventionPlugin(v27Content: String): String = v27Content
+        // Remove the private extension function definition (handles generic receiver types).
         .replace(
             Regex(
-                """(?ms)(\s*// v2\.7.*?workaround.*?\n)?\s*private fun\s+\w+Extension\.configureFlavors\([^)]*\)\s*\{.*?^\s*\}""",
+                """(?ms)^\s*private fun\s+[^\n]+\.configureFlavors\([^)]*\)\s*\{.*?^\s*\}\s*\n?""",
             ),
             "",
         )
+        // Remove the call site on its own line.
+        .replace(Regex("""(?m)^\s*configureFlavors\([^)]*\)\s*\n?"""), "")
+        // Replace the v2.7 comment with v2.8.
         .replace("// v2.7 — pure-AGP workaround", "// v2.8 — plugin handles AGP directly")
         .trimEnd() + "\n"
 }

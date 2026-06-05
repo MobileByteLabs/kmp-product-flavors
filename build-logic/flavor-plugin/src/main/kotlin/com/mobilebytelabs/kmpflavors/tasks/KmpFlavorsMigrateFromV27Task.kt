@@ -16,6 +16,7 @@ package com.mobilebytelabs.kmpflavors.tasks
 
 import com.mobilebytelabs.kmpflavors.internal.V27MigrationDetector
 import org.gradle.api.DefaultTask
+import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.options.Option
 
@@ -37,6 +38,7 @@ abstract class KmpFlavorsMigrateFromV27Task : DefaultTask() {
             "Dry-run by default; pass --apply to mutate."
     }
 
+    @get:Internal
     @set:Option(option = "apply", description = "Apply the mutations (default: dry-run)")
     var applyChanges: Boolean = false
 

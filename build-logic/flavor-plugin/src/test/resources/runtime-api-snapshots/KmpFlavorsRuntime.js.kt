@@ -3,22 +3,16 @@ package com.example.snapshot
 
 @Suppress("ObjectPropertyName", "ClassName", "FunctionName")
 private external val __KMPF_FLAVOR_NAME__: String
-
 @Suppress("ObjectPropertyName", "ClassName", "FunctionName")
 private external val __KMPF_BUILD_TYPE_NAME__: String
-
 @Suppress("ObjectPropertyName", "ClassName", "FunctionName")
 private external val __KMPF_BUNDLE_ID__: String
-
 @Suppress("ObjectPropertyName", "ClassName", "FunctionName")
 private external val __KMPF_APP_DISPLAY_NAME__: String
-
 @Suppress("ObjectPropertyName", "ClassName", "FunctionName")
 private external val __KMPF_APP_VERSION__: String
-
 @Suppress("ObjectPropertyName", "ClassName", "FunctionName")
 private external val __KMPF_IS_DEBUG__: Boolean
-
 @Suppress("ObjectPropertyName", "ClassName", "FunctionName")
 private external val __KMPF_IS_DEMO__: Boolean
 
