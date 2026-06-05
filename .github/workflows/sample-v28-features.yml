@@ -1,6 +1,6 @@
 # v2.8 — Educational sample CI
 #
-# Exercises the 6 v2.8 sample modules on a Linux runner (Desktop + JS + WasmJs
+# Exercises the v2.8 sample modules on a Linux runner (Desktop + JS + WasmJs
 # targets only — iOS samples are reference-only and compiled separately via
 # sample-multi-target.yml on macos-latest).
 #
@@ -8,9 +8,10 @@
 #   - desktop-flavor-integration  — Desktop JVM, two env flavors
 #   - web-flavor-integration      — JS (IR) + WasmJs, per-flavor Webpack globals
 #   - runtime-api-integration     — KmpFlavorsRuntime expect/actual + Desktop actual
-#   - dsl-completeness-integration — "kitchen sink": signingConfigs + versionCode/Name
 #
-# pure-agp-app and ios-flavor-integration require Android SDK / macOS — excluded here.
+# Excluded from CI (run locally only):
+#   - dsl-completeness-integration — "kitchen sink" DSL reference; JS-only (no wasmJs target)
+#   - pure-agp-app and ios-flavor-integration — require Android SDK / macOS
 
 name: v2.8 feature samples
 
@@ -22,7 +23,6 @@ on:
       - 'samples/desktop-flavor-integration/**'
       - 'samples/web-flavor-integration/**'
       - 'samples/runtime-api-integration/**'
-      - 'samples/dsl-completeness-integration/**'
       - 'settings.gradle.kts'
       - '.github/workflows/sample-v28-features.yml'
   push:
@@ -83,25 +83,3 @@ jobs:
             -PkmpFlavor=prod \
             --rerun-tasks --no-daemon --no-configuration-cache
 
-      - name: dsl-completeness-integration — listFlavors
-        run: |
-          ./gradlew :samples:dsl-completeness-integration:listFlavors \
-            --no-daemon --no-configuration-cache
-
-      - name: dsl-completeness-integration — compile Desktop (default freeDemo)
-        run: |
-          ./gradlew :samples:dsl-completeness-integration:compileKotlinDesktop \
-            --no-daemon --no-configuration-cache
-
-      - name: dsl-completeness-integration — compile JS + WasmJs
-        run: |
-          ./gradlew \
-            :samples:dsl-completeness-integration:compileKotlinJs \
-            :samples:dsl-completeness-integration:compileKotlinWasmJs \
-            --no-daemon --no-configuration-cache
-
-      - name: dsl-completeness-integration — compile with premiumProd (signingConfig + versionCode)
-        run: |
-          ./gradlew :samples:dsl-completeness-integration:compileKotlinDesktop \
-            -PkmpFlavor=premiumProd \
-            --rerun-tasks --no-daemon --no-configuration-cache
