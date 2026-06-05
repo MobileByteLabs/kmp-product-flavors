@@ -82,4 +82,3 @@ jobs:
           ./gradlew :samples:runtime-api-integration:compileKotlinDesktop \
             -PkmpFlavor=prod \
             --rerun-tasks --no-daemon --no-configuration-cache
-
