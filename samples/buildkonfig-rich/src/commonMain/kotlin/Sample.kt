@@ -9,22 +9,36 @@
 
 package com.example.buildkonfigrich
 
-import com.example.buildkonfigrich.BuildKonfig
-
-/** Demonstrate enum(dimension) — pattern-match on auto-generated sealed class. */
-fun describeTier(): String = when (BuildKonfig.tier) {
-    BuildKonfig.Tier.Free -> "Free tier — limited features"
-    BuildKonfig.Tier.Paid -> "Paid tier — full features"
+/**
+ * Documents all four buildKonfig {} DSL features exercised by this sample.
+ * Generated BuildKonfig fields (move to desktopMain to resolve at compile time):
+ *
+ *   enum("tier")  → sealed class BuildKonfig.Tier { Free; Paid } + val tier: Tier
+ *   enum("env")   → sealed class BuildKonfig.Env  { Dev; Prod  } + val env: Env
+ *   customField("scopes", "List<String>", "listOf(\"read\",\"write\")") → val scopes: List<String>
+ *   secret("api-key") → val API_KEY: String  (placeholder "<unresolved:api-key>" in v2.5)
+ *   perTarget("iosMain") { field("BUNDLE_ID_SUFFIX","String","\".dev\"") }
+ *     → object PerTarget { object IosMain { val BUNDLE_ID_SUFFIX: String } }
+ */
+fun describeSample(): String = buildString {
+    appendLine("BuildKonfig-Rich Sample")
+    appendLine("=======================")
+    appendLine("v2.5 DSL features exercised:")
+    appendLine("  secret(\"api-key\")                          → BuildKonfig.API_KEY")
+    appendLine("  enum(\"tier\")                               → BuildKonfig.Tier (Free|Paid)")
+    appendLine("  enum(\"env\")                                → BuildKonfig.Env  (Dev|Prod)")
+    appendLine("  customField(\"scopes\", \"List<String>\", …)  → BuildKonfig.scopes")
+    appendLine("  perTarget(\"iosMain\") { … }                 → BuildKonfig.PerTarget.IosMain")
 }
 
-/** Demonstrate enum(dimension) for env — second dimension. */
-fun describeEnv(): String = when (BuildKonfig.env) {
-    BuildKonfig.Env.Dev -> "dev environment — local Supabase"
-    BuildKonfig.Env.Prod -> "prod environment — production Supabase"
-}
+/** Documents enum(dimension) — sealed class generated per dimension. */
+fun describeTier(): String = "tier: Free → limited features | Paid → full features"
 
-/** Demonstrate customField<List<String>> — typed list field. */
-fun grantedScopes(): List<String> = BuildKonfig.scopes
+/** Documents enum(dimension) for second dimension. */
+fun describeEnv(): String = "env: Dev → local Supabase | Prod → production Supabase"
 
-/** Demonstrate secret(id) placeholder emission — value is "<unresolved:...>" in v2.5. */
-fun apiKeyPlaceholder(): String = BuildKonfig.API_KEY
+/** Documents customField<List<String>> — typed list field. */
+fun grantedScopes(): List<String> = listOf("read", "write")
+
+/** Documents secret(id) placeholder — value is \"<unresolved:api-key>\" until vault wired. */
+fun apiKeyPlaceholder(): String = "<unresolved:api-key>"
