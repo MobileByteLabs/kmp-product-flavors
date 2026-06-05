@@ -100,3 +100,51 @@ tasks.register("fix") {
     description = "Applies all automatic fixes including Spotless formatting"
     dependsOn("spotlessApply")
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Aggregate sample compilation tasks
+//
+// Each task compiles a given KMP target across ALL sample modules that declare
+// it. New samples added to settings.gradle.kts are automatically covered —
+// no workflow changes required. CI calls these tasks instead of listing
+// individual :samples:<name>:compileKotlin<Target> invocations.
+//
+// Usage (CI or local):
+//   ./gradlew compileSamplesDesktop compileSamplesJs compileSamplesWasmJs
+//   ./gradlew compileSamplesIosX64 compileSamplesIosArm64 compileSamplesIosSimulatorArm64
+//   ./gradlew compileSamplesLinuxX64 compileSamplesMingwX64
+// ─────────────────────────────────────────────────────────────────────────────
+val sampleTargets =
+    listOf(
+        "Desktop",
+        "Js",
+        "WasmJs",
+        "IosX64",
+        "IosArm64",
+        "IosSimulatorArm64",
+        "WatchosX64",
+        "WatchosArm64",
+        "WatchosSimulatorArm64",
+        "TvosX64",
+        "TvosArm64",
+        "TvosSimulatorArm64",
+        "LinuxX64",
+        "MingwX64",
+    )
+
+sampleTargets.forEach { target ->
+    tasks.register("compileSamples$target") {
+        group = "samples"
+        description = "Compiles :samples:*:compileKotlin$target for every sample that declares the target"
+    }
+}
+
+subprojects {
+    afterEvaluate {
+        if (parent?.name != "samples") return@afterEvaluate
+        sampleTargets.forEach { target ->
+            val compileTask = tasks.findByName("compileKotlin$target") ?: return@forEach
+            rootProject.tasks.named("compileSamples$target") { dependsOn(compileTask) }
+        }
+    }
+}

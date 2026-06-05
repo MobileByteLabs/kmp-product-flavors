@@ -1,61 +1,350 @@
-# PR Check Workflow — fast gate on pull requests
-# Runs quality + JVM tests on the plugin module (iOS/Linux skipped for speed),
-# then validates flavor generation across representative flavor combinations.
+# PR Check — consolidated gate for all pull requests
+#
+# One workflow covering quality, tests, coverage, consistency, and all
+# platform compilations. New samples added to settings.gradle.kts are
+# automatically covered via the compileSamples<Target> aggregate tasks
+# registered in the root build.gradle.kts — no workflow edits needed.
+#
+# Job graph (quality is the fast-fail entry point):
+#
+#   quality ──┬─► test
+#             ├─► build-linux    (Desktop + JS + WasmJs + linuxX64)
+#             ├─► build-macos    (iOS + watchOS + tvOS)
+#             └─► build-windows  (mingwX64)
 
 name: PR Check
 
 on:
-  pull_request:
-    branches: [ "development", "main" ]
+    pull_request:
+        branches: [development, main]
+        paths:
+            - 'build-logic/**'
+            - 'samples/**'
+            - 'docs/**'
+            - 'README.md'
+            - 'gradle/libs.versions.toml'
+            - 'settings.gradle.kts'
+            - '.github/workflows/pr-check.yml'
+            - '.github/scripts/**'
 
 permissions:
-  contents: read
+    contents: read
 
 concurrency:
-  group: pr-check-${{ github.ref }}
-  cancel-in-progress: true
+    group: pr-check-${{ github.ref }}
+    cancel-in-progress: true
 
 jobs:
-  pr-check:
-    uses: MobileByteLabs/mbl-actionhub/.github/workflows/ci-kmp-library.yml@v1.5.4
-    with:
-      module-path: 'build-logic/flavor-plugin'
-      java-version: '21'
-      java-distribution: 'zulu'
-      run-quality: true
-      run-ios-tests: false
-      run-linux-tests: false
+    # ─────────────────────────────────────────────────────────────────
+    # quality — spotless + detekt + consistency checks (fast-fail gate)
+    # All other jobs depend on this passing before they start.
+    # ─────────────────────────────────────────────────────────────────
+    quality:
+        name: Code Quality + Consistency
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
 
-  sample-build:
-    name: Sample (${{ matrix.flavor }})
-    runs-on: ubuntu-latest
-    needs: pr-check
+            - uses: actions/setup-java@v4
+              with:
+                  distribution: zulu
+                  java-version: '21'
 
-    strategy:
-      matrix:
-        flavor: [ freeDev, paidProd, freeStaging ]
-      fail-fast: false
+            - uses: gradle/actions/setup-gradle@v4
+              with:
+                  cache-read-only: true
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+            - name: spotlessCheck
+              run: ./gradlew spotlessCheck --no-daemon --no-configuration-cache
 
-      - name: Setup JDK 21
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '21'
+            - name: detekt
+              run: ./gradlew detekt --no-daemon --no-configuration-cache
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          cache-read-only: true
+            # G17 — plugin id must be identical in gradlePlugin block and KDoc
+            - name: Plugin id consistency
+              run: |
+                  set -euo pipefail
+                  REG_ID=$(grep -oE 'id = "io\.github\.[a-z.]+\.kmp-product-flavors"' \
+                      build-logic/flavor-plugin/build.gradle.kts | head -1 | \
+                      grep -oE 'io\.github\.[a-z.]+\.kmp-product-flavors')
+                  KDOC_ID=$(grep -oE 'id\("io\.github\.[a-z.]+\.kmp-product-flavors"\)' \
+                      build-logic/flavor-plugin/src/main/kotlin/com/mobilebytelabs/kmpflavors/KmpFlavorPlugin.kt | head -1 | \
+                      grep -oE 'io\.github\.[a-z.]+\.kmp-product-flavors')
+                  [ "$REG_ID" = "$KDOC_ID" ] || { echo "::error::plugin id mismatch: $REG_ID vs $KDOC_ID"; exit 1; }
+                  echo "✓ plugin id consistent: $REG_ID"
 
-      - name: Build Sample (${{ matrix.flavor }})
-        run: ./gradlew :samples:basic-flavors:assemble -PkmpFlavor=${{ matrix.flavor }} --no-daemon --no-configuration-cache
+            # G5 — no stale 0.1.0 version references in docs or sample catalogs
+            - name: No stale version refs
+              run: |
+                  set -euo pipefail
+                  if grep -rEn 'version[ .]*=[ ]*"0\.1\.0"' docs/ samples/*/gradle/libs.versions.toml 2>/dev/null; then
+                      echo "::error::stale 0.1.0 version reference — bump to current"; exit 1
+                  fi
+                  echo "✓ no stale version refs"
 
-      - name: Validate Flavors (${{ matrix.flavor }})
-        run: ./gradlew :samples:basic-flavors:validateFlavors -PkmpFlavor=${{ matrix.flavor }} --no-daemon --no-configuration-cache
+            # G18 — every KmpFlavorExtension property documented in REFERENCE.md
+            - name: KmpFlavorExtension ↔ REFERENCE.md coverage
+              run: bash .github/scripts/check-reference-coverage.sh
 
-      - name: List Flavors
-        run: ./gradlew :samples:basic-flavors:listFlavors --no-daemon --no-configuration-cache
+    # ─────────────────────────────────────────────────────────────────
+    # test — unit tests + Kover coverage gate + Pitest (informational)
+    # ─────────────────────────────────────────────────────────────────
+    test:
+        name: Tests + Coverage
+        runs-on: ubuntu-latest
+        needs: quality
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-java@v4
+              with:
+                  distribution: zulu
+                  java-version: '21'
+
+            - uses: gradle/actions/setup-gradle@v4
+              with:
+                  cache-read-only: true
+
+            - name: Unit tests
+              run: |
+                  ./gradlew :build-logic:flavor-plugin:test \
+                      --no-daemon --no-configuration-cache
+
+            - name: Kover verify (coverage floor)
+              run: |
+                  ./gradlew :build-logic:flavor-plugin:koverVerify \
+                      --no-daemon --no-configuration-cache --warning-mode=summary
+
+            - name: Kover HTML + XML reports
+              if: always()
+              run: |
+                  ./gradlew \
+                      :build-logic:flavor-plugin:koverHtmlReport \
+                      :build-logic:flavor-plugin:koverXmlReport \
+                      --no-daemon --no-configuration-cache --warning-mode=summary
+
+            - name: Upload coverage report
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: kover-coverage-report
+                  path: build-logic/flavor-plugin/build/reports/kover/
+                  if-no-files-found: warn
+                  retention-days: 14
+
+            - name: Pitest mutation report (informational — does not block PR)
+              continue-on-error: true
+              run: |
+                  ./gradlew :build-logic:flavor-plugin:pitest \
+                      --no-daemon --no-configuration-cache --warning-mode=summary || \
+                  echo "::warning::Pitest informational only — PR not blocked"
+
+            - name: Upload Pitest report
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: pitest-mutation-report
+                  path: build-logic/flavor-plugin/build/reports/pitest/
+                  if-no-files-found: ignore
+                  retention-days: 14
+
+    # ─────────────────────────────────────────────────────────────────
+    # build-linux — Desktop + JS + WasmJs + linuxX64 across all samples
+    #
+    # Uses compileSamples<Target> aggregate tasks: any sample added to
+    # settings.gradle.kts with a matching target is compiled automatically.
+    # Also validates BuildKonfig generation and matrix-mode task wiring
+    # against the canonical multi-target-multi-variant sample.
+    # ─────────────────────────────────────────────────────────────────
+    build-linux:
+        name: Build (Linux — Desktop + JS + WasmJs + linuxX64)
+        runs-on: ubuntu-latest
+        needs: quality
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-java@v4
+              with:
+                  distribution: zulu
+                  java-version: '21'
+
+            - uses: gradle/actions/setup-gradle@v4
+              with:
+                  cache-read-only: true
+
+            - name: Compile all samples — Desktop + JS + WasmJs
+              run: |
+                  ./gradlew \
+                      compileSamplesDesktop \
+                      compileSamplesJs \
+                      compileSamplesWasmJs \
+                      --no-daemon --no-configuration-cache
+
+            - name: Compile all samples — linuxX64
+              run: |
+                  ./gradlew compileSamplesLinuxX64 \
+                      --no-daemon --no-configuration-cache
+
+            # Validate BuildKonfig content for the default variant
+            - name: Validate default BuildKonfig (multi-target-multi-variant freeDebug)
+              run: |
+                  set -euo pipefail
+                  GEN=samples/multi-target-multi-variant/build/generated/kmpFlavors/commonMain/kotlin/com/example/multitarget/BuildKonfig.kt
+                  test -f "$GEN" || { echo "::error::BuildKonfig.kt missing at $GEN"; exit 1; }
+                  for needle in \
+                      'VARIANT_NAME: String = "freeDebug"' \
+                      'IS_FREE: Boolean = true' \
+                      'IS_DEBUG: Boolean = true' \
+                      'MAX_ITEMS: Int = 10'; do
+                      grep -qF "$needle" "$GEN" || { echo "::error::BuildKonfig missing: $needle"; cat "$GEN"; exit 1; }
+                  done
+                  echo "✓ freeDebug BuildKonfig correct"
+
+            # Validate override variant regenerates correctly
+            - name: Override variant — enterpriseRelease (Desktop)
+              run: |
+                  ./gradlew :samples:multi-target-multi-variant:compileKotlinDesktop \
+                      -PkmpFlavor=enterpriseRelease \
+                      --rerun-tasks --no-daemon --no-configuration-cache
+
+            - name: Validate override BuildKonfig (enterpriseRelease)
+              run: |
+                  set -euo pipefail
+                  GEN=samples/multi-target-multi-variant/build/generated/kmpFlavors/commonMain/kotlin/com/example/multitarget/BuildKonfig.kt
+                  for needle in \
+                      'VARIANT_NAME: String = "enterpriseRelease"' \
+                      'IS_ENTERPRISE: Boolean = true' \
+                      'IS_RELEASE: Boolean = true' \
+                      'MAX_ITEMS: Int = 100000'; do
+                      grep -qF "$needle" "$GEN" || { echo "::error::Override BuildKonfig missing: $needle"; cat "$GEN"; exit 1; }
+                  done
+                  echo "✓ enterpriseRelease BuildKonfig regenerated correctly"
+
+            # Verify matrix-mode task registration (regression lock for KMPF-V23)
+            - name: Probe matrix-mode task wiring
+              run: |
+                  ./gradlew :samples:multi-target-multi-variant:tasks \
+                      --group="kmpFlavors variants" \
+                      --no-daemon --no-configuration-cache > tasks.txt
+                  for needle in jarPaidDebugKotlinDesktop zipPaidStagingKotlinJs zipEnterpriseReleaseKotlinWasmJs; do
+                      grep -qF "$needle" tasks.txt || { echo "::error::Matrix task missing: $needle"; cat tasks.txt; exit 1; }
+                  done
+                  echo "✓ matrix-mode tasks registered"
+
+            # Full variant matrix on Linux targets (regression lock for duplicate BuildKonfig)
+            - name: Full matrix — Desktop + JS + WasmJs + linuxX64 (all variants)
+              run: |
+                  ./gradlew \
+                      :samples:multi-target-multi-variant:assembleAllDesktopVariants \
+                      :samples:multi-target-multi-variant:assembleAllJsVariants \
+                      :samples:multi-target-multi-variant:assembleAllWasmJsVariants \
+                      :samples:multi-target-multi-variant:assembleAllLinuxX64Variants \
+                      --no-daemon --no-configuration-cache
+                  echo "✓ full matrix green on Linux targets"
+
+    # ─────────────────────────────────────────────────────────────────
+    # build-macos — iOS + watchOS + tvOS across all samples
+    # ─────────────────────────────────────────────────────────────────
+    build-macos:
+        name: Build (macOS — iOS + watchOS + tvOS)
+        runs-on: macos-latest
+        needs: quality
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-java@v4
+              with:
+                  distribution: zulu
+                  java-version: '21'
+
+            - uses: gradle/actions/setup-gradle@v4
+              with:
+                  cache-read-only: true
+
+            - name: Compile all samples — iOS (X64 + Arm64 + Simulator)
+              run: |
+                  ./gradlew \
+                      compileSamplesIosX64 \
+                      compileSamplesIosArm64 \
+                      compileSamplesIosSimulatorArm64 \
+                      --no-daemon --no-configuration-cache
+
+            - name: Compile all samples — watchOS + tvOS
+              run: |
+                  ./gradlew \
+                      compileSamplesWatchosX64 \
+                      compileSamplesWatchosArm64 \
+                      compileSamplesWatchosSimulatorArm64 \
+                      compileSamplesTvosX64 \
+                      compileSamplesTvosArm64 \
+                      compileSamplesTvosSimulatorArm64 \
+                      --no-daemon --no-configuration-cache
+
+            # Validate iOS-side BuildKonfig and override variant
+            - name: Validate iOS BuildKonfig (freeDebug)
+              run: |
+                  set -euo pipefail
+                  GEN=samples/multi-target-multi-variant/build/generated/kmpFlavors/commonMain/kotlin/com/example/multitarget/BuildKonfig.kt
+                  test -f "$GEN" || { echo "::error::BuildKonfig.kt missing"; exit 1; }
+                  grep -qF 'VARIANT_NAME: String = "freeDebug"' "$GEN" || { echo "::error::iOS default not freeDebug"; exit 1; }
+                  echo "✓ iOS freeDebug BuildKonfig generated"
+
+            - name: Override variant — paidStaging (iOS Simulator)
+              run: |
+                  ./gradlew :samples:multi-target-multi-variant:compileKotlinIosSimulatorArm64 \
+                      -PkmpFlavor=paidStaging \
+                      --rerun-tasks --no-daemon --no-configuration-cache
+
+            # Full variant matrix on Apple targets (regression lock)
+            - name: Full matrix — iOS (all variants)
+              run: |
+                  ./gradlew \
+                      :samples:multi-target-multi-variant:assembleAllIosX64Variants \
+                      :samples:multi-target-multi-variant:assembleAllIosArm64Variants \
+                      :samples:multi-target-multi-variant:assembleAllIosSimulatorArm64Variants \
+                      --no-daemon --no-configuration-cache
+                  echo "✓ full iOS matrix green"
+
+            - name: Full matrix — watchOS + tvOS (all variants)
+              run: |
+                  ./gradlew \
+                      :samples:multi-target-multi-variant:assembleAllWatchosX64Variants \
+                      :samples:multi-target-multi-variant:assembleAllWatchosArm64Variants \
+                      :samples:multi-target-multi-variant:assembleAllWatchosSimulatorArm64Variants \
+                      :samples:multi-target-multi-variant:assembleAllTvosX64Variants \
+                      :samples:multi-target-multi-variant:assembleAllTvosArm64Variants \
+                      :samples:multi-target-multi-variant:assembleAllTvosSimulatorArm64Variants \
+                      --no-daemon --no-configuration-cache
+                  echo "✓ full watchOS + tvOS matrix green"
+
+    # ─────────────────────────────────────────────────────────────────
+    # build-windows — mingwX64 across all samples
+    # ─────────────────────────────────────────────────────────────────
+    build-windows:
+        name: Build (Windows — mingwX64)
+        runs-on: windows-latest
+        needs: quality
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-java@v4
+              with:
+                  distribution: zulu
+                  java-version: '21'
+
+            - uses: gradle/actions/setup-gradle@v4
+              with:
+                  cache-read-only: true
+
+            - name: Compile all samples — mingwX64
+              shell: bash
+              run: |
+                  ./gradlew compileSamplesMingwX64 --no-daemon --no-configuration-cache
+
+            - name: Full matrix — mingwX64 (all variants)
+              shell: bash
+              run: |
+                  ./gradlew \
+                      :samples:multi-target-multi-variant:assembleAllMingwX64Variants \
+                      --no-daemon --no-configuration-cache
+                  echo "✓ full mingwX64 matrix green"
