@@ -7,6 +7,7 @@ Curated entry point. Find the right doc per topic instead of crawling the full `
 | Doc | What it covers |
 |---|---|
 | [`QUICKSTART.md`](QUICKSTART.md) | 5-minute onboarding. Plugin declaration → first variant compilation. |
+| [`CONSUMER_GUIDE.md`](CONSUMER_GUIDE.md) | Why the plugin exists, when (and when not) to adopt it, BuildConfig patterns, anti-patterns, and signing DSL narrative. |
 | [`REFERENCE.md`](REFERENCE.md) | Complete `kmpFlavors { }` DSL reference. Every property + DSL method with stability bucket + default + example. |
 
 ## Deep-dive guides
