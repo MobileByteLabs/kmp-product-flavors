@@ -15,14 +15,37 @@ import com.mobilebytelabs.kmpflavors.FlavorConfig
  */
 internal data class RuntimeApiSpec(val packageName: String)
 
-internal data class RuntimeVariantHint(val flavorName: String, val buildTypeName: String, val isDemo: Boolean, val isDebug: Boolean) {
+internal data class RuntimeVariantHint(
+    val flavorName: String,
+    val buildTypeName: String,
+    val bundleId: String,
+    val appDisplayName: String,
+    val appVersion: String,
+    val isDemo: Boolean,
+    val isDebug: Boolean,
+) {
     companion object {
-        fun from(flavor: FlavorConfig, buildType: BuildTypeConfig): RuntimeVariantHint {
+        /**
+         * @param baseBundleId    the project's base application id (e.g. `org.mifos.kmp.template`).
+         * @param appDisplayName  the app display name (typically `rootProject.name`).
+         * @param baseAppVersion  the project version string (typically `project.version`).
+         *
+         * `bundleId` resolves to `baseBundleId` + the active flavor's id suffix (iOS
+         * `bundleIdSuffix`, else Android `applicationIdSuffix`) and `appVersion` appends
+         * the flavor's `versionNameSuffix` — the same resolution IosXcconfigSpec uses, so
+         * the runtime object reports the active variant's real identity, never a stub.
+         */
+        fun from(flavor: FlavorConfig, buildType: BuildTypeConfig, baseBundleId: String, appDisplayName: String, baseAppVersion: String): RuntimeVariantHint {
             val isDemoField =
                 (flavor.buildConfigFields.orNull?.get("IS_DEMO")?.value == "true") || (flavor.name == "demo")
+            val idSuffix = flavor.bundleIdSuffix.orNull ?: flavor.applicationIdSuffix.orNull ?: ""
+            val versionSuffix = flavor.versionNameSuffix.orNull ?: ""
             return RuntimeVariantHint(
                 flavorName = flavor.name,
                 buildTypeName = buildType.name,
+                bundleId = baseBundleId + idSuffix,
+                appDisplayName = appDisplayName,
+                appVersion = baseAppVersion + versionSuffix,
                 isDemo = isDemoField,
                 isDebug = (buildType.isDebuggable.orNull == true),
             )

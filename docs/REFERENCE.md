@@ -177,6 +177,17 @@ Defaults: `"com.example.app"` / `"BuildKonfig"`. Both used only when `generateBu
 
 ---
 
+### 🟢 `appId` / `appDisplayName`
+
+```kotlin
+abstract val appId: Property<String>
+abstract val appDisplayName: Property<String>
+```
+
+Optional app identity fed into the generated `KmpFlavorsRuntime`. `appId` (e.g. `"com.example.app"`) becomes `KmpFlavorsRuntime.bundleId`/`applicationId` with the active flavor's id suffix appended (`bundleIdSuffix`, else `applicationIdSuffix`); `appDisplayName` (e.g. `"Money Toolkit"`) becomes `KmpFlavorsRuntime.appDisplayName`. When unset, the corresponding runtime field is left **empty** rather than guessed from the module or root-project name. `appVersion` is sourced separately from `project.version` (+ the flavor's `versionNameSuffix`).
+
+---
+
 ### 🟢 `bridgeAgpProductFlavors` / `bridgeAgpBuildTypes`
 
 ```kotlin

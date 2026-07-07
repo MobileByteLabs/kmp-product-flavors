@@ -199,79 +199,57 @@ internal object FlavorPhaseDispatcher {
 
         val outDir = project.layout.buildDirectory
             .dir("generated/kmpflavors-runtime").get().asFile
-        val spec = RuntimeApiSpec(packageName = packageName)
-        val files = RuntimeApiGenerator.generate(spec, outDir)
-        // Wire generated source dirs into KMP source sets.
-        // commonMain (expect) always exists. Platform-specific intermediates
-        // (iosMain, desktopMain, etc.) exist only when the consumer either
-        // (a) calls `applyDefaultHierarchyTemplate()` or (b) declares them
-        // explicitly via `val iosMain by getting`. We resolve this per
-        // platform: if the canonical intermediate exists, wire the actual
-        // dir to it; otherwise, fan out to each KMP TARGET's main source
-        // set so the actual still reaches its platform compilations.
-        run {
-            // commonMain (expect) — always present in a multiplatform module.
-            val commonSrc = outDir.resolve("commonMain")
-            if (commonSrc.exists()) {
-                kmp.sourceSets.findByName("commonMain")?.kotlin?.srcDir(commonSrc)
-            }
-        }
-        // Platform actuals (androidMain / iosMain / desktopMain / jsMain / wasmJsMain).
-        // For each, if the canonical intermediate exists use it; otherwise fall
-        // back to per-target main source sets.
-        listOf(
-            "iosMain" to { t: org.jetbrains.kotlin.gradle.plugin.KotlinTarget -> t.name.startsWith("ios") },
-            "androidMain" to { t: org.jetbrains.kotlin.gradle.plugin.KotlinTarget -> t.name == "android" },
-            "desktopMain" to { t: org.jetbrains.kotlin.gradle.plugin.KotlinTarget -> t.platformType.name.lowercase() == "jvm" && t.name == "desktop" },
-            "jsMain" to { t: org.jetbrains.kotlin.gradle.plugin.KotlinTarget -> t.name == "js" },
-            "wasmJsMain" to { t: org.jetbrains.kotlin.gradle.plugin.KotlinTarget -> t.name == "wasmJs" },
-        ).forEach { (ssName, targetPredicate) ->
-            val platformSrcDir = outDir.resolve(ssName)
-            if (!platformSrcDir.exists()) return@forEach
-            val canonical = kmp.sourceSets.findByName(ssName)
-            if (canonical != null) {
-                canonical.kotlin.srcDir(platformSrcDir)
+
+        // Resolve the active variant's values for the concrete commonMain object.
+        val activeFlavor = ext.flavors.firstOrNull { it.isDefault.orNull == true }
+            ?: ext.flavors.firstOrNull()
+        val activeBuildType = ext.buildTypes.firstOrNull { it.isDefault.orNull == true }
+            ?: ext.buildTypes.firstOrNull()
+        // Identity is consumer-declared via the DSL (ext.appId / ext.appDisplayName) or a
+        // gradle property — NEVER guessed from the module/root-project name, which would
+        // bake a misleading value (the runtime object is elected into an arbitrary module).
+        // Unset → empty string (honest "not provided") rather than wrong.
+        val baseBundleId = ext.appId.orNull
+            ?: (project.findProperty("applicationId") as? String)
+            ?: ""
+        val runtimeAppDisplayName = ext.appDisplayName.orNull
+            ?: (project.findProperty("appDisplayName") as? String)
+            ?: ""
+        val runtimeAppVersion = project.version.toString()
+        val hint =
+            if (activeFlavor != null && activeBuildType != null) {
+                RuntimeVariantHint.from(
+                    activeFlavor,
+                    activeBuildType,
+                    baseBundleId,
+                    runtimeAppDisplayName,
+                    runtimeAppVersion,
+                )
             } else {
-                // No canonical intermediate (e.g. iosMain when the consumer skipped
-                // applyDefaultHierarchyTemplate). Fan out to each per-target main
-                // source set that matches this platform.
-                kmp.targets.filter(targetPredicate).forEach { target ->
-                    val tMain = kmp.sourceSets.findByName("${target.name}Main")
-                    tMain?.kotlin?.srcDir(platformSrcDir)
-                }
+                RuntimeVariantHint(
+                    flavorName = "",
+                    buildTypeName = "",
+                    bundleId = baseBundleId,
+                    appDisplayName = runtimeAppDisplayName,
+                    appVersion = runtimeAppVersion,
+                    isDemo = false,
+                    isDebug = false,
+                )
             }
-        }
-        // Replay platform-specific actual srcDirs into each per-variant MAIN
-        // compilation's defaultSourceSet. CompilationRegistrar.register runs
-        // at KMP-plugin-apply (via `plugins.withId`) and snapshots target
-        // main's srcDirs BEFORE this generator runs in afterEvaluate, so
-        // per-variant compilations miss the runtime API actuals without
-        // this second wiring pass. Test compilations are excluded — they
-        // inherit the actual via associateWith on the main compilation;
-        // adding it as source creates orphaned 'actual' declarations.
-        kmp.targets.forEach { target ->
-            val ssName = when {
-                target.name == "android" -> "androidMain"
-                target.name.startsWith("ios") -> "iosMain"
-                target.name == "js" -> "jsMain"
-                target.name == "wasmJs" -> "wasmJsMain"
-                target.platformType.name.lowercase() == "jvm" -> "${target.name}Main"
-                else -> return@forEach
-            }
-            val platformSrcDir = outDir.resolve(ssName)
-            if (!platformSrcDir.exists()) return@forEach
-            target.compilations
-                .matching { c ->
-                    c.name != KotlinCompilation.MAIN_COMPILATION_NAME &&
-                        c.name != KotlinCompilation.TEST_COMPILATION_NAME &&
-                        !c.name.endsWith("Test")
-                }
-                .configureEach {
-                    defaultSourceSet.kotlin.srcDir(platformSrcDir)
-                }
+
+        val spec = RuntimeApiSpec(packageName = packageName)
+        val files = RuntimeApiGenerator.generate(spec, hint, outDir)
+
+        // Wire ONLY the generated commonMain source dir. The runtime is now a single
+        // concrete `object` in commonMain (no expect/actual) so it compiles on every
+        // platform AND every per-variant compilation via normal commonMain visibility —
+        // no platform-actual replay, no per-variant second wiring pass required.
+        val commonSrc = outDir.resolve("commonMain")
+        if (commonSrc.exists()) {
+            kmp.sourceSets.findByName("commonMain")?.kotlin?.srcDir(commonSrc)
         }
         logger.lifecycle(
-            "[KMP Flavors] ${project.path} generated ${files.size} runtime API files (package=$packageName)",
+            "[KMP Flavors] ${project.path} generated ${files.size} runtime API file(s) (package=$packageName)",
         )
         return files.size
     }
