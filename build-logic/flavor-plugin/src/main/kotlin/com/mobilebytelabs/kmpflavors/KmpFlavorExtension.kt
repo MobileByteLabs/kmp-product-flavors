@@ -124,6 +124,22 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
     abstract val buildConfigClassName: Property<String>
 
     /**
+     * The app's base application/bundle id (without any flavor suffix), e.g.
+     * "com.example.app". Consumed by the generated `KmpFlavorsRuntime.bundleId`
+     * (with the active flavor's id suffix appended). Optional — when unset,
+     * `KmpFlavorsRuntime.bundleId` is left empty rather than guessed from the
+     * module name.
+     */
+    abstract val appId: Property<String>
+
+    /**
+     * The app's human-facing display name, e.g. "Money Toolkit". Consumed by the
+     * generated `KmpFlavorsRuntime.appDisplayName`. Optional — when unset, that
+     * field is left empty rather than guessed from the root project name.
+     */
+    abstract val appDisplayName: Property<String>
+
+    /**
      * The active flavor/variant name.
      * Can be overridden via the Gradle property `-PkmpFlavor=xxx`.
      *

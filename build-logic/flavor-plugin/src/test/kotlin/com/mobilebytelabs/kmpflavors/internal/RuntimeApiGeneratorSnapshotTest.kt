@@ -15,20 +15,22 @@
 package com.mobilebytelabs.kmpflavors.internal
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
 
 /**
- * v2.8 Wave B1 — Golden snapshot tests for [RuntimeApiGenerator].
+ * Tests for [RuntimeApiGenerator].
  *
- * Fixtures at `src/test/resources/platform-api-snapshots/` (6 `.kt` files). A synthetic spec
- * with package `com.example.snapshot` drives generation; each of the 6 emitted
- * files is compared byte-equal (trimmed trailing whitespace) against its golden.
- *
- * To update golden files: delete the relevant fixture, run this test, capture
- * the output, write it back. Intentionally no automated "update" flag —
- * snapshots should only change when template logic changes.
+ * Since v2.8.3 the runtime is a SINGLE concrete `object` in commonMain (no
+ * expect/actual). A commonMain `expect` cannot reach a module's per-variant
+ * compilations (`compileDevKotlinDesktop` etc.) — the platform `actual`s are
+ * replayed into variant compilations but the `expect` can't follow, yielding
+ * orphan `actual`s on any KMP module that combines build-type variants with a
+ * desktop (jvm) target. The concrete common object compiles on every platform
+ * AND every per-variant compilation with the variant values resolved at codegen.
  */
 class RuntimeApiGeneratorSnapshotTest {
 
@@ -36,81 +38,52 @@ class RuntimeApiGeneratorSnapshotTest {
     lateinit var outputDir: File
 
     private val spec = RuntimeApiSpec("com.example.snapshot")
-
-    private fun loadSnapshot(name: String): String = javaClass.classLoader
-        .getResourceAsStream("platform-api-snapshots/$name")
-        ?.bufferedReader()?.readText()
-        ?: error("Missing snapshot fixture: platform-api-snapshots/$name")
+    private val hint = RuntimeVariantHint(
+        flavorName = "demo",
+        buildTypeName = "debug",
+        bundleId = "com.example.app.demo",
+        appDisplayName = "Example App",
+        appVersion = "1.2.3",
+        isDemo = true,
+        isDebug = true,
+    )
 
     @Test
-    fun `expect commonMain file matches golden snapshot`() {
-        val files = RuntimeApiGenerator.generate(spec, outputDir)
-        val generated = files.first { it.name == "KmpFlavorsRuntime.kt" }
-        assertEquals(
-            loadSnapshot("KmpFlavorsRuntime.expect.kt").trimEnd(),
-            generated.readText().trimEnd(),
-            "KmpFlavorsRuntime.kt (expect/commonMain) snapshot mismatch",
+    fun `generate returns exactly one commonMain file`() {
+        val files = RuntimeApiGenerator.generate(spec, hint, outputDir)
+        assertEquals(1, files.size, "Expected exactly 1 generated file (concrete commonMain object)")
+        assertEquals("KmpFlavorsRuntime.kt", files.first().name)
+        assertTrue(
+            files.first().absolutePath.replace(File.separatorChar, '/').contains("/commonMain/"),
+            "Runtime file must land in commonMain",
         )
     }
 
     @Test
-    fun `android actual matches golden snapshot`() {
-        val files = RuntimeApiGenerator.generate(spec, outputDir)
-        val generated = files.first { it.name == "KmpFlavorsRuntime.android.kt" }
-        assertEquals(
-            loadSnapshot("KmpFlavorsRuntime.android.kt").trimEnd(),
-            generated.readText().trimEnd(),
-            "KmpFlavorsRuntime.android.kt snapshot mismatch",
-        )
+    fun `generated runtime is a concrete object with no expect or actual`() {
+        val text = RuntimeApiGenerator.generate(spec, hint, outputDir).first().readText()
+        assertTrue(text.contains("public object KmpFlavorsRuntime"), "must be a concrete object")
+        assertFalse(text.contains("expect"), "must not declare expect")
+        assertFalse(text.contains("actual"), "must not declare actual")
+        assertTrue(text.contains("package com.example.snapshot"), "must carry the spec package")
     }
 
     @Test
-    fun `ios actual matches golden snapshot`() {
-        val files = RuntimeApiGenerator.generate(spec, outputDir)
-        val generated = files.first { it.name == "KmpFlavorsRuntime.ios.kt" }
-        assertEquals(
-            loadSnapshot("KmpFlavorsRuntime.ios.kt").trimEnd(),
-            generated.readText().trimEnd(),
-            "KmpFlavorsRuntime.ios.kt snapshot mismatch",
-        )
-    }
-
-    @Test
-    fun `desktop actual matches golden snapshot`() {
-        val files = RuntimeApiGenerator.generate(spec, outputDir)
-        val generated = files.first { it.name == "KmpFlavorsRuntime.desktop.kt" }
-        assertEquals(
-            loadSnapshot("KmpFlavorsRuntime.desktop.kt").trimEnd(),
-            generated.readText().trimEnd(),
-            "KmpFlavorsRuntime.desktop.kt snapshot mismatch",
-        )
-    }
-
-    @Test
-    fun `js actual matches golden snapshot`() {
-        val files = RuntimeApiGenerator.generate(spec, outputDir)
-        val generated = files.first { it.name == "KmpFlavorsRuntime.js.kt" }
-        assertEquals(
-            loadSnapshot("KmpFlavorsRuntime.js.kt").trimEnd(),
-            generated.readText().trimEnd(),
-            "KmpFlavorsRuntime.js.kt snapshot mismatch",
-        )
-    }
-
-    @Test
-    fun `wasmJs actual matches golden snapshot`() {
-        val files = RuntimeApiGenerator.generate(spec, outputDir)
-        val generated = files.first { it.name == "KmpFlavorsRuntime.wasmJs.kt" }
-        assertEquals(
-            loadSnapshot("KmpFlavorsRuntime.wasmJs.kt").trimEnd(),
-            generated.readText().trimEnd(),
-            "KmpFlavorsRuntime.wasmJs.kt snapshot mismatch",
-        )
-    }
-
-    @Test
-    fun `generate returns exactly 6 files`() {
-        val files = RuntimeApiGenerator.generate(spec, outputDir)
-        assertEquals(6, files.size, "Expected 6 generated files (1 expect + 5 actuals)")
+    fun `generated runtime carries the resolved variant values`() {
+        val text = RuntimeApiGenerator.generate(spec, hint, outputDir).first().readText()
+        assertTrue(text.contains("flavorName: String = \"demo\""), "flavorName constant from hint")
+        assertTrue(text.contains("buildTypeName: String = \"debug\""), "buildTypeName constant from hint")
+        assertTrue(text.contains("isDebug: Boolean = true"), "isDebug constant from hint")
+        assertTrue(text.contains("isDemo: Boolean = true"), "isDemo constant from hint")
+        // Identity fields are populated from the hint — never empty stubs.
+        assertTrue(text.contains("bundleId: String = \"com.example.app.demo\""), "bundleId constant from hint")
+        assertTrue(text.contains("appDisplayName: String = \"Example App\""), "appDisplayName constant from hint")
+        assertTrue(text.contains("appVersion: String = \"1.2.3\""), "appVersion constant from hint")
+        assertFalse(text.contains("bundleId: String = \"\""), "bundleId must not be an empty stub")
+        assertFalse(text.contains("appDisplayName: String = \"\""), "appDisplayName must not be an empty stub")
+        assertFalse(text.contains("appVersion: String = \"\""), "appVersion must not be an empty stub")
+        // Full public API surface preserved for source compatibility.
+        listOf("applicationId", "fun get(key: String)")
+            .forEach { assertTrue(text.contains(it), "runtime API must expose $it") }
     }
 }

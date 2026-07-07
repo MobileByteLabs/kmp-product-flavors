@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`kmpFlavors { appId; appDisplayName }` DSL** — optional app identity fed into the generated `KmpFlavorsRuntime`. `appId` gets the active flavor's id suffix appended for `bundleId`/`applicationId`; `appDisplayName` populates `appDisplayName`. Unset → the field is left empty (honest "not provided"), never guessed from the module or root-project name.
+
+### Changed
+
+- **`RuntimeApiGenerator` now emits a single concrete `object KmpFlavorsRuntime` in `commonMain`** — no `expect`/`actual`. A commonMain `expect` cannot reach a module's per-variant compilations (`compileDevKotlinDesktop`, iOS native, etc.): the platform `actual` srcDirs are replayed into each variant compilation but the `expect` cannot follow, leaving orphan `actual`s that fail to compile on any module combining build-type variants with a desktop (jvm) target. The concrete common object compiles on Android, iOS, Web, Desktop **and** every per-variant compilation. Variant values are resolved at codegen (constants) for the active variant. The public API surface is unchanged — additive/internal only, consumers recompile transparently.
+- **`KmpFlavorsRuntime.bundleId` / `applicationId` / `appDisplayName` / `appVersion` are now populated** from the DSL identity + `project.version` (previously emitted as empty strings).
+
+### Fixed
+
+- **KMP consumers combining product-flavor build-type variants with a desktop/iOS target now compile** — this was the orphan-`actual` failure described above, which blocked the runtime API on Desktop and iOS.
+
 ## [2.8.1] - 2026-06-05 — v2.8 Polish: Runtime-API Snapshots + Migration Task + 6 Educational Samples
 
 **Patch release.** No breaking changes. All new APIs are additive; v2.8.0 consumers can upgrade in-place.
