@@ -1,0 +1,143 @@
+/*
+ * Copyright 2026 MobileByteLabs
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ */
+
+package com.mobilebytelabs.kmpflavors.tasks
+
+import org.gradle.api.DefaultTask
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.provider.MapProperty
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.TaskAction
+import org.gradle.work.DisableCachingByDefault
+import java.io.File
+
+/**
+ * Generates one self-contained `Configs/{variant}.xcconfig` per flavor × build-type
+ * combination declared in the `kmpFlavors {}` DSL.
+ *
+ * Each file is the Xcode build configuration's base config (wired directly in
+ * `project.pbxproj` by [KmpFlavorsBootstrapXcodeTask] — NOT via a `$(CONFIGURATION)`
+ * umbrella `#include`, which Xcode does not expand). It owns the per-flavor identity and
+ * optionally pulls in the matching CocoaPods settings.
+ *
+ * ## Config-cache safety
+ *
+ * All inputs are `MapProperty` / `Property` — no `Project` reference is captured in the
+ * task action. The provider blocks that resolve the DSL live at the registration site
+ * ([com.mobilebytelabs.kmpflavors.internal.FlavorPhaseDispatcher]).
+ */
+@DisableCachingByDefault(because = "Fast codegen; output depends on DSL state resolved at execution time")
+abstract class GenerateIosFlavorXcconfigsTask : DefaultTask() {
+
+    /** flavor name → iOS `bundleIdSuffix` (e.g. `"demo"` → `".demo"`, `"prod"` → `""`). */
+    @get:Input
+    abstract val flavorBundleSuffixes: MapProperty<String, String>
+
+    /** build-type name → iOS `bundleIdSuffix` (usually `""`). */
+    @get:Input
+    abstract val buildTypeBundleSuffixes: MapProperty<String, String>
+
+    /** Bundle-id base expression before the suffix. Empty → use [appId]. */
+    @get:Input
+    abstract val bundleIdBaseExpr: Property<String>
+
+    /** Resolved app id, used as the bundle-id base when [bundleIdBaseExpr] is empty. */
+    @get:Input
+    abstract val appId: Property<String>
+
+    /** `DEVELOPMENT_TEAM` value; empty → the line is omitted. */
+    @get:Input
+    abstract val developmentTeamExpr: Property<String>
+
+    /** Optional identity xcconfig each file `#include`s (relative to the Configs dir). */
+    @get:Input
+    abstract val identityInclude: Property<String>
+
+    /** Emit the per-config CocoaPods `#include?`. */
+    @get:Input
+    abstract val cocoapodsIntegration: Property<Boolean>
+
+    /** CocoaPods target name (e.g. `"iosApp"` → `Pods-iosApp.{variant}.xcconfig`). */
+    @get:Input
+    abstract val podsTargetName: Property<String>
+
+    /** The iOS project's `Configs/` directory. */
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    init {
+        group = "kmp-flavors"
+        description = "Generate self-contained per-variant Configs/{variant}.xcconfig from the kmpFlavors DSL."
+    }
+
+    @TaskAction
+    fun generate() {
+        val flavors = flavorBundleSuffixes.get()
+        val buildTypes = buildTypeBundleSuffixes.get()
+        val dir = outputDir.get().asFile.also { it.mkdirs() }
+        val base = bundleIdBaseExpr.get().ifEmpty { appId.get() }
+        val team = developmentTeamExpr.get()
+        val identity = identityInclude.get()
+        val pods = cocoapodsIntegration.get()
+        val podsTarget = podsTargetName.get()
+
+        val variantNames = flavors.keys
+            .flatMap { f -> buildTypes.keys.map { bt -> variantName(f, bt) } }
+            .toSet()
+
+        // Remove stale per-variant xcconfigs (renamed / removed flavors). Never touch a
+        // legacy `iOSApp.xcconfig` umbrella nor any non-variant file.
+        dir.listFiles { file -> file.name.endsWith(".xcconfig") }?.forEach { file ->
+            val vn = file.name.removeSuffix(".xcconfig")
+            if (vn !in variantNames && vn != "iOSApp") file.delete()
+        }
+
+        for ((flavor, flavorSuffix) in flavors.entries.sortedBy { it.key }) {
+            for ((buildType, buildTypeSuffix) in buildTypes.entries.sortedBy { it.key }) {
+                val variant = variantName(flavor, buildType)
+                val combined = flavorSuffix + buildTypeSuffix
+                val bundleExpr = if (combined.isEmpty()) base else base + combined
+                File(dir, "$variant.xcconfig")
+                    .writeText(render(flavor, buildType, variant, bundleExpr, team, identity, pods, podsTarget))
+                logger.lifecycle("generateIosFlavorXcconfigs: wrote $variant.xcconfig  (bundle: $bundleExpr)")
+            }
+        }
+    }
+
+    private fun variantName(flavor: String, buildType: String): String = flavor + buildType.replaceFirstChar { it.uppercase() }
+
+    private fun render(flavor: String, buildType: String, variant: String, bundleExpr: String, team: String, identity: String, pods: Boolean, podsTarget: String): String =
+        buildString {
+            appendLine("// kmp-product-flavors — flavor: $flavor  build-type: $buildType")
+            appendLine("// Generated by com.mobilebytelabs.kmp-product-flavors — DO NOT EDIT.")
+            appendLine("// Re-generate: ./gradlew generateIosFlavorXcconfigs")
+            appendLine("//")
+            appendLine("// This file is the Xcode build configuration's base config (wired in")
+            appendLine("// project.pbxproj). Xcode does not expand \$(CONFIGURATION) in an xcconfig")
+            appendLine("// #include, so each build config points at its own file directly.")
+            appendLine()
+            if (identity.isNotEmpty()) {
+                appendLine("#include \"$identity\"")
+                appendLine()
+            }
+            appendLine("KMPF_VARIANT = $variant")
+            appendLine("PRODUCT_BUNDLE_IDENTIFIER = $bundleExpr")
+            if (team.isNotEmpty()) {
+                appendLine("DEVELOPMENT_TEAM = $team")
+            }
+            if (pods) {
+                appendLine()
+                appendLine("// CocoaPods — per-configuration link/framework settings. Optional (#include?)")
+                appendLine("// so a fresh clone builds before `pod install` runs (Pods/ is gitignored and")
+                appendLine("// regenerated by CI). CocoaPods lowercases the configuration name.")
+                appendLine(
+                    "#include? \"../Pods/Target Support Files/Pods-$podsTarget/" +
+                        "Pods-$podsTarget.${variant.lowercase()}.xcconfig\"",
+                )
+            }
+        }
+}

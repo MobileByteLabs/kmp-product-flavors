@@ -188,6 +188,53 @@ Optional app identity fed into the generated `KmpFlavorsRuntime`. `appId` (e.g. 
 
 ---
 
+### 🟢 `iosXcconfigGeneration` / `iosManifestExport`
+
+```kotlin
+abstract val iosXcconfigGeneration: Property<Boolean>
+abstract val iosManifestExport: Property<Boolean>
+```
+
+Both default `false`. On the module that owns a sibling iOS project:
+
+- `iosXcconfigGeneration=true` registers **`generateIosFlavorXcconfigs`** — writes one self-contained `Configs/{variant}.xcconfig` per flavor × build-type (each is a real per-variant file, NOT a `$(CONFIGURATION)` umbrella `#include`, which Xcode does not expand) and depends on the framework-link tasks so xcconfigs are fresh before Xcode links — plus **`kmpFlavorsBootstrapXcode`**, a manual one-shot that points each flavor build configuration's base config at its own per-variant file in `project.pbxproj`.
+- `iosManifestExport=true` registers **`exportKmpFlavorsManifest`** — writes `build/kmp-flavors/variants.json`, a machine-readable flavor matrix for CI/CD (fastlane variant resolvers, resolve-variants jobs) to read instead of hardcoding a flavor list.
+
+---
+
+### 🟢 `iosConfigsDir` / `iosPbxprojPath`
+
+```kotlin
+abstract val iosConfigsDir: Property<String>
+abstract val iosPbxprojPath: Property<String>
+```
+
+Relative paths (from the registering module) to the iOS project's `Configs/` directory and `project.pbxproj`. Defaults `"../cmp-ios/Configs"` and `"../cmp-ios/iosApp.xcodeproj/project.pbxproj"`. The last segment of `iosConfigsDir` is also the PBXGroup the generated file references are added to.
+
+---
+
+### 🟢 `iosBundleIdBaseExpr` / `iosDevelopmentTeamExpr` / `iosIdentityInclude`
+
+```kotlin
+abstract val iosBundleIdBaseExpr: Property<String>
+abstract val iosDevelopmentTeamExpr: Property<String>
+abstract val iosIdentityInclude: Property<String>
+```
+
+Shape the generated per-variant xcconfigs. `iosBundleIdBaseExpr` is the `PRODUCT_BUNDLE_IDENTIFIER` base before the flavor's `bundleIdSuffix` — empty → the resolved [`appId`](#-appid--appdisplayname) is baked in (self-contained); a consumer keeping identity in an Xcode config sets an expression like `"$(APP_BUNDLE_ID)"`. `iosDevelopmentTeamExpr` is the `DEVELOPMENT_TEAM` value (empty → the line is omitted; e.g. `"$(TEAM_ID)"`). `iosIdentityInclude` is an optional identity xcconfig each per-variant file `#include`s at the top, relative to `Configs/` (e.g. `"../Configuration/Config.xcconfig"`), making each file self-contained so repointing any build configuration at it is safe.
+
+---
+
+### 🟢 `iosCocoapodsIntegration`
+
+```kotlin
+abstract val iosCocoapodsIntegration: Property<Boolean>
+```
+
+Default `false`. When `true`, each generated per-variant xcconfig emits a per-configuration CocoaPods `#include?` (`../Pods/Target Support Files/Pods-iosApp/Pods-iosApp.{lowercasevariant}.xcconfig`) so Pods link/framework settings flow into the custom base config that CocoaPods otherwise refuses to override.
+
+---
+
 ### 🟢 `bridgeAgpProductFlavors` / `bridgeAgpBuildTypes`
 
 ```kotlin

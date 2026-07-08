@@ -6,13 +6,14 @@
 package com.mobilebytelabs.kmpflavors.internal
 
 import com.mobilebytelabs.kmpflavors.KmpFlavorExtension
+import com.mobilebytelabs.kmpflavors.tasks.ExportKmpFlavorsManifestTask
+import com.mobilebytelabs.kmpflavors.tasks.GenerateIosFlavorXcconfigsTask
 import com.mobilebytelabs.kmpflavors.tasks.KmpFlavorsBootstrapXcodeTask
 import com.mobilebytelabs.kmpflavors.tasks.KmpFlavorsDoctorTask
 import com.mobilebytelabs.kmpflavors.tasks.KmpFlavorsMigrateFromV27Task
-import com.mobilebytelabs.kmpflavors.tasks.KmpFlavorsXcodeIntegrateTask
-import org.gradle.api.Action
 import org.gradle.api.Project
 import org.gradle.api.logging.Logger
+import org.gradle.kotlin.dsl.register
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 
@@ -68,10 +69,9 @@ internal object FlavorPhaseDispatcher {
             }
         }
 
-        // phaseIos — xcconfig + xcode integrate task + bootstrap task + iOS firebase
+        // phaseIos — per-variant xcconfig generation + pbxproj bootstrap + manifest + iOS firebase
         if (hasKmp && hasAnyAppleTarget(kmp!!)) {
-            fired += generateIosXcconfigs(project, ext, logger)
-            registerIosTasks(project, ext, logger)
+            fired += registerIosTasks(project, ext, logger)
             fired += IosFirebaseFlavorRouter.apply(project, ext, logger)
         }
 
@@ -98,70 +98,85 @@ internal object FlavorPhaseDispatcher {
         }
     }
 
-    private fun registerIosTasks(project: Project, ext: KmpFlavorExtension, logger: Logger) {
-        val iosAppDir = project.projectDir.resolve("iosApp").takeIf { it.exists() }
-            ?: project.projectDir.resolve("../cmp-ios/iosApp").takeIf { it.exists() }
-            ?: return
-
-        val xcconfigOutDir = iosAppDir.resolve("Configs")
-        val integrateTaskName = "kmpFlavorsXcodeIntegrate"
-        if (project.tasks.findByName(integrateTaskName) == null) {
-            val provider = project.tasks.register(
-                integrateTaskName,
-                KmpFlavorsXcodeIntegrateTask::class.java,
-            )
-            provider.configure(object : Action<KmpFlavorsXcodeIntegrateTask> {
-                override fun execute(task: KmpFlavorsXcodeIntegrateTask) {
-                    task.xcconfigGeneratedDir.set("../../build/generated/iosFlavorConfigs")
-                    task.outputDir.set(xcconfigOutDir)
-                }
-            })
+    /**
+     * Registers the opt-in iOS tasks — `generateIosFlavorXcconfigs` (self-contained per-variant
+     * xcconfigs) + `kmpFlavorsBootstrapXcode` (per-config pbxproj base-config wiring) when
+     * [KmpFlavorExtension.iosXcconfigGeneration] is true, and `exportKmpFlavorsManifest`
+     * (variants.json) when [KmpFlavorExtension.iosManifestExport] is true. All DSL reads use
+     * lazy providers so `LocalFlavors.kt` additions are picked up at execution time.
+     */
+    private fun registerIosTasks(project: Project, ext: KmpFlavorExtension, logger: Logger): Int {
+        val wantXcconfig = ext.iosXcconfigGeneration.getOrElse(false)
+        val wantManifest = ext.iosManifestExport.getOrElse(false)
+        if (!wantXcconfig && !wantManifest) {
+            logger.info("[KMP Flavors] iOS xcconfig generation + manifest export disabled; skipping iOS task registration")
+            return 0
         }
+        var fired = 0
 
-        val bootstrapTaskName = "kmpFlavorsBootstrapXcode"
-        if (project.tasks.findByName(bootstrapTaskName) == null) {
-            val pbxproj = iosAppDir.resolve("iosApp.xcodeproj/project.pbxproj")
-            val infoPlist = iosAppDir.resolve("iosApp/Info.plist")
-            val provider = project.tasks.register(
-                bootstrapTaskName,
-                KmpFlavorsBootstrapXcodeTask::class.java,
-            )
-            provider.configure(object : Action<KmpFlavorsBootstrapXcodeTask> {
-                override fun execute(task: KmpFlavorsBootstrapXcodeTask) {
-                    task.xcconfigRelativePath.set("Configs/iOSApp.xcconfig")
-                    if (pbxproj.exists()) task.pbxprojFile.set(pbxproj)
-                    if (infoPlist.exists()) task.infoPlistFile.set(infoPlist)
-                }
-            })
-        }
-        logger.info("[KMP Flavors] registered iOS bootstrap + integrate tasks")
-    }
-
-    private fun generateIosXcconfigs(project: Project, ext: KmpFlavorExtension, logger: Logger): Int {
-        val flavors = ext.flavors.toList()
-        val buildTypes = ext.buildTypes.toList().ifEmpty { return 0 }
-        val outDir = project.layout.buildDirectory
-            .dir("generated/iosFlavorConfigs").get().asFile
-        val baseBundleId = (project.findProperty("applicationId") as? String) ?: project.name
-        val appDisplayName = project.rootProject.name
-        val appVersion = project.version.toString()
-        var count = 0
-        for (flavor in flavors) {
-            for (buildType in buildTypes) {
-                val spec = IosXcconfigSpec.from(
-                    flavor,
-                    buildType,
-                    baseBundleId,
-                    appDisplayName,
-                    appVersion,
-                    ext,
-                )
-                IosXcconfigGenerator.generate(spec, outDir)
-                count++
+        if (wantManifest && project.tasks.findByName("exportKmpFlavorsManifest") == null) {
+            project.tasks.register<ExportKmpFlavorsManifestTask>("exportKmpFlavorsManifest") {
+                flavorAppIdSuffixes.set(project.provider { ext.flavors.associate { it.name to (it.applicationIdSuffix.orNull ?: "") } })
+                flavorBundleIdSuffixes.set(project.provider { ext.flavors.associate { it.name to (it.bundleIdSuffix.orNull ?: "") } })
+                buildTypeAppIdSuffixes.set(project.provider { ext.buildTypes.associate { it.name to (it.applicationIdSuffix.orNull ?: "") } })
+                outputFile.set(project.layout.buildDirectory.file("kmp-flavors/variants.json"))
             }
+            fired++
         }
-        logger.lifecycle("[KMP Flavors] generated $count xcconfig files")
-        return count
+
+        if (wantXcconfig) {
+            val configsDirRel = ext.iosConfigsDir.getOrElse("../cmp-ios/Configs")
+            val pbxprojRel = ext.iosPbxprojPath.getOrElse("../cmp-ios/iosApp.xcodeproj/project.pbxproj")
+            val groupName = configsDirRel.substringAfterLast('/')
+            val iosDirRel = configsDirRel.substringBeforeLast('/')
+            val podsTarget = "iosApp"
+
+            if (project.tasks.findByName("generateIosFlavorXcconfigs") == null) {
+                project.tasks.register<GenerateIosFlavorXcconfigsTask>("generateIosFlavorXcconfigs") {
+                    flavorBundleSuffixes.set(project.provider { ext.flavors.associate { it.name to (it.bundleIdSuffix.orNull ?: "") } })
+                    buildTypeBundleSuffixes.set(project.provider { ext.buildTypes.associate { it.name to (it.bundleIdSuffix.orNull ?: "") } })
+                    bundleIdBaseExpr.set(ext.iosBundleIdBaseExpr.orElse(""))
+                    appId.set(ext.appId.orElse(""))
+                    developmentTeamExpr.set(ext.iosDevelopmentTeamExpr.orElse(""))
+                    identityInclude.set(ext.iosIdentityInclude.orElse(""))
+                    cocoapodsIntegration.set(ext.iosCocoapodsIntegration.orElse(false))
+                    podsTargetName.set(podsTarget)
+                    outputDir.set(project.layout.projectDirectory.dir(configsDirRel))
+                }
+            }
+            fired++
+
+            // Keep xcconfigs fresh before Xcode links the KMP framework.
+            val generateProvider = project.tasks.named("generateIosFlavorXcconfigs")
+            project.tasks.configureEach {
+                if (name == "embedAndSignAppleFrameworkForXcode" ||
+                    (name.startsWith("link") && name.contains("Framework") && name.contains("Ios"))
+                ) {
+                    dependsOn(generateProvider)
+                }
+            }
+
+            // Bootstrap is NOT auto-hooked — a consumer runs it once to wire their pbxproj.
+            if (project.tasks.findByName("kmpFlavorsBootstrapXcode") == null) {
+                project.tasks.register<KmpFlavorsBootstrapXcodeTask>("kmpFlavorsBootstrapXcode") {
+                    variantNames.set(
+                        project.provider {
+                            ext.flavors.flatMap { f ->
+                                ext.buildTypes.map { bt -> f.name + bt.name.replaceFirstChar { it.uppercase() } }
+                            }.toSet()
+                        },
+                    )
+                    configsGroupName.set(groupName)
+                    projectName.set(project.name)
+                    pbxprojFile.set(project.layout.projectDirectory.file(pbxprojRel))
+                    infoPlistFile.set(project.layout.projectDirectory.file("$iosDirRel/$podsTarget/Info.plist"))
+                }
+            }
+            fired++
+        }
+
+        logger.info("[KMP Flavors] registered iOS tasks (xcconfig=$wantXcconfig, manifest=$wantManifest)")
+        return fired
     }
 
     private fun generateRuntimeApi(project: Project, ext: KmpFlavorExtension, kmp: KotlinMultiplatformExtension, logger: Logger): Int {
