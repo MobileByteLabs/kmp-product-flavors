@@ -139,6 +139,64 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
      */
     abstract val appDisplayName: Property<String>
 
+    // ──────────────────────────────────────────────────────────────────────────
+    // iOS xcconfig + manifest generation (opt-in; see docs/REFERENCE.md).
+    //
+    // When [iosXcconfigGeneration] is true the plugin registers, on the module
+    // that has a sibling iOS project, a `generateIosFlavorXcconfigs` task that
+    // writes one self-contained `Configs/{variant}.xcconfig` per flavor×buildType
+    // and a `kmpFlavorsBootstrapXcode` task that points each Xcode flavor build
+    // configuration's base config at its own per-variant xcconfig (NOT a broken
+    // `$(CONFIGURATION)` umbrella include). `exportKmpFlavorsManifest` (variants.json)
+    // is registered when [iosManifestExport] is true.
+    // ──────────────────────────────────────────────────────────────────────────
+
+    /** Master switch for the per-variant iOS xcconfig generation + pbxproj wiring. Default: false. */
+    abstract val iosXcconfigGeneration: Property<Boolean>
+
+    /** Register the `exportKmpFlavorsManifest` (variants.json) task. Default: false. */
+    abstract val iosManifestExport: Property<Boolean>
+
+    /**
+     * Relative path (from the registering module) to the iOS project's `Configs/`
+     * directory where per-variant xcconfigs are written. Default: `"../cmp-ios/Configs"`.
+     */
+    abstract val iosConfigsDir: Property<String>
+
+    /**
+     * Relative path (from the registering module) to `project.pbxproj`.
+     * Default: `"../cmp-ios/iosApp.xcodeproj/project.pbxproj"`.
+     */
+    abstract val iosPbxprojPath: Property<String>
+
+    /**
+     * Bundle-id base expression written into each per-variant xcconfig, before the
+     * flavor's `bundleIdSuffix`. Empty → use the resolved [appId] (self-contained).
+     * A consumer keeping identity in an Xcode config sets an expr like `"$(APP_BUNDLE_ID)"`.
+     */
+    abstract val iosBundleIdBaseExpr: Property<String>
+
+    /**
+     * `DEVELOPMENT_TEAM` value written into each per-variant xcconfig. Empty → the
+     * line is omitted. A consumer keeping the team in an Xcode config sets `"$(TEAM_ID)"`.
+     */
+    abstract val iosDevelopmentTeamExpr: Property<String>
+
+    /**
+     * Optional identity xcconfig each per-variant file `#include`s at the top (relative
+     * to the `Configs/` dir), e.g. `"../Configuration/Config.xcconfig"`. Makes each
+     * per-variant file self-contained so repointing any build config at it is safe.
+     * Empty → no identity include.
+     */
+    abstract val iosIdentityInclude: Property<String>
+
+    /**
+     * Emit a per-configuration CocoaPods `#include?` in each per-variant xcconfig
+     * (`../Pods/Target Support Files/Pods-iosApp/Pods-iosApp.{lowercasevariant}.xcconfig`)
+     * so Pods link/framework settings flow in despite the custom base config. Default: false.
+     */
+    abstract val iosCocoapodsIntegration: Property<Boolean>
+
     /**
      * The active flavor/variant name.
      * Can be overridden via the Gradle property `-PkmpFlavor=xxx`.

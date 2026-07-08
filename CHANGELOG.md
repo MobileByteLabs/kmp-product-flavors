@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **First-class iOS xcconfig + manifest generation in the plugin.** New opt-in DSL — `kmpFlavors { iosXcconfigGeneration = true; iosManifestExport = true; … }` — registers three tasks on the module owning the iOS project, so consumers no longer hand-maintain them in their own `build-logic`:
+  - **`generateIosFlavorXcconfigs`** writes one self-contained `Configs/{variant}.xcconfig` per flavor × build-type (each is a real per-variant file, NOT a `$(CONFIGURATION)` umbrella `#include` — which Xcode does not expand), optionally `#include`-ing an identity config and a per-configuration CocoaPods `#include?`. Hooked to the framework-link tasks so xcconfigs are fresh before Xcode links.
+  - **`kmpFlavorsBootstrapXcode`** points each flavor build configuration's base config at its own per-variant file in `project.pbxproj` (replaces the previous broken umbrella base-config wiring).
+  - **`exportKmpFlavorsManifest`** writes `build/kmp-flavors/variants.json`, a machine-readable flavor matrix for CI/CD.
+  - New DSL: `iosXcconfigGeneration`, `iosManifestExport`, `iosConfigsDir`, `iosPbxprojPath`, `iosBundleIdBaseExpr`, `iosDevelopmentTeamExpr`, `iosIdentityInclude`, `iosCocoapodsIntegration` — see `docs/REFERENCE.md`.
 - **`kmpFlavors { appId; appDisplayName }` DSL** — optional app identity fed into the generated `KmpFlavorsRuntime`. `appId` gets the active flavor's id suffix appended for `bundleId`/`applicationId`; `appDisplayName` populates `appDisplayName`. Unset → the field is left empty (honest "not provided"), never guessed from the module or root-project name.
 
 ### Changed
