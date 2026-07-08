@@ -337,6 +337,13 @@ kover {
                     // which is brittle. Equivalent v2.x tasks are also excluded.
                     "com.mobilebytelabs.kmpflavors.tasks.KmpFlavorsBootstrapXcodeTask",
                     "com.mobilebytelabs.kmpflavors.tasks.KmpFlavorsBootstrapXcodeTask\$*",
+                    // v2.8.3 — iOS xcconfig + manifest tasks moved into the plugin. Same
+                    // Gradle-task category as the entries above: TestKit-driven, brittle
+                    // Property<T> instantiation, so excluded from line-coverage instrumentation.
+                    "com.mobilebytelabs.kmpflavors.tasks.GenerateIosFlavorXcconfigsTask",
+                    "com.mobilebytelabs.kmpflavors.tasks.GenerateIosFlavorXcconfigsTask\$*",
+                    "com.mobilebytelabs.kmpflavors.tasks.ExportKmpFlavorsManifestTask",
+                    "com.mobilebytelabs.kmpflavors.tasks.ExportKmpFlavorsManifestTask\$*",
                     "com.mobilebytelabs.kmpflavors.tasks.KmpFlavorsDoctorTask",
                     "com.mobilebytelabs.kmpflavors.tasks.KmpFlavorsDoctorTask\$*",
                     "com.mobilebytelabs.kmpflavors.tasks.KmpFlavorsXcodeIntegrateTask",
