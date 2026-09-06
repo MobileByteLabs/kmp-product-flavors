@@ -13,6 +13,7 @@ package com.mobilebytelabs.kmpflavors
 import org.gradle.testfixtures.ProjectBuilder
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class SpmConfigTest {
@@ -20,8 +21,20 @@ class SpmConfigTest {
     private fun newConfig(): SpmConfig = ProjectBuilder.builder().build().objects.newInstance(SpmConfig::class.java)
 
     @Test
-    fun `generateManifest convention is false`() {
-        assertFalse(newConfig().generateManifest.get())
+    fun `generateManifest convention is true — SPM is the default iOS distribution path`() {
+        // v2.9: SPM is on by default. CocoaPods was never the default and stays opt-in;
+        // before v2.9 NEITHER was on, so "SPM by default" was only true on paper.
+        assertTrue(newConfig().generateManifest.get())
+    }
+
+    @Test
+    fun `requireXcframework convention is true — a dangling manifest must fail loudly`() {
+        assertTrue(newConfig().requireXcframework.get())
+    }
+
+    @Test
+    fun `xcframeworkTask has no convention — resolution is auto by default`() {
+        assertFalse(newConfig().xcframeworkTask.isPresent)
     }
 
     @Test

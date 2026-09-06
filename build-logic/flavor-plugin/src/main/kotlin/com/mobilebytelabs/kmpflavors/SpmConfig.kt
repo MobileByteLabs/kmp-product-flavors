@@ -121,10 +121,54 @@ abstract class SpmConfig @Inject constructor() {
      */
     abstract val checksumStrategy: Property<SpmChecksumStrategy>
 
+    /**
+     * v2.9 — explicit name of the Gradle task that PRODUCES the XCFramework this manifest
+     * points at. Leave unset (the default) to auto-resolve the consumer's own producer:
+     * `assemble{Name}{Variant}XCFramework` → `assemble{Name}{BuildType}XCFramework` →
+     * `assemble{Name}XCFramework`.
+     *
+     * Set this only when the producing task has a non-conventional name.
+     */
+    abstract val xcframeworkTask: Property<String>
+
+    /**
+     * v2.9 — when true (the default), the build FAILS if no XCFramework producer can be
+     * resolved for the active variant, instead of writing a `Package.swift` whose
+     * `binaryTarget` path does not exist. That dangling manifest was the v2.8 behaviour and
+     * it surfaced as a confusing SwiftPM *resolution* error inside Xcode rather than a
+     * Gradle error.
+     *
+     * Set to `false` when the binary is produced outside this Gradle build — e.g.
+     * [SpmDistribution.REMOTE] against a CDN artifact.
+     */
+    abstract val requireXcframework: Property<Boolean>
+
+    /**
+     * v2.9 — also generate the flavor-aware Xcode Run-Script that assembles the XCFramework
+     * and stages the SDK-matching slice ([com.mobilebytelabs.kmpflavors.tasks.GenerateSpmEmbedScriptTask]).
+     *
+     * On by default alongside [generateManifest]: a manifest without this script is only
+     * half an integration — Xcode would have nothing to build the referenced binary.
+     */
+    abstract val generateEmbedScript: Property<Boolean>
+
+    /**
+     * Path of the generated embed script, relative to the repository root.
+     * Convention: `<iosProjectDir>/scripts/embed-xcframework.sh`.
+     */
+    abstract val embedScriptPath: Property<String>
+
     init {
-        generateManifest.convention(false)
+        // v2.9 — SPM is the DEFAULT iOS framework-distribution path. Prior to v2.9 this was
+        // `false`, so a consumer got neither SPM nor CocoaPods unless they opted in; the
+        // "SPM only" stance in docs/IOS_DISTRIBUTION.md was therefore aspirational rather
+        // than the shipped default. Registration is still skipped entirely for projects with
+        // no iOS target, so non-Apple consumers see no new tasks.
+        generateManifest.convention(true)
         xcframeworkName.convention("Shared")
         distribution.convention(SpmDistribution.LOCAL)
         checksumStrategy.convention(SpmChecksumStrategy.AUTO)
+        requireXcframework.convention(true)
+        generateEmbedScript.convention(true)
     }
 }

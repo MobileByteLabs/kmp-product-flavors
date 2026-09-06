@@ -1,0 +1,183 @@
+/*
+ * Copyright 2026 MobileByteLabs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.mobilebytelabs.kmpflavors.tasks
+
+import org.gradle.api.DefaultTask
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.MapProperty
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.Internal
+import org.gradle.api.tasks.OutputFile
+import org.gradle.api.tasks.TaskAction
+import org.gradle.work.DisableCachingByDefault
+
+/**
+ * v2.9 — generates the Xcode Run-Script that makes SPM consumption actually work.
+ *
+ * ## Why the plugin owns this
+ *
+ * `Package.swift` alone does not produce a build. Something has to assemble the XCFramework
+ * for the flavor Xcode is currently building, and stage the SDK-matching `.framework` slice
+ * into `FRAMEWORK_SEARCH_PATHS`. Until v2.9 every consumer hand-wrote that script, which
+ * meant re-deriving the `{flavor}{BuildType}` → `NativeBuildType` mapping that the Kotlin
+ * CocoaPods plugin's `xcodeConfigurationToNativeBuildType[...]` block used to own. That
+ * mapping is the single non-trivial piece of a CocoaPods→SPM migration.
+ *
+ * ## Why generated beats hand-written
+ *
+ * A hand-written script matches configurations with a `*Debug` glob. That is wrong for any
+ * debuggable build type not named `*Debug` — e.g. a `staging` type with
+ * `isDebuggable = true` would silently link the RELEASE slice. This task emits an EXACT
+ * case arm per declared Xcode configuration, taken from the `kmpFlavors` DSL, so the
+ * mapping cannot drift from the flavor matrix.
+ *
+ * Emitted script is bash-3.2 safe: macOS ships bash 3.2 and Xcode Run-Script phases run
+ * under it, so `${x,,}` (bash 4) is avoided in favour of `tr`.
+ */
+@DisableCachingByDefault(because = "Fast codegen; output depends on DSL state resolved at execution time")
+abstract class GenerateSpmEmbedScriptTask : DefaultTask() {
+
+    /** Logical XCFramework name, matching `spm.xcframeworkName` / the KMP `baseName`. */
+    @get:Input
+    abstract val xcframeworkName: Property<String>
+
+    /** Gradle path of the module that exports the framework, e.g. `":cmp-shared"`. */
+    @get:Input
+    abstract val sharedModulePath: Property<String>
+
+    /** Directory name of the Xcode project relative to the repo root, e.g. `"cmp-ios"`. */
+    @get:Input
+    abstract val iosProjectDirName: Property<String>
+
+    /** Xcode configuration name → Kotlin `NativeBuildType` name (`Debug` / `Release`). */
+    @get:Input
+    abstract val configurationToBuildType: MapProperty<String, String>
+
+    @get:OutputFile
+    abstract val outputFile: RegularFileProperty
+
+    /** Repo root captured at configuration time — see [GenerateSpmManifestTask.rootDirPath]. */
+    @get:Internal
+    abstract val rootDirPath: org.gradle.api.file.DirectoryProperty
+
+    init {
+        group = "kmp flavors"
+        description = "Generate the flavor-aware Xcode Run-Script that assembles + stages the SPM XCFramework."
+    }
+
+    @TaskAction
+    fun generate() {
+        val name = xcframeworkName.get()
+        val modulePath = sharedModulePath.get()
+        val iosDir = iosProjectDirName.get()
+        val mapping = configurationToBuildType.get()
+
+        val target = outputFile.get().asFile
+        target.parentFile?.mkdirs()
+        target.writeText(renderScript(name, modulePath, iosDir, mapping))
+        target.setExecutable(true, false)
+        val shown = rootDirPath.orNull?.asFile
+            ?.let { root -> runCatching { target.relativeTo(root).path }.getOrElse { target.path } }
+            ?: target.path
+        logger.lifecycle("[KMP Flavors] Wrote SPM embed script → $shown")
+    }
+
+    private fun renderScript(name: String, modulePath: String, iosDir: String, mapping: Map<String, String>): String {
+        // Group configurations by build type so the case statement stays compact and
+        // reviewable: one arm per Kotlin build type listing every configuration that maps
+        // to it. Sorted for deterministic output (reproducible builds / clean diffs).
+        val byBuildType: Map<String, List<String>> = mapping.entries
+            .groupBy({ it.value }, { it.key })
+            .mapValues { (_, configs) -> configs.sorted() }
+        val moduleDir = modulePath.removePrefix(":").replace(':', '/')
+
+        return buildString {
+            appendLine("#!/usr/bin/env bash")
+            appendLine("#")
+            appendLine("# embed-xcframework.sh — GENERATED by kmp-product-flavors. DO NOT EDIT.")
+            appendLine("#")
+            appendLine("# Regenerate with: ./gradlew $modulePath:generateSpmEmbedScript")
+            appendLine("#")
+            appendLine("# Wire this as an Xcode Run-Script build phase on the app target, ordered")
+            appendLine("# BEFORE 'Compile Sources':")
+            appendLine("#     \"\$SRCROOT/scripts/$(target_basename())\"")
+            appendLine("#")
+            appendLine("# It reproduces the flavor-aware build-type selection that the Kotlin CocoaPods")
+            appendLine("# plugin's xcodeConfigurationToNativeBuildType[...] block used to perform, but")
+            appendLine("# derived from the kmpFlavors DSL instead of a name glob.")
+            appendLine("set -euo pipefail")
+            appendLine()
+            appendLine("# SRCROOT is exported by Xcode (…/$iosDir); fall back to a relative resolve")
+            appendLine("# so the script is runnable from a terminal too.")
+            appendLine("SRCROOT=\"\${SRCROOT:-\$(cd \"\$(dirname \"\$0\")/..\" && pwd)}\"")
+            appendLine("REPO_ROOT=\"\$(cd \"\$SRCROOT/..\" && pwd)\"")
+            appendLine("GRADLEW=\"\$REPO_ROOT/gradlew\"")
+            appendLine()
+            appendLine("CONFIG=\"\${CONFIGURATION:-}\"")
+            appendLine("case \"\$CONFIG\" in")
+            for ((buildType, configs) in byBuildType.toSortedMap()) {
+                appendLine("  ${configs.joinToString("|")}) KOTLIN_BUILD_TYPE=\"$buildType\" ;;")
+            }
+            appendLine("  *)")
+            appendLine("    # Unknown configuration — default to Release rather than guessing a")
+            appendLine("    # debuggable slice for what may be a store build.")
+            appendLine("    echo \"warning: [KMP] unmapped Xcode configuration '\$CONFIG' — defaulting to Release\" >&2")
+            appendLine("    KOTLIN_BUILD_TYPE=\"Release\"")
+            appendLine("    ;;")
+            appendLine("esac")
+            appendLine()
+            appendLine("echo \"note: [KMP] \$CONFIG -> Kotlin build type \$KOTLIN_BUILD_TYPE\"")
+            appendLine()
+            appendLine("if [ ! -x \"\$GRADLEW\" ]; then")
+            appendLine("  echo \"error: gradlew not found or not executable at \$GRADLEW\" >&2")
+            appendLine("  exit 1")
+            appendLine("fi")
+            appendLine()
+            appendLine("# Assemble the XCFramework the SPM binary target in Package.swift points at.")
+            appendLine("# NOTE: embedAndSignAppleFrameworkForXcode is deliberately NOT used — Kotlin")
+            appendLine("# rejects it once the Xcode project carries SwiftPM dependencies with")
+            appendLine("# \"You have SwiftPM dependencies with embedAndSign integration\", which is")
+            appendLine("# true by definition once Package.swift is consumed.")
+            appendLine("\"\$GRADLEW\" -p \"\$REPO_ROOT\" \\")
+            appendLine("  \"$modulePath:assemble$name\${KOTLIN_BUILD_TYPE}XCFramework\"")
+            appendLine()
+            appendLine("# Stage the SDK-matching slice into FRAMEWORK_SEARCH_PATHS so `import $name`")
+            appendLine("# resolves at LINK time. bash 3.2 on the Xcode runner: lowercase via tr.")
+            appendLine("SDK=\"\${SDK_NAME:-iphoneos}\"")
+            appendLine("TYPE_DIR=\"\$(printf '%s' \"\$KOTLIN_BUILD_TYPE\" | tr '[:upper:]' '[:lower:]')\"")
+            appendLine("XCF=\"\$REPO_ROOT/$moduleDir/build/XCFrameworks/\$TYPE_DIR/$name.xcframework\"")
+            appendLine("case \"\$SDK\" in")
+            appendLine("  *simulator*) SRC_FW=\"\$(ls -d \"\$XCF\"/*simulator*/$name.framework 2>/dev/null | head -1)\" ;;")
+            appendLine("  *)           SRC_FW=\"\$(ls -d \"\$XCF\"/ios-arm64/$name.framework 2>/dev/null | head -1)\" ;;")
+            appendLine("esac")
+            appendLine()
+            appendLine("if [ -z \"\${SRC_FW:-}\" ]; then")
+            appendLine("  echo \"error: [KMP] no $name.framework slice for SDK '\$SDK' in \$XCF\" >&2")
+            appendLine("  exit 1")
+            appendLine("fi")
+            appendLine()
+            appendLine("DST_DIR=\"\$REPO_ROOT/$moduleDir/build/xcode-frameworks/\$CONFIG/\$SDK\"")
+            appendLine("mkdir -p \"\$DST_DIR\"")
+            appendLine("rm -rf \"\$DST_DIR/$name.framework\"")
+            appendLine("cp -R \"\$SRC_FW\" \"\$DST_DIR/\"")
+            appendLine("echo \"note: [KMP] staged \$SRC_FW -> \$DST_DIR\"")
+        }
+    }
+
+    private fun target_basename(): String = "embed-xcframework.sh"
+}
