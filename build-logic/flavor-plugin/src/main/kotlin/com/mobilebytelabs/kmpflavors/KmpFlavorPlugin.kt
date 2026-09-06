@@ -607,7 +607,21 @@ class KmpFlavorPlugin : Plugin<Project> {
                     // variant compilations altogether (KGP's documented shape for custom
                     // compilations), which collides with expect/actual placement. Left as a
                     // deliberate, measured trade — see CHANGELOG.
-                    variantCommon.dependsOn(commonMainSourceSet)
+                    // commonMain is folded in as a SEPARATE, upstream source set inside this
+                    // variant's own tree — never as a `dependsOn` on the real `commonMain`
+                    // node (that edge is what put one node into many Source Set Trees).
+                    //
+                    // Two levels are required, not one. Collapsing commonMain and the flavor
+                    // directories into a single source set puts `expect` (commonMain) and
+                    // `actual` (commonFlavor) in the SAME source set, which Kotlin rejects:
+                    //   "appName: expect and corresponding actual are in the same module"
+                    // So: {variant}VariantCommon (commonMain) <- {variant}VariantMain (flavors).
+                    val variantRootName = "${name}VariantCommon"
+                    val variantRoot = kotlin.sourceSets.maybeCreate(variantRootName)
+                    variantRoot.kotlin.srcDir("src/commonMain/kotlin")
+                    variantRoot.resources.srcDir("src/commonMain/resources")
+                    inheritSourceSetDependencies(project, variantRootName, "commonMain")
+                    variantCommon.dependsOn(variantRoot)
                     // Share the flavor directories by path. `src/common<Flavor>/{kotlin,resources}`
                     // is the same convention SourceSetConfigurator uses.
                     variant.flavors.forEach { flavor ->
@@ -703,7 +717,13 @@ class KmpFlavorPlugin : Plugin<Project> {
                         // Collision-free for the same reason as the main tree above.
                         val variantCommonTestName = "${name}VariantTest"
                         val variantCommonTest = kotlin.sourceSets.maybeCreate(variantCommonTestName)
-                        variantCommonTest.dependsOn(commonTestSourceSet)
+                        // Same two-level shape as the main tree above.
+                        val variantTestRootName = "${name}VariantCommonTest"
+                        val variantTestRoot = kotlin.sourceSets.maybeCreate(variantTestRootName)
+                        variantTestRoot.kotlin.srcDir("src/commonTest/kotlin")
+                        variantTestRoot.resources.srcDir("src/commonTest/resources")
+                        inheritSourceSetDependencies(project, variantTestRootName, "commonTest")
+                        variantCommonTest.dependsOn(variantTestRoot)
                         variant.flavors.forEach { flavor ->
                             val ssName = "common${flavor.name.replaceFirstChar { it.uppercase() }}Test"
                             variantCommonTest.kotlin.srcDir("src/$ssName/kotlin")

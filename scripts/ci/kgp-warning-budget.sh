@@ -25,16 +25,27 @@
 #   scripts/ci/kgp-warning-budget.sh --report   # print the breakdown, never fail
 set -euo pipefail
 
-# Current ceiling. Remaining known classes at the time of writing:
-#   * 20 — commonMain / commonTest as shared roots. Inherent to matrix mode: multiple
-#          compilations must share commonMain for BOTH sources and dependencies, and KGP's
-#          tree model has no supported shape for that. Removing the edge was implemented
-#          and measured — it trades 20 cross-tree warnings for 112 "Missing 'dependsOn'"
-#          ones, because KGP already includes commonMain in the variant compilation.
-#          Closing it needs intermediate source sets dropped for variant compilations,
-#          which collides with expect/actual placement.
-#   * 10 — unused per-target-flavor intermediates (e.g. iosDev, iosFree).
-KGP_WARNING_BUDGET=30
+# Current ceiling. ZERO "Invalid Source Set Dependency Across Trees" warnings remain —
+# that class is fully fixed and must never come back.
+#
+# The remaining 7 are all "Unused Kotlin Source Sets", and they are the deliberate,
+# irreducible cost of the "share DIRECTORIES, never NODES" design:
+#
+#   commonPaid / commonProd / commonTablet / commonEnterprise / commonPrd
+#   commonDebug / commonRelease / commonStaging / desktopDebug / desktopRelease
+#
+# Each of these NODES must keep existing because it is a public configuration surface —
+# consumers write `sourceSets.commonPaid.dependencies { ... }` (pinned by
+# PerVariantDependencyClasspathTest) and registering a build type is a contract that
+# `common{BuildType}` exists (pinned by IntermediateBuildTypeSourceSetTest). But the node
+# itself is no longer attached to a compilation: variant compilations consume its
+# DIRECTORY via srcDir, with dependencies carried by `extendsFrom`. KGP therefore reports
+# it as unused, which is literally true and harmless.
+#
+# Removing them would mean deleting a documented API. Re-attaching them to compilations
+# would restore the cross-tree warnings this work removed. Gating them on on-disk content
+# was tried and breaks IntermediateBuildTypeSourceSetTest.
+KGP_WARNING_BUDGET=7
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
@@ -56,6 +67,20 @@ echo "── KGP source-set warnings ──────────────�
 grep -oE 'w: ⚠️ [A-Za-z'"'"' ]+' "$LOG" | sort | uniq -c | sort -rn || true
 echo "─────────────────────────────────────────────────────────"
 echo "  actual: ${ACTUAL}   budget: ${KGP_WARNING_BUDGET}"
+
+# ── Hard zero: cross-tree edges ──────────────────────────────────────────────
+# "Invalid Source Set Dependency Across Trees" describes wiring KGP does not support, so
+# it is a forward-compat hazard rather than noise. It was 83 warnings; it is now 0 and is
+# gated at 0 independently of the overall budget, so it can never creep back under cover
+# of the aggregate count. The rule that keeps it at zero: share source-set DIRECTORIES
+# across variant trees, never the NODES.
+CROSS_TREE=$(grep -c 'Invalid Source Set Dependency Across Trees' "$LOG" || true)
+if [ "$CROSS_TREE" -gt 0 ]; then
+    echo ""
+    echo "::error::${CROSS_TREE} cross-tree source-set warning(s) reintroduced (must stay 0)."
+    grep -A 8 'Invalid Source Set Dependency Across Trees' "$LOG" | head -40
+    exit 1
+fi
 
 if [ "${1:-}" = "--report" ]; then
     exit 0

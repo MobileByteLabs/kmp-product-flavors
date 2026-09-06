@@ -79,7 +79,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   inherited via `extendsFrom`.
 
 - **CI now gates the warning count.** `scripts/ci/kgp-warning-budget.sh` fails the Code
-  Quality job if KGP source-set warnings exceed a declared ceiling (currently 30). The budget
+  Quality job if KGP source-set warnings exceed a declared ceiling (currently 7), and fails outright on ANY cross-tree warning (hard zero). The budget
   ratchets down only. Nothing counted these before, which is how 95 accumulated unnoticed.
 
 - **Cut KGP "Invalid Source Set Dependency Across Trees" warnings by sharing flavor
@@ -93,7 +93,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Q11 (expect/actual in separate source sets) and Q12 (cross-variant isolation) are preserved
   — isolation is in fact stronger, since variants no longer share any node — and the TestKit
   `CrossVariantIsolationTest` / `ExpectActualMatrixTest` suites still pass unchanged.
-  Warnings on a full configure: **95 → 30** across this and the two fixes below.
+  Warnings on a full configure: **95 → 7**, with the "Invalid Source Set Dependency Across
+  Trees" class down to **ZERO** (from 83) across this and the fixes below.
 
   Two follow-on details this required:
   - Variant source sets are named `{variant}VariantMain` / `{variant}VariantTest`. A plain
@@ -106,15 +107,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     so they are now inherited explicitly via `extendsFrom` on the Gradle configurations
     (`PerVariantDependencyClasspathTest` guards this).
 
-  **Known remaining gap:** `commonMain` / `commonTest` are still cross-tree roots (19 of the
-  61 remaining warnings). Removing those edges was implemented and measured: dependencies can
-  be re-established via `extendsFrom`, but KGP already includes `commonMain` in the variant
-  compilation, so the intermediate then shares no root with it and KGP emits
-  *"Missing 'dependsOn' in Source Sets"* instead — **112 new warnings for 19 removed**, plus
-  duplicated `commonMain` sources. Closing it properly means dropping intermediate source sets
-  for variant compilations entirely (KGP's documented shape for custom compilations), which
-  collides with expect/actual placement. Deliberately deferred rather than shipped as a net
-  regression.
+  **`commonMain` / `commonTest` cross-tree roots — also fixed.** Each variant gets a
+  TWO-level tree: `{variant}VariantCommon` (carrying `src/commonMain/`) upstream of
+  `{variant}VariantMain` (carrying the flavor directories), with dependencies via
+  `extendsFrom`. Two levels are required, not one: collapsing them puts `expect` (commonMain)
+  and `actual` (commonFlavor) in the SAME source set, which Kotlin rejects with
+  *"appName: expect and corresponding actual are in the same module"*.
+
+  An earlier single-level attempt is recorded here because it looked right and was not: it
+  produced **112 new "Missing 'dependsOn' in Source Sets" warnings for 19 removed**, because
+  at that point the `common{BuildType}` edges were still transitively pulling `commonMain`
+  into the variant compilation. Removing those first changed the conditions, after which the
+  same approach landed cleanly.
+
+- **Per-target-flavor intermediates were created with no possible consumer.** `PlatformDetector`
+  registers groups such as `ios` / `tvos` / `watchos` whose `iosMain` source set often does not
+  exist (the real leaves are `iosArm64` / `iosX64` / `iosSimulatorArm64`), so `iosFree`,
+  `iosDev` and `nativeFree` were created and could never be attached to any compilation. They
+  are now created only when the consumer actually has code in that directory.
+
+- **The 7 warnings that remain are deliberate.** All are "Unused Kotlin Source Sets" for nodes
+  that must keep existing as a PUBLIC configuration surface — `sourceSets.commonPaid.dependencies { … }`
+  (`PerVariantDependencyClasspathTest`) and the `common{BuildType}` registration contract
+  (`IntermediateBuildTypeSourceSetTest`) — while their DIRECTORIES are what actually compiles.
+  Deleting them removes a documented API; re-attaching them to compilations restores the
+  cross-tree warnings. Both alternatives were implemented, measured and rejected.
 
 - **`GenerateSpmManifestTask` was incompatible with the Gradle configuration cache.** It called
   `Task.project` from its `@TaskAction` (`project.rootDir` / `project.projectDir`), which fails

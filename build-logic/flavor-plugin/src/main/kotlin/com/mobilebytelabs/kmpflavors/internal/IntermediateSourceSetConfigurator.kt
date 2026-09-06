@@ -89,8 +89,13 @@ internal object IntermediateSourceSetConfigurator {
         }
 
         // 1. Create one common{BuildType} per registered build type, dependsOn commonMain.
-        val commonBuildTypeSourceSets: Map<String, KotlinSourceSet> = buildTypes.associate { buildType ->
+        val commonBuildTypeSourceSets: Map<String, KotlinSourceSet> = buildTypes.mapNotNull { buildType ->
             val ssName = "common${buildType.name.replaceFirstChar { it.uppercase() }}"
+            // NOTE: deliberately NOT gated on on-disk content. Registering a build type is
+            // a CONTRACT that `common{BuildType}` exists — consumers configure it directly
+            // (`sourceSets.commonStaging.dependencies { … }`) before any file is placed
+            // there, and IntermediateBuildTypeSourceSetTest pins that. Gating it trades 3
+            // warnings for a broken public contract.
             val ss = kotlin.sourceSets.maybeCreate(ssName)
             ss.kotlin.srcDir("src/$ssName/kotlin")
             ss.resources.srcDir("src/$ssName/resources")
@@ -99,7 +104,7 @@ internal object IntermediateSourceSetConfigurator {
             }
             logger.info("[KMP Flavors] Phase 1A — created $ssName -> dependsOn(commonMain)")
             buildType.name to ss
-        }
+        }.toMap()
 
         // 2. Create per-target {target}{BuildType} source sets too. These let consumers drop
         //    target+buildType-specific code in `src/desktopStaging/kotlin/...`.
@@ -188,5 +193,13 @@ internal object IntermediateSourceSetConfigurator {
                 into.extendsFrom(from)
             }
         }
+    }
+
+    /** True when `src/{name}/{kotlin,resources}` actually contains files. */
+    private fun hasOnDiskContent(project: org.gradle.api.Project, name: String): Boolean {
+        val kotlinDir = project.file("src/$name/kotlin")
+        val resourcesDir = project.file("src/$name/resources")
+        return (kotlinDir.isDirectory && kotlinDir.walk().any { it.isFile }) ||
+            (resourcesDir.isDirectory && resourcesDir.walk().any { it.isFile })
     }
 }
