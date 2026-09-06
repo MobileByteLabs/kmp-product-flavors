@@ -148,4 +148,39 @@ class SpmXcframeworkResolverTest {
         assertTrue(message.contains("freeDevDebug"), message)
         assertTrue(message.contains("spm.requireXcframework"), message)
     }
+
+    @Test
+    fun `null or blank native build type falls back to the release bucket`() {
+        // KGP always emits a release aggregate; a flavor-only matrix (no build-type
+        // dimension) therefore resolves to `release` rather than an empty path segment.
+        assertEquals(
+            "../../XCFrameworks/release/Shared.xcframework",
+            SpmXcframeworkResolver.conventionalOutputPath("Shared", null),
+        )
+        assertEquals(
+            "../../XCFrameworks/release/Shared.xcframework",
+            SpmXcframeworkResolver.conventionalOutputPath("Shared", "   "),
+        )
+    }
+
+    @Test
+    fun `an already-capitalised variant name is not double-capitalised`() {
+        // Variant names normally arrive lowerCamel, but a consumer may register a flavor
+        // with a leading capital; the task name must stay well-formed either way.
+        val candidates = SpmXcframeworkResolver.candidateTaskNames(
+            xcframeworkName = "Shared",
+            variantName = "FreeDebug",
+            buildTypeName = "Debug",
+        )
+        assertEquals("assembleSharedFreeDebugXCFramework", candidates.first())
+        assertTrue(candidates.contains("assembleSharedDebugXCFramework"), candidates.toString())
+    }
+
+    @Test
+    fun `mixed-case build type is lowercased into the bucket path`() {
+        assertEquals(
+            "../../XCFrameworks/debug/Shared.xcframework",
+            SpmXcframeworkResolver.conventionalOutputPath("Shared", "DEBUG"),
+        )
+    }
 }
