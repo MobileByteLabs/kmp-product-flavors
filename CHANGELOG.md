@@ -58,6 +58,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Cut KGP "Invalid Source Set Dependency Across Trees" warnings by sharing flavor
+  DIRECTORIES instead of source-set NODES.** Matrix mode wired every variant compilation
+  `dependsOn(commonFree)` / `dependsOn(commonProd)` — the *shared* per-flavor source sets.
+  KGP treats each compilation as its own Source Set Tree, so a single node ended up depended
+  on from the active variant's `main` tree plus every matrix variant containing that flavor,
+  which KGP flags as an unsupported shape (not merely noise — it is forward-compat risk).
+  Each variant now gets its own `common{Variant}` / `common{Variant}Test` source set carrying
+  the same `src/common<Flavor>/` directories, so every node belongs to exactly one tree.
+  Q11 (expect/actual in separate source sets) and Q12 (cross-variant isolation) are preserved
+  — isolation is in fact stronger, since variants no longer share any node — and the TestKit
+  `CrossVariantIsolationTest` / `ExpectActualMatrixTest` suites still pass unchanged.
+  Warnings on a full configure: **95 → 73**.
+
 - **`GenerateSpmManifestTask` was incompatible with the Gradle configuration cache.** It called
   `Task.project` from its `@TaskAction` (`project.rootDir` / `project.projectDir`), which fails
   with *"Invocation of 'Task.project' … at execution time is unsupported"*. Never caught because
