@@ -166,7 +166,15 @@ class DiagnoseVariantTaskTest {
         assertTrue(line.contains("\"flavors\":[\"paid\"]"))
         assertTrue(line.contains("\"active\":false"))
         assertTrue(line.contains("\"targets\":[\"desktop\"]"))
-        assertTrue(line.contains("\"sourceSets\":[") && line.contains("commonPaid"))
+        // v2.9: a matrix variant compiles through its OWN `{variant}VariantMain` source set,
+        // which carries `src/commonPaid/` as a srcDir. Variants no longer dependsOn the
+        // shared `commonPaid` NODE — that is what produced KGP's "Invalid Source Set
+        // Dependency Across Trees" warning, since one node then sat in several trees.
+        assertTrue(line.contains("\"sourceSets\":["))
+        assertTrue(
+            line.contains("paidVariantMain") || line.contains("commonPaid"),
+            "Expected the variant's own source set in the diagnostic:\n$line",
+        )
         assertTrue(line.contains("\"buildConfigFields\":{") && line.contains("IS_PREMIUM"))
     }
 

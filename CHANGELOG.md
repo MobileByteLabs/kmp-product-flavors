@@ -71,6 +71,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `CrossVariantIsolationTest` / `ExpectActualMatrixTest` suites still pass unchanged.
   Warnings on a full configure: **95 → 73**.
 
+  Two follow-on details this required:
+  - Variant source sets are named `{variant}VariantMain` / `{variant}VariantTest`. A plain
+    `common{Variant}` collides with `common{Flavor}` whenever there is one flavor dimension
+    and no build types (variant name == flavor name), which silently re-created the very
+    cross-tree edge being removed.
+  - Dependencies a consumer declares on a flavor source set
+    (`sourceSets.commonPaid.dependencies { … }`) previously reached variant compilations
+    through the `dependsOn` edge. Sharing directories carries sources but not dependencies,
+    so they are now inherited explicitly via `extendsFrom` on the Gradle configurations
+    (`PerVariantDependencyClasspathTest` guards this).
+
+  **Known remaining gap:** `commonMain` / `commonTest` are still cross-tree roots (19 of the
+  61 remaining warnings). Removing those edges was implemented and measured: dependencies can
+  be re-established via `extendsFrom`, but KGP already includes `commonMain` in the variant
+  compilation, so the intermediate then shares no root with it and KGP emits
+  *"Missing 'dependsOn' in Source Sets"* instead — **112 new warnings for 19 removed**, plus
+  duplicated `commonMain` sources. Closing it properly means dropping intermediate source sets
+  for variant compilations entirely (KGP's documented shape for custom compilations), which
+  collides with expect/actual placement. Deliberately deferred rather than shipped as a net
+  regression.
+
 - **`GenerateSpmManifestTask` was incompatible with the Gradle configuration cache.** It called
   `Task.project` from its `@TaskAction` (`project.rootDir` / `project.projectDir`), which fails
   with *"Invocation of 'Task.project' … at execution time is unsupported"*. Never caught because
