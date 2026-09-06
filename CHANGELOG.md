@@ -58,6 +58,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`src/{flavor}Main/` never compiled — a documented feature that silently did nothing.**
+  `docs/CONSUMER_GUIDE.md` documents `freeMain/` as "sources compiled only for the `free`
+  flavor" and `docs/SOURCE_SET_DISCIPLINE.md` builds the single-axis model on it, but the
+  `{F}Main` source sets were created, given srcDirs and wired `dependsOn(commonMain)` with
+  **no consumer at all** — nothing ever depended on them, so code placed there was dropped
+  without a word. (The orphans also showed up in KGP's cross-tree diagnostics under a
+  `'null' Tree`.) The directories are now folded into the source sets that actually compile:
+  `common{Flavor}` for the active flavor and `{variant}VariantMain` for matrix variants.
+  `FlavorMainSourceSetLivenessTest` is the canary — it puts deliberately broken code in
+  `src/freeMain/` and REQUIRES the build to fail, so a dead source set can never pass again.
+  **Consumers with code in `src/{flavor}Main/` will see it compiled for the first time**, so
+  a previously-ignored compile error there can now surface.
+
+- **Build-type source sets were shared across variant trees too.** `IntermediateSourceSetConfigurator`
+  wired every variant compilation `dependsOn(commonDebug)` and `dependsOn({target}{BuildType})`,
+  putting one node into every variant tree carrying that build type — the same defect as the
+  per-flavor case, and the source of the `watchos*` warning cluster. Now shares the
+  directories (mirroring the ISSUE #99 fix already used for `<target>Main`) with dependencies
+  inherited via `extendsFrom`.
+
+- **CI now gates the warning count.** `scripts/ci/kgp-warning-budget.sh` fails the Code
+  Quality job if KGP source-set warnings exceed a declared ceiling (currently 30). The budget
+  ratchets down only. Nothing counted these before, which is how 95 accumulated unnoticed.
+
 - **Cut KGP "Invalid Source Set Dependency Across Trees" warnings by sharing flavor
   DIRECTORIES instead of source-set NODES.** Matrix mode wired every variant compilation
   `dependsOn(commonFree)` / `dependsOn(commonProd)` — the *shared* per-flavor source sets.
@@ -69,7 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Q11 (expect/actual in separate source sets) and Q12 (cross-variant isolation) are preserved
   — isolation is in fact stronger, since variants no longer share any node — and the TestKit
   `CrossVariantIsolationTest` / `ExpectActualMatrixTest` suites still pass unchanged.
-  Warnings on a full configure: **95 → 73**.
+  Warnings on a full configure: **95 → 30** across this and the two fixes below.
 
   Two follow-on details this required:
   - Variant source sets are named `{variant}VariantMain` / `{variant}VariantTest`. A plain

@@ -89,7 +89,15 @@ class SourceSetConfigurator(private val logger: Logger) {
 
             if (isActiveFlavor && commonFlavor != null) {
                 commonFlavor.dependsOn(commonMain)
-                logger.info("[KMP Flavors] Wired $commonFlavorName -> commonMain")
+                // v2.9 — `src/{flavor}Main/` is a DOCUMENTED convention
+                // (docs/CONSUMER_GUIDE.md, docs/SOURCE_SET_DISCIPLINE.md) but the
+                // standalone `{F}Main` source set KmpFlavorSourceSetWiring created had no
+                // consumer, so code placed there was silently NEVER COMPILED — and the
+                // orphan node also surfaced in KGP's cross-tree warnings under a
+                // `'null' Tree`. Fold the directory into the live per-flavor source set.
+                commonFlavor.kotlin.srcDir("src/${flavorName}Main/kotlin")
+                commonFlavor.resources.srcDir("src/${flavorName}Main/resources")
+                logger.info("[KMP Flavors] Wired $commonFlavorName -> commonMain (+ src/${flavorName}Main)")
             }
 
             // 2. Create intermediate<Flavor> source sets (if enabled)

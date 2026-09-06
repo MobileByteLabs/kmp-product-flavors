@@ -614,6 +614,11 @@ class KmpFlavorPlugin : Plugin<Project> {
                         val cap = flavor.name.replaceFirstChar { it.uppercase() }
                         variantCommon.kotlin.srcDir("src/common$cap/kotlin")
                         variantCommon.resources.srcDir("src/common$cap/resources")
+                        // The documented `src/{flavor}Main/` convention — see the note in
+                        // SourceSetConfigurator; these directories had no consumer at all
+                        // before v2.9.
+                        variantCommon.kotlin.srcDir("src/${flavor.name}Main/kotlin")
+                        variantCommon.resources.srcDir("src/${flavor.name}Main/resources")
                         // Sharing the DIRECTORY carries the flavor's SOURCES but not the
                         // dependencies a consumer declared on the flavor source set itself
                         // (`sourceSets.commonPaid.dependencies { ... }`) — those used to
@@ -665,6 +670,7 @@ class KmpFlavorPlugin : Plugin<Project> {
             // v2.2 Phase 1A — wire cross-variant intermediate source sets when opted in.
             // No-op when createIntermediateBuildTypeSourceSets=false OR no buildTypes registered.
             intermediateSourceSetsByVariant = IntermediateSourceSetConfigurator.configure(
+                project = project,
                 kotlin = kotlin,
                 buildTypes = buildTypesList,
                 allVariants = allVariants,

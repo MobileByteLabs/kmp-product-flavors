@@ -68,6 +68,7 @@ internal object IntermediateSourceSetConfigurator {
      * variant depends on, so the caller can populate `KmpFlavorVariant.intermediateSourceSets`.
      */
     fun configure(
+        project: org.gradle.api.Project,
         kotlin: KotlinMultiplatformExtension,
         buildTypes: List<BuildTypeConfig>,
         allVariants: List<FlavorVariant>,
@@ -135,13 +136,26 @@ internal object IntermediateSourceSetConfigurator {
                 @Suppress("UNCHECKED_CAST")
                 val container = target.compilations
                 val compilation = container.findByName(variant.name) ?: continue
-                if (commonBt !in compilation.defaultSourceSet.dependsOn) {
-                    compilation.defaultSourceSet.dependsOn(commonBt)
-                }
-                // Also wire the per-target intermediate if it exists.
+                // v2.9 — share the build-type DIRECTORIES, never the NODES.
+                //
+                // `commonDebug` / `watchosArm64Debug` are shared by EVERY variant carrying
+                // that build type, so a `dependsOn` edge put one node into several Kotlin
+                // Source Set Trees at once and KGP rejected it:
+                //   w: ⚠️ Invalid Source Set Dependency Across Trees
+                //      …'watchosArm64Debug'… 'enterpriseDebug' Tree / 'paidDebug' Tree
+                // This mirrors the ISSUE #99 fix in CompilationRegistrar, which already
+                // folds `<target>Main` in by srcDir for exactly the same reason.
+                val commonBtName = commonBt.name
+                compilation.defaultSourceSet.kotlin.srcDir("src/$commonBtName/kotlin")
+                compilation.defaultSourceSet.resources.srcDir("src/$commonBtName/resources")
+                inheritSourceSetDependencies(project, compilation.defaultSourceSet.name, commonBtName)
+
+                // Also fold in the per-target intermediate if it exists.
                 val perTarget = perTargetBuildTypeSourceSets[target.name to buildTypeName]
-                if (perTarget != null && perTarget !in compilation.defaultSourceSet.dependsOn) {
-                    compilation.defaultSourceSet.dependsOn(perTarget)
+                if (perTarget != null) {
+                    compilation.defaultSourceSet.kotlin.srcDir("src/${perTarget.name}/kotlin")
+                    compilation.defaultSourceSet.resources.srcDir("src/${perTarget.name}/resources")
+                    inheritSourceSetDependencies(project, compilation.defaultSourceSet.name, perTarget.name)
                     intermediates += perTarget
                 }
             }
@@ -159,5 +173,20 @@ internal object IntermediateSourceSetConfigurator {
                 "{target}{BuildType} source sets across $variantCount variant(s).",
         )
         return variantIntermediateSourceSets
+    }
+
+    /**
+     * Inherit the dependencies declared on a shared build-type source set without creating a
+     * `dependsOn` edge (which would place one node in several Source Set Trees). Directories
+     * carry sources; `extendsFrom` carries dependencies.
+     */
+    private fun inheritSourceSetDependencies(project: org.gradle.api.Project, targetSourceSetName: String, sharedSourceSetName: String) {
+        listOf("Implementation", "Api", "CompileOnly", "RuntimeOnly").forEach { scope ->
+            val from = project.configurations.findByName("$sharedSourceSetName$scope") ?: return@forEach
+            val into = project.configurations.findByName("$targetSourceSetName$scope") ?: return@forEach
+            if (from !== into && !into.extendsFrom.contains(from)) {
+                into.extendsFrom(from)
+            }
+        }
     }
 }

@@ -60,6 +60,12 @@ jobs:
             - name: detekt
               run: ./gradlew detekt --no-daemon --no-configuration-cache
 
+            # KGP source-set warning budget — ratchet gate. Warnings here describe wiring
+            # KGP does not support (today's warning, tomorrow's error) or directories that
+            # silently never compile, so the count may fall but never rise.
+            - name: KGP warning budget
+              run: bash scripts/ci/kgp-warning-budget.sh
+
             # G17 — plugin id must be identical in gradlePlugin block and KDoc
             - name: Plugin id consistency
               run: |
