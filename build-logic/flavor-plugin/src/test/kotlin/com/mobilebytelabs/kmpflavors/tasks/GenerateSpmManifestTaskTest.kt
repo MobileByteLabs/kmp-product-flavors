@@ -108,7 +108,7 @@ class GenerateSpmManifestTaskTest {
     fun `REMOTE AUTO reads checksum from sidecar file when present`() {
         val task = newTask()
         // Place the sidecar where the resolver expects it.
-        val xcframeworkDir = File(tempDir, "XCFrameworks/freeDev/Shared.xcframework").apply { mkdirs() }
+        val xcframeworkDir = File(tempDir, "build/XCFrameworks/freeDev/Shared.xcframework").apply { mkdirs() }
         File(xcframeworkDir.parentFile, "Shared.xcframework.checksum").writeText("sha256-abc123\n")
         task.distribution.set(SpmDistribution.REMOTE)
         task.binaryUrlTemplate.set("https://cdn/x.zip")
@@ -130,7 +130,7 @@ class GenerateSpmManifestTaskTest {
     @Test
     fun `REMOTE REQUIRE_FILE reads sidecar happy path`() {
         val task = newTask()
-        val xcframeworkDir = File(tempDir, "XCFrameworks/freeDev/Shared.xcframework").apply { mkdirs() }
+        val xcframeworkDir = File(tempDir, "build/XCFrameworks/freeDev/Shared.xcframework").apply { mkdirs() }
         File(xcframeworkDir.parentFile, "Shared.xcframework.checksum").writeText("sha256-required-file-value\n")
         task.distribution.set(SpmDistribution.REMOTE)
         task.binaryUrlTemplate.set("https://cdn/x.zip")
@@ -144,7 +144,7 @@ class GenerateSpmManifestTaskTest {
     fun `REMOTE AUTO computes sha256 over xcframework directory when present`() {
         val task = newTask()
         // Build a fake .xcframework bundle with a couple of files.
-        val xcframeworkDir = File(tempDir, "XCFrameworks/freeDev/Shared.xcframework").apply { mkdirs() }
+        val xcframeworkDir = File(tempDir, "build/XCFrameworks/freeDev/Shared.xcframework").apply { mkdirs() }
         File(xcframeworkDir, "Info.plist").writeText("<plist></plist>")
         File(xcframeworkDir, "binary.bin").writeBytes(byteArrayOf(1, 2, 3, 4))
         task.distribution.set(SpmDistribution.REMOTE)
@@ -161,7 +161,7 @@ class GenerateSpmManifestTaskTest {
     fun `REMOTE AUTO computes sha256 over xcframework when it is a single file`() {
         val task = newTask()
         // Single file rather than directory bundle — exercises sha256(file) branch.
-        val xcframeworkFile = File(tempDir, "XCFrameworks/freeDev/Shared.xcframework").apply {
+        val xcframeworkFile = File(tempDir, "build/XCFrameworks/freeDev/Shared.xcframework").apply {
             parentFile.mkdirs()
             writeBytes(byteArrayOf(10, 20, 30, 40, 50))
         }

@@ -22,6 +22,7 @@ import org.gradle.api.DefaultTask
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
@@ -71,6 +72,17 @@ abstract class GenerateSpmManifestTask : DefaultTask() {
     @get:OutputDirectory
     abstract val outputDirectory: DirectoryProperty
 
+    /**
+     * Repo root + module dir captured at CONFIGURATION time.
+     *
+     * `Task.project` must never be touched from a `@TaskAction` — Gradle's configuration
+     * cache rejects it ("Invocation of 'Task.project' by task ... at execution time is
+     * unsupported"). This task did exactly that until v2.9; it went unnoticed because SPM
+     * generation was opt-in and no sample exercised it under the configuration cache.
+     */
+    @get:Internal
+    abstract val rootDirPath: DirectoryProperty
+
     @TaskAction
     fun generate() {
         val variant = variantName.get()
@@ -85,7 +97,7 @@ abstract class GenerateSpmManifestTask : DefaultTask() {
 
         val target = File(outDir, "Package.swift")
         target.writeText(manifest)
-        logger.lifecycle("[KMP Flavors] Wrote SPM manifest → ${target.relativeTo(project.rootDir)}")
+        logger.lifecycle("[KMP Flavors] Wrote SPM manifest → ${relativeToRoot(target)}")
     }
 
     private fun renderLocal(name: String, variant: String): String {
@@ -151,7 +163,13 @@ abstract class GenerateSpmManifestTask : DefaultTask() {
 
         val expected = xcframeworkPath.orNull
             ?: "../../XCFrameworks/$variant/$name.xcframework"
-        val xcframework = File(project.projectDir, expected.removePrefix("../../"))
+        // Resolve RELATIVE TO THE MANIFEST, because that is exactly what the path in the
+        // emitted `binaryTarget(path:)` means. The previous resolution joined the path
+        // against the MODULE dir after stripping "../../", which silently pointed at
+        // <module>/XCFrameworks/... while the manifest itself said
+        // <module>/build/XCFrameworks/... — so checksum lookups could miss the very binary
+        // the manifest referenced.
+        val xcframework = File(outputDirectory.get().asFile, expected).canonicalFile
         val sidecar = File(xcframework.parentFile, "${xcframework.name}.checksum")
 
         return when (strategy) {
@@ -160,7 +178,7 @@ abstract class GenerateSpmManifestTask : DefaultTask() {
             SpmChecksumStrategy.REQUIRE_FILE -> {
                 if (!sidecar.exists()) {
                     error(
-                        "[KMP Flavors] checksumStrategy=REQUIRE_FILE but ${sidecar.relativeTo(project.rootDir)} " +
+                        "[KMP Flavors] checksumStrategy=REQUIRE_FILE but ${relativeToRoot(sidecar)} " +
                             "is missing. Generate it via `swift package compute-checksum <xcframework>`.",
                     )
                 }
@@ -202,5 +220,11 @@ abstract class GenerateSpmManifestTask : DefaultTask() {
     companion object {
         const val TODO_PLACEHOLDER = "<TODO-checksum>"
         const val SKIP_PLACEHOLDER = "<SKIP-checksum>"
+    }
+
+    /** Pretty relative path for logs, without touching `Task.project` at execution time. */
+    private fun relativeToRoot(file: File): String {
+        val root = rootDirPath.orNull?.asFile ?: return file.path
+        return runCatching { file.relativeTo(root).path }.getOrElse { file.path }
     }
 }

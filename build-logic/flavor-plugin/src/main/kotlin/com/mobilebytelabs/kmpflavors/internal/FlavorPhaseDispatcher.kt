@@ -139,7 +139,7 @@ internal object FlavorPhaseDispatcher {
                     appId.set(ext.appId.orElse(""))
                     developmentTeamExpr.set(ext.iosDevelopmentTeamExpr.orElse(""))
                     identityInclude.set(ext.iosIdentityInclude.orElse(""))
-                    cocoapodsIntegration.set(ext.iosCocoapodsIntegration.orElse(false))
+                    cocoapodsIntegration.set(ext.iosIncludePodsXcconfig.orElse(false))
                     podsTargetName.set(podsTarget)
                     outputDir.set(project.layout.projectDirectory.dir(configsDirRel))
                 }

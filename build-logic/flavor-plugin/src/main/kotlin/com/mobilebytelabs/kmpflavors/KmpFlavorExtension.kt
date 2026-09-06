@@ -191,11 +191,37 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
     abstract val iosIdentityInclude: Property<String>
 
     /**
-     * Emit a per-configuration CocoaPods `#include?` in each per-variant xcconfig
+     * Emit a per-configuration Pods `#include?` in each per-variant xcconfig
      * (`../Pods/Target Support Files/Pods-iosApp/Pods-iosApp.{lowercasevariant}.xcconfig`)
-     * so Pods link/framework settings flow in despite the custom base config. Default: false.
+     * so Pods link/framework settings flow in despite the custom base config.
+     *
+     * **Default: `false` — SPM is the default and only supported path for distributing the
+     * KMP framework itself** (see `spm { }` / [SpmConfig]). This flag is deliberately NOT a
+     * CocoaPods integration: it neither applies the Kotlin CocoaPods plugin, nor generates a
+     * podspec, nor runs `pod install`. It adds one *optional* `#include?` line — inert when
+     * `Pods/` is absent, since Xcode silently ignores a missing optional include.
+     *
+     * It exists for the hybrid brownfield case: an app that consumes the KMP framework via
+     * SPM but still uses CocoaPods for *other* native dependencies (Firebase, analytics
+     * SDKs). Those apps need the Pods xcconfig re-included because this plugin's per-variant
+     * base config displaces the one CocoaPods installs.
+     *
+     * @since v2.9 renamed from `iosCocoapodsIntegration`.
      */
-    abstract val iosCocoapodsIntegration: Property<Boolean>
+    abstract val iosIncludePodsXcconfig: Property<Boolean>
+
+    /**
+     * Renamed in v2.9 — the old name oversold the behaviour as a "CocoaPods integration"
+     * when it only emits an optional Pods xcconfig `#include?`. Kept as a source-compatible
+     * alias over the same [Property] instance; reads and writes are interchangeable.
+     */
+    @Deprecated(
+        message = "Renamed to iosIncludePodsXcconfig — this emits an optional Pods xcconfig " +
+            "#include?, it is not a CocoaPods integration. SPM is the default framework " +
+            "distribution path.",
+        replaceWith = ReplaceWith("iosIncludePodsXcconfig"),
+    )
+    val iosCocoapodsIntegration: Property<Boolean> get() = iosIncludePodsXcconfig
 
     /**
      * The active flavor/variant name.
@@ -878,6 +904,9 @@ abstract class KmpFlavorExtension @Inject constructor(objects: ObjectFactory) {
 
     init {
         // Set conventions
+        // iOS framework distribution: SPM is the default (see SpmConfig.generateManifest,
+        // convention = true since v2.9). The Pods xcconfig passthrough is strictly opt-in.
+        iosIncludePodsXcconfig.convention(false)
         generateBuildConfig.convention(true)
         buildConfigClassName.convention("BuildKonfig")
         createIntermediateSourceSets.convention(true)

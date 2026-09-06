@@ -936,11 +936,17 @@ class KmpFlavorPlugin : Plugin<Project> {
             allowedVariantNames = allVariants.map { it.name }.toSet(),
         )
 
-        // SPM manifest generator — opt-in via spm { generateManifest.set(true) }.
+        // SPM manifest generator — ON BY DEFAULT since v2.9 (SPM is the default iOS
+        // framework-distribution path; CocoaPods is opt-in and never the default).
+        // Gated on an actual iOS target so flipping the default adds ZERO tasks to
+        // Android-only / desktop-only / JVM consumers.
         // v2.2 Phase 5B: when matrix mode is ALSO on, register one SPM task per variant
         // (build/spm/{variantName}/Package.swift). v1.x consumers without matrix mode get
         // the single-variant SPM manifest unchanged.
-        if (extension.spm.generateManifest.get()) {
+        val hasIosTarget = nonAndroidTargets.any {
+            it.name in com.mobilebytelabs.kmpflavors.internal.SpmXcframeworkResolver.IOS_TARGET_NAMES
+        }
+        if (extension.spm.generateManifest.get() && hasIosTarget) {
             if (matrixModeEnabled) {
                 for (variant in allVariants) {
                     registerSpmTaskForVariant(project, extension, variant)
@@ -951,6 +957,12 @@ class KmpFlavorPlugin : Plugin<Project> {
                 )
             } else {
                 registerSpmTask(project, extension, activeVariantResolved)
+            }
+
+            // v2.9 — the Xcode half of end-to-end SPM. A Package.swift with no script to
+            // assemble + stage the binary it references is only half an integration.
+            if (extension.spm.generateEmbedScript.get()) {
+                registerSpmEmbedScriptTask(project, extension, allVariants)
             }
         }
 
@@ -1387,6 +1399,41 @@ class KmpFlavorPlugin : Plugin<Project> {
     }
 
     /**
+     * v2.9 — registers `generateSpmEmbedScript`, which emits the flavor-aware Xcode
+     * Run-Script phase body. The `{flavor}{BuildType}` → `NativeBuildType` mapping is taken
+     * from the DSL (each build type's `isDebuggable`), reproducing exactly what the Kotlin
+     * CocoaPods plugin's `xcodeConfigurationToNativeBuildType[...]` block used to do.
+     */
+    private fun registerSpmEmbedScriptTask(project: org.gradle.api.Project, extension: KmpFlavorExtension, allVariants: List<FlavorVariant>) {
+        // Xcode configuration names ARE the variant names produced by the flavor matrix.
+        // Debuggability comes from the declared build type, NOT from a name glob — a
+        // build type called `staging` with isDebuggable = true must select the Debug slice.
+        val mapping: Map<String, String> = allVariants.associate { variant ->
+            val debuggable = variant.buildType?.isDebuggable?.getOrElse(false) ?: false
+            variant.name to if (debuggable) "Debug" else "Release"
+        }
+
+        // Derive the iOS project dir from the configured pbxproj path
+        // ("../cmp-ios/iosApp.xcodeproj/project.pbxproj" → "cmp-ios").
+        val pbxPath = extension.iosPbxprojPath.getOrElse("../cmp-ios/iosApp.xcodeproj/project.pbxproj")
+        val iosDirName = pbxPath.removePrefix("../").substringBefore('/').ifBlank { "cmp-ios" }
+        val scriptPath = extension.spm.embedScriptPath
+            .getOrElse("$iosDirName/scripts/embed-xcframework.sh")
+
+        project.tasks.register(
+            "generateSpmEmbedScript",
+            com.mobilebytelabs.kmpflavors.tasks.GenerateSpmEmbedScriptTask::class.java,
+        ).configure {
+            xcframeworkName.set(extension.spm.xcframeworkName)
+            sharedModulePath.set(project.path)
+            iosProjectDirName.set(iosDirName)
+            configurationToBuildType.set(mapping)
+            outputFile.set(project.rootProject.layout.projectDirectory.file(scriptPath))
+            rootDirPath.set(project.rootProject.layout.projectDirectory)
+        }
+    }
+
+    /**
      * v2.2 Phase 5B — per-variant SPM manifest registration. Mirrors `registerSpmTask` but
      * produces one `generate{Variant}SpmManifest` task per variant, writing to
      * `build/spm/{variant}/Package.swift`.
@@ -1410,6 +1457,81 @@ class KmpFlavorPlugin : Plugin<Project> {
             projectVersion.set(project.provider { project.version.toString() })
             checksumStrategy.set(extension.spm.checksumStrategy)
             outputDirectory.set(project.layout.buildDirectory.dir("spm/${variant.name}"))
+            rootDirPath.set(project.rootProject.layout.projectDirectory)
+        }
+        wireXcframeworkProducer(project, extension, variant, "generate${variantCap}SpmManifest")
+    }
+
+    /**
+     * v2.9 — connect a generated manifest to the task that actually BUILDS the XCFramework
+     * it references, so `Package.swift` can never point at a binary nothing produces.
+     *
+     * Resolution is deferred to `afterEvaluate` because the consumer's `XCFramework()` DSL
+     * (and this plugin's own per-variant publishing tasks) register their producers during
+     * the consumer's own configuration phase.
+     */
+    private fun wireXcframeworkProducer(project: org.gradle.api.Project, extension: KmpFlavorExtension, variant: FlavorVariant, manifestTaskName: String) {
+        project.afterEvaluate {
+            val name = extension.spm.xcframeworkName.get()
+            // Kotlin build type (debug/release), NOT the flavor's build-type name —
+            // KGP names both its producer tasks and its output buckets by native type.
+            val debuggable = variant.buildType?.isDebuggable?.getOrElse(false) ?: false
+            val buildType = com.mobilebytelabs.kmpflavors.internal.SpmXcframeworkResolver
+                .nativeBuildTypeFor(debuggable)
+            val explicit = extension.spm.xcframeworkTask.orNull
+            val producer = explicit
+                ?: com.mobilebytelabs.kmpflavors.internal.SpmXcframeworkResolver.resolveProducer(
+                    xcframeworkName = name,
+                    variantName = variant.name,
+                    buildTypeName = buildType,
+                    existingTaskNames = project.tasks.names,
+                )
+
+            if (explicit != null && !project.tasks.names.contains(explicit)) {
+                // Explicit user intent pointing at a task that does not exist is a
+                // configuration ERROR — fail loudly, this can only be a typo.
+                throw org.gradle.api.InvalidUserDataException(
+                    "[KMP Flavors] spm.xcframeworkTask is set to '$explicit' but no such task " +
+                        "exists in project '${project.path}'.",
+                )
+            }
+
+            if (producer == null) {
+                // No producer in this build. REMOTE distribution is fine (the binary comes
+                // from a CDN), and `requireXcframework = false` is an explicit opt-out.
+                // Otherwise SKIP generation rather than emitting a dangling manifest — and
+                // rather than failing the build, because SPM is ON BY DEFAULT since v2.9 and
+                // plenty of iOS-targeted modules legitimately publish klibs and never
+                // aggregate an XCFramework. Breaking those on upgrade would be unacceptable.
+                val remote = extension.spm.distribution.get() == SpmDistribution.REMOTE
+                if (remote || !extension.spm.requireXcframework.get()) {
+                    return@afterEvaluate
+                }
+                project.tasks.named(manifestTaskName).configure {
+                    onlyIf { false }
+                }
+                project.logger.warn(
+                    com.mobilebytelabs.kmpflavors.internal.SpmXcframeworkResolver
+                        .missingProducerMessage(name, variant.name),
+                )
+                return@afterEvaluate
+            }
+
+            project.tasks.named(manifestTaskName).configure {
+                dependsOn(producer)
+            }
+            // Point the manifest at the binary the resolved producer emits, unless the
+            // consumer pinned an explicit path.
+            if (!extension.spm.xcframeworkPath.isPresent) {
+                val relative = com.mobilebytelabs.kmpflavors.internal.SpmXcframeworkResolver
+                    .conventionalOutputPath(name, buildType)
+                project.tasks.named(manifestTaskName, GenerateSpmManifestTask::class.java).configure {
+                    xcframeworkPath.set(relative)
+                }
+            }
+            project.logger.info(
+                "[KMP Flavors] SPM manifest '$manifestTaskName' now depends on producer '$producer'.",
+            )
         }
     }
 
@@ -1434,7 +1556,10 @@ class KmpFlavorPlugin : Plugin<Project> {
             projectVersion.set(project.provider { project.version.toString() })
             checksumStrategy.set(extension.spm.checksumStrategy)
             outputDirectory.set(project.layout.buildDirectory.dir("spm/${activeVariantResolved.name}"))
+            rootDirPath.set(project.rootProject.layout.projectDirectory)
         }
+
+        wireXcframeworkProducer(project, extension, activeVariantResolved, "generateSpmManifest")
 
         // Hook into :assemble so generation happens automatically alongside builds.
         project.tasks.matching { it.name == "assemble" }.configureEach {

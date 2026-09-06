@@ -55,5 +55,9 @@ include(":samples:web-flavor-integration")
 include(":samples:runtime-api-integration")
 include(":samples:dsl-completeness-integration")
 
+// v2.9 — end-to-end SPM proving ground (XCFramework producer + manifest + embed script).
+// Fulfils the `samples/spm-distribution/` entry promised in docs/IOS_DISTRIBUTION.md.
+include(":samples:spm-distribution")
+
 // Note: samples/kmp-project-template is a standalone project with its own build
 // Build it separately: cd samples/kmp-project-template && ./gradlew build

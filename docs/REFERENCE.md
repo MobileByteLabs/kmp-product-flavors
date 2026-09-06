@@ -225,13 +225,22 @@ Shape the generated per-variant xcconfigs. `iosBundleIdBaseExpr` is the `PRODUCT
 
 ---
 
-### 🟢 `iosCocoapodsIntegration`
+### 🟢 `iosIncludePodsXcconfig`
 
 ```kotlin
-abstract val iosCocoapodsIntegration: Property<Boolean>
+abstract val iosIncludePodsXcconfig: Property<Boolean>
+
+@Deprecated("Renamed to iosIncludePodsXcconfig")
+val iosCocoapodsIntegration: Property<Boolean>   // v2.9 alias, same Property instance
 ```
 
-Default `false`. When `true`, each generated per-variant xcconfig emits a per-configuration CocoaPods `#include?` (`../Pods/Target Support Files/Pods-iosApp/Pods-iosApp.{lowercasevariant}.xcconfig`) so Pods link/framework settings flow into the custom base config that CocoaPods otherwise refuses to override.
+Default `false` — **opt-in**. When `true`, each generated per-variant xcconfig emits a per-configuration Pods `#include?` (`../Pods/Target Support Files/Pods-iosApp/Pods-iosApp.{lowercasevariant}.xcconfig`) so Pods link/framework settings flow into the custom base config that CocoaPods otherwise refuses to override.
+
+**This is not a CocoaPods integration.** It does not apply the Kotlin CocoaPods plugin, generate a podspec, or run `pod install`. It adds one *optional* include — inert when `Pods/` is absent, because Xcode silently ignores a missing `#include?`.
+
+It exists for the hybrid brownfield case: an app that gets the KMP framework via **SPM** (the default — see [`spm`](#-spm)) but still uses CocoaPods for *other* native dependencies (Firebase, analytics SDKs). Those apps need the Pods xcconfig re-included because this plugin's per-variant base config displaces the one CocoaPods installs.
+
+> Renamed in v2.9 — the old name oversold the behaviour. `iosCocoapodsIntegration` still works as a deprecated alias over the same property.
 
 ---
 
