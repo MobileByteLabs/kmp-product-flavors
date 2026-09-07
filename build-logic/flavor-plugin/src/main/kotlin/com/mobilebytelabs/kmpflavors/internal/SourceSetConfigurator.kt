@@ -89,7 +89,15 @@ class SourceSetConfigurator(private val logger: Logger) {
 
             if (isActiveFlavor && commonFlavor != null) {
                 commonFlavor.dependsOn(commonMain)
-                logger.info("[KMP Flavors] Wired $commonFlavorName -> commonMain")
+                // v2.9 — `src/{flavor}Main/` is a DOCUMENTED convention
+                // (docs/CONSUMER_GUIDE.md, docs/SOURCE_SET_DISCIPLINE.md) but the
+                // standalone `{F}Main` source set KmpFlavorSourceSetWiring created had no
+                // consumer, so code placed there was silently NEVER COMPILED — and the
+                // orphan node also surfaced in KGP's cross-tree warnings under a
+                // `'null' Tree`. Fold the directory into the live per-flavor source set.
+                commonFlavor.kotlin.srcDir("src/${flavorName}Main/kotlin")
+                commonFlavor.resources.srcDir("src/${flavorName}Main/resources")
+                logger.info("[KMP Flavors] Wired $commonFlavorName -> commonMain (+ src/${flavorName}Main)")
             }
 
             // 2. Create intermediate<Flavor> source sets (if enabled)
@@ -105,6 +113,7 @@ class SourceSetConfigurator(private val logger: Logger) {
                         isActiveFlavor,
                         matrixModeEnabled = matrixModeEnabled,
                         createInactiveFlavorSourceSets = createInactiveFlavorSourceSets,
+                        requireOnDiskContent = true,
                     )
 
                     if (isActiveFlavor && intermediateFlavor != null && commonFlavor != null) {
@@ -121,6 +130,12 @@ class SourceSetConfigurator(private val logger: Logger) {
             // Instead, they depend on commonFlavor or intermediate flavor source sets only
             for (platform in leafPlatforms) {
                 val platformFlavorName = "${platform.prefix}$capitalizedFlavor"
+                // A platform-flavor source set is consumed by the F8 wiring below, which
+                // needs `platform.mainSourceSet` to exist. PlatformDetector registers groups
+                // like `ios`/`tvos`/`watchos` whose `iosMain` may NOT exist (the real leaves
+                // are iosArm64/iosX64/iosSimulatorArm64), so `iosFree` was created with no
+                // possible consumer — a guaranteed "Unused Kotlin Source Sets" warning.
+                val platformMainExists = sourceSets.findByName(platform.mainSourceSet) != null
                 val platformFlavor = maybeCreateLazy(
                     project,
                     sourceSets,
@@ -128,21 +143,24 @@ class SourceSetConfigurator(private val logger: Logger) {
                     isActiveFlavor,
                     matrixModeEnabled = matrixModeEnabled,
                     createInactiveFlavorSourceSets = createInactiveFlavorSourceSets,
+                    requireOnDiskContent = !platformMainExists,
                 ) ?: continue
 
                 if (isActiveFlavor) {
                     // Wire to intermediate flavor or common flavor (NOT to platformMain)
-                    if (createIntermediates && platform.parent != null) {
-                        val parentIntermediate = intermediatePlatforms.find { it.prefix == platform.parent }
-                        if (parentIntermediate != null) {
-                            val intermediateFlavorName = "${parentIntermediate.prefix}$capitalizedFlavor"
-                            val intermediateFlavor = sourceSets.findByName(intermediateFlavorName)
-                            if (intermediateFlavor != null) {
-                                platformFlavor.dependsOn(intermediateFlavor)
-                                logger.info("[KMP Flavors] Wired $platformFlavorName -> $intermediateFlavorName")
-                            }
-                        }
+                    val parentIntermediateFlavor = if (createIntermediates && platform.parent != null) {
+                        intermediatePlatforms.find { it.prefix == platform.parent }
+                            ?.let { sourceSets.findByName("${it.prefix}$capitalizedFlavor") }
+                    } else {
+                        null
+                    }
+                    if (parentIntermediateFlavor != null) {
+                        platformFlavor.dependsOn(parentIntermediateFlavor)
+                        logger.info("[KMP Flavors] Wired $platformFlavorName -> ${parentIntermediateFlavor.name}")
                     } else if (commonFlavor != null) {
+                        // Falls through to commonFlavor when the intermediate was not
+                        // created (no on-disk content) — without this the leaf source set
+                        // would be left parentless and become an orphan itself.
                         // No intermediate parent, wire directly to commonFlavor
                         platformFlavor.dependsOn(commonFlavor)
                         logger.info("[KMP Flavors] Wired $platformFlavorName -> $commonFlavorName")
@@ -233,6 +251,7 @@ class SourceSetConfigurator(private val logger: Logger) {
         isActive: Boolean,
         matrixModeEnabled: Boolean = false,
         createInactiveFlavorSourceSets: Boolean = false,
+        requireOnDiskContent: Boolean = false,
     ): KotlinSourceSet? {
         val existing = sourceSets.findByName(name)
         if (existing != null) {
@@ -244,6 +263,15 @@ class SourceSetConfigurator(private val logger: Logger) {
             }
         }
         if (isActive) {
+            // v2.9 — an INTERMEDIATE source set (ios/native/apple × flavor) owns no
+            // compilation of its own: it is only ever reachable through a leaf platform
+            // source set. Creating an EMPTY one therefore guarantees KGP's
+            // "Unused Kotlin Source Sets" warning with nothing to show for it, which is
+            // how `iosFree` / `nativeDev` / `iosDemo` ended up in every sample's output.
+            // Create it only when the consumer actually has code there.
+            if (requireOnDiskContent && !hasOnDiskContent(project, name)) {
+                return null
+            }
             return sourceSets.maybeCreate(name).apply {
                 kotlin.srcDir("src/$name/kotlin")
                 resources.srcDir("src/$name/resources")

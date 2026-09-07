@@ -175,4 +175,40 @@ class GenerateSpmManifestTaskTest {
         // Sanity — confirm we hit the single-file branch by validating the file existed.
         assertTrue(xcframeworkFile.isFile)
     }
+
+    @Test
+    fun `an already-capitalised variant name is not double-capitalised in the product name`() {
+        val task = newTask()
+        task.variantName.set("FreeDev")
+        task.distribution.set(SpmDistribution.LOCAL)
+        task.checksumStrategy.set(SpmChecksumStrategy.AUTO)
+        task.outputDirectory.set(File(tempDir, "build/spm/FreeDev"))
+        task.generate()
+        val manifest = File(tempDir, "build/spm/FreeDev/Package.swift").readText()
+        assertTrue(manifest.contains("name: \"SharedFreeDev\""), manifest)
+    }
+
+    @Test
+    fun `REMOTE with an explicit xcframeworkPath resolves the sidecar next to that path`() {
+        val task = newTask()
+        val xcf = File(tempDir, "custom/Shared.xcframework").apply { mkdirs() }
+        File(xcf.parentFile, "Shared.xcframework.checksum").writeText("a".repeat(64))
+        task.distribution.set(SpmDistribution.REMOTE)
+        task.binaryUrlTemplate.set("https://cdn/{variant}.zip")
+        task.xcframeworkPath.set("../../../custom/Shared.xcframework")
+        task.checksumStrategy.set(SpmChecksumStrategy.REQUIRE_FILE)
+        task.generate()
+        val manifest = File(tempDir, "build/spm/freeDev/Package.swift").readText()
+        assertTrue(manifest.contains("checksum: \"${"a".repeat(64)}\""), manifest)
+    }
+
+    @Test
+    fun `log path is shortened when the root dir is known`() {
+        val task = newTask()
+        task.distribution.set(SpmDistribution.LOCAL)
+        task.checksumStrategy.set(SpmChecksumStrategy.AUTO)
+        task.rootDirPath.set(task.project.layout.projectDirectory)
+        task.generate()
+        assertTrue(File(tempDir, "build/spm/freeDev/Package.swift").exists())
+    }
 }

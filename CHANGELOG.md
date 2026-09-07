@@ -58,6 +58,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`src/{flavor}Main/` never compiled — a documented feature that silently did nothing.**
+  `docs/CONSUMER_GUIDE.md` documents `freeMain/` as "sources compiled only for the `free`
+  flavor" and `docs/SOURCE_SET_DISCIPLINE.md` builds the single-axis model on it, but the
+  `{F}Main` source sets were created, given srcDirs and wired `dependsOn(commonMain)` with
+  **no consumer at all** — nothing ever depended on them, so code placed there was dropped
+  without a word. (The orphans also showed up in KGP's cross-tree diagnostics under a
+  `'null' Tree`.) The directories are now folded into the source sets that actually compile:
+  `common{Flavor}` for the active flavor and `{variant}VariantMain` for matrix variants.
+  `FlavorMainSourceSetLivenessTest` is the canary — it puts deliberately broken code in
+  `src/freeMain/` and REQUIRES the build to fail, so a dead source set can never pass again.
+  **Consumers with code in `src/{flavor}Main/` will see it compiled for the first time**, so
+  a previously-ignored compile error there can now surface.
+
+- **Build-type source sets were shared across variant trees too.** `IntermediateSourceSetConfigurator`
+  wired every variant compilation `dependsOn(commonDebug)` and `dependsOn({target}{BuildType})`,
+  putting one node into every variant tree carrying that build type — the same defect as the
+  per-flavor case, and the source of the `watchos*` warning cluster. Now shares the
+  directories (mirroring the ISSUE #99 fix already used for `<target>Main`) with dependencies
+  inherited via `extendsFrom`.
+
+- **CI now gates the warning count.** `scripts/ci/kgp-warning-budget.sh` fails the Code
+  Quality job if KGP source-set warnings exceed a declared ceiling (currently 7), and fails outright on ANY cross-tree warning (hard zero). The budget
+  ratchets down only. Nothing counted these before, which is how 95 accumulated unnoticed.
+
+- **Cut KGP "Invalid Source Set Dependency Across Trees" warnings by sharing flavor
+  DIRECTORIES instead of source-set NODES.** Matrix mode wired every variant compilation
+  `dependsOn(commonFree)` / `dependsOn(commonProd)` — the *shared* per-flavor source sets.
+  KGP treats each compilation as its own Source Set Tree, so a single node ended up depended
+  on from the active variant's `main` tree plus every matrix variant containing that flavor,
+  which KGP flags as an unsupported shape (not merely noise — it is forward-compat risk).
+  Each variant now gets its own `common{Variant}` / `common{Variant}Test` source set carrying
+  the same `src/common<Flavor>/` directories, so every node belongs to exactly one tree.
+  Q11 (expect/actual in separate source sets) and Q12 (cross-variant isolation) are preserved
+  — isolation is in fact stronger, since variants no longer share any node — and the TestKit
+  `CrossVariantIsolationTest` / `ExpectActualMatrixTest` suites still pass unchanged.
+  Warnings on a full configure: **95 → 7**, with the "Invalid Source Set Dependency Across
+  Trees" class down to **ZERO** (from 83) across this and the fixes below.
+
+  Two follow-on details this required:
+  - Variant source sets are named `{variant}VariantMain` / `{variant}VariantTest`. A plain
+    `common{Variant}` collides with `common{Flavor}` whenever there is one flavor dimension
+    and no build types (variant name == flavor name), which silently re-created the very
+    cross-tree edge being removed.
+  - Dependencies a consumer declares on a flavor source set
+    (`sourceSets.commonPaid.dependencies { … }`) previously reached variant compilations
+    through the `dependsOn` edge. Sharing directories carries sources but not dependencies,
+    so they are now inherited explicitly via `extendsFrom` on the Gradle configurations
+    (`PerVariantDependencyClasspathTest` guards this).
+
+  **`commonMain` / `commonTest` cross-tree roots — also fixed.** Each variant gets a
+  TWO-level tree: `{variant}VariantCommon` (carrying `src/commonMain/`) upstream of
+  `{variant}VariantMain` (carrying the flavor directories), with dependencies via
+  `extendsFrom`. Two levels are required, not one: collapsing them puts `expect` (commonMain)
+  and `actual` (commonFlavor) in the SAME source set, which Kotlin rejects with
+  *"appName: expect and corresponding actual are in the same module"*.
+
+  An earlier single-level attempt is recorded here because it looked right and was not: it
+  produced **112 new "Missing 'dependsOn' in Source Sets" warnings for 19 removed**, because
+  at that point the `common{BuildType}` edges were still transitively pulling `commonMain`
+  into the variant compilation. Removing those first changed the conditions, after which the
+  same approach landed cleanly.
+
+- **Per-target-flavor intermediates were created with no possible consumer.** `PlatformDetector`
+  registers groups such as `ios` / `tvos` / `watchos` whose `iosMain` source set often does not
+  exist (the real leaves are `iosArm64` / `iosX64` / `iosSimulatorArm64`), so `iosFree`,
+  `iosDev` and `nativeFree` were created and could never be attached to any compilation. They
+  are now created only when the consumer actually has code in that directory.
+
+- **The 7 warnings that remain are deliberate.** All are "Unused Kotlin Source Sets" for nodes
+  that must keep existing as a PUBLIC configuration surface — `sourceSets.commonPaid.dependencies { … }`
+  (`PerVariantDependencyClasspathTest`) and the `common{BuildType}` registration contract
+  (`IntermediateBuildTypeSourceSetTest`) — while their DIRECTORIES are what actually compiles.
+  Deleting them removes a documented API; re-attaching them to compilations restores the
+  cross-tree warnings. Both alternatives were implemented, measured and rejected.
+
 - **`GenerateSpmManifestTask` was incompatible with the Gradle configuration cache.** It called
   `Task.project` from its `@TaskAction` (`project.rootDir` / `project.projectDir`), which fails
   with *"Invocation of 'Task.project' … at execution time is unsupported"*. Never caught because

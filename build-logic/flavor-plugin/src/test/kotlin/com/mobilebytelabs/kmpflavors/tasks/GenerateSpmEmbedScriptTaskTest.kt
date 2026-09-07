@@ -127,4 +127,48 @@ class GenerateSpmEmbedScriptTaskTest {
         assertFalse(text.contains(",,}"), text)
         assertTrue(text.contains("tr '[:upper:]' '[:lower:]'"), text)
     }
+
+    @Test
+    fun `header documents the ACTUAL script filename, not a placeholder`() {
+        // Regression: the header was built with "$(target_basename())", which Kotlin does
+        // NOT interpolate — it reached the generated script as literal bash command
+        // substitution for a function that does not exist.
+        val text = generated()
+        assertTrue(text.contains("SRCROOT/scripts/embed-xcframework.sh"), text.lines().take(12).toString())
+        assertFalse(text.contains("target_basename"), text)
+    }
+
+    @Test
+    fun `log path is rendered relative when the root dir is known`() {
+        val project = ProjectBuilder.builder().withProjectDir(tempDir).build()
+        val task = project.tasks
+            .register("genEmbedRel", GenerateSpmEmbedScriptTask::class.java).get().apply {
+                xcframeworkName.set("ComposeApp")
+                sharedModulePath.set(":cmp-shared")
+                iosProjectDirName.set("cmp-ios")
+                configurationToBuildType.set(mapOf("freeRelease" to "Release"))
+                outputFile.set(File(tempDir, "cmp-ios/scripts/embed-xcframework.sh"))
+                rootDirPath.set(project.layout.projectDirectory)
+            }
+        task.generate()
+        assertTrue(File(tempDir, "cmp-ios/scripts/embed-xcframework.sh").exists())
+    }
+
+    @Test
+    fun `an empty configuration map still yields a runnable script with a safe default`() {
+        val project = ProjectBuilder.builder().withProjectDir(tempDir).build()
+        val task = project.tasks
+            .register("genEmbedEmpty", GenerateSpmEmbedScriptTask::class.java).get().apply {
+                xcframeworkName.set("Shared")
+                sharedModulePath.set(":shared")
+                iosProjectDirName.set("ios")
+                configurationToBuildType.set(emptyMap())
+                outputFile.set(File(tempDir, "ios/scripts/embed-xcframework.sh"))
+            }
+        task.generate()
+        val text = File(tempDir, "ios/scripts/embed-xcframework.sh").readText()
+        // No case arms, but the wildcard default must still be present so the script
+        // never leaves KOTLIN_BUILD_TYPE unset under `set -u`.
+        assertTrue(text.contains("KOTLIN_BUILD_TYPE=\"Release\""), text)
+    }
 }

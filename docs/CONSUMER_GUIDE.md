@@ -245,6 +245,11 @@ fun provideApiClient(): ApiClient {
 The plugin wires each flavor into a matching source set:
 - `freeMain/` — sources compiled only for the `free` flavor
 - `paidMain/` — sources compiled only for the `paid` flavor
+
+> **Fixed in v2.9.** Before v2.9 these directories were created as source sets but never
+> attached to any compilation, so code placed in them was silently ignored. If you have code
+> in `src/{flavor}Main/` that has never been exercised, it compiles for the first time on
+> v2.9 — and may surface errors that were previously invisible.
 - `debugMain/` — sources compiled only for the `debug` build type
 - `freeDebugMain/` — sources compiled only for the `free` + `debug` combination
 

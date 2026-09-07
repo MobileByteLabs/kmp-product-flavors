@@ -41,24 +41,22 @@ internal object KmpFlavorSourceSetWiring {
         // source set ({T}Main) — KGP enforces this. Consumers who want per-target-
         // per-flavor code should place it inside {F}Main with platform-conditional
         // logic, or use a KMP intermediate source set.
-        hierarchy.flavorSourceSets.forEach { name ->
-            kmp.sourceSets.maybeCreate(name)
-        }
+        // v2.9 — do NOT create standalone `{F}Main` source sets any more.
+        //
+        // They were created here, given srcDirs and wired `dependsOn(commonMain)`, but
+        // NOTHING ever depended on them, so `src/{flavor}Main/` was silently never
+        // compiled despite being documented in CONSUMER_GUIDE.md / SOURCE_SET_DISCIPLINE.md
+        // (FlavorMainSourceSetLivenessTest is the canary). The orphans also appeared in
+        // KGP's cross-tree diagnostics under a `'null' Tree`.
+        //
+        // The directories are now folded into the source sets that are actually compiled:
+        // `common{Flavor}` for the active flavor (SourceSetConfigurator) and
+        // `{variant}VariantMain` for matrix variants (KmpFlavorPlugin).
 
-        // Wire dependsOn edges only for flavor sets → commonMain
-        hierarchy.dependsOnEdges
-            .filter { (_, parent) -> parent == "commonMain" }
-            .forEach { (child, parent) ->
-                val parentSs = kmp.sourceSets.findByName(parent)
-                val childSs = kmp.sourceSets.findByName(child)
-                if (parentSs != null && childSs != null) {
-                    try {
-                        childSs.dependsOn(parentSs)
-                    } catch (e: Exception) {
-                        logger.info("[KMP Flavors] skipped dependsOn $child -> $parent: ${e.message}")
-                    }
-                }
-            }
+        // No dependsOn edges are wired here any more — see the note above. Wiring an
+        // orphan `{F}Main -> commonMain` edge is precisely what produced
+        //   w: ⚠️ Invalid Source Set Dependency Across Trees … Source Sets from 'null' Tree
+        // because the child belonged to no compilation at all.
 
         // Register source set src dirs (Kotlin) — only for the {F}Main sets we created
         val ourSetNames = hierarchy.flavorSourceSets.toSet()

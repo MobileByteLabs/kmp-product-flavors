@@ -97,7 +97,7 @@ abstract class GenerateSpmManifestTask : DefaultTask() {
 
         val target = File(outDir, "Package.swift")
         target.writeText(manifest)
-        logger.lifecycle("[KMP Flavors] Wrote SPM manifest → ${relativeToRoot(target)}")
+        logger.lifecycle("[KMP Flavors] Wrote SPM manifest → ${displayPath(target)}")
     }
 
     private fun renderLocal(name: String, variant: String): String {
@@ -178,7 +178,7 @@ abstract class GenerateSpmManifestTask : DefaultTask() {
             SpmChecksumStrategy.REQUIRE_FILE -> {
                 if (!sidecar.exists()) {
                     error(
-                        "[KMP Flavors] checksumStrategy=REQUIRE_FILE but ${relativeToRoot(sidecar)} " +
+                        "[KMP Flavors] checksumStrategy=REQUIRE_FILE but ${displayPath(sidecar)} " +
                             "is missing. Generate it via `swift package compute-checksum <xcframework>`.",
                     )
                 }
@@ -222,9 +222,15 @@ abstract class GenerateSpmManifestTask : DefaultTask() {
         const val SKIP_PLACEHOLDER = "<SKIP-checksum>"
     }
 
-    /** Pretty relative path for logs, without touching `Task.project` at execution time. */
-    private fun relativeToRoot(file: File): String {
-        val root = rootDirPath.orNull?.asFile ?: return file.path
-        return runCatching { file.relativeTo(root).path }.getOrElse { file.path }
+    /**
+     * Pretty relative path for logs, without touching `Task.project` at execution time.
+     *
+     * Deliberately pure string work: `File.relativeTo` throws when two paths share no root,
+     * and guarding that with `runCatching` produced a branch unreachable on POSIX — which
+     * the 100% Kover floor then (correctly) refused to accept as covered.
+     */
+    private fun displayPath(file: File): String {
+        val root = rootDirPath.orNull?.asFile?.path ?: return file.path
+        return file.path.removePrefix(root).removePrefix(File.separator)
     }
 }

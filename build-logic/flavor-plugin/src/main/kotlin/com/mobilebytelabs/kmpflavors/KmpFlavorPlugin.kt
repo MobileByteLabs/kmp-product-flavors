@@ -556,31 +556,98 @@ class KmpFlavorPlugin : Plugin<Project> {
                 .filter { it != activeVariantName }
             // Index variants by name so the per-variant lookup is O(1).
             val variantByName = allVariants.associateBy { it.name }
-            // RFC §3 Q2-C hybrid: dependsOn into per-flavor source sets that
-            // v1.x SourceSetConfigurator created (commonFree, commonPaid, etc.),
-            // plus optional variant-specific srcDir for code unique to one
-            // variant. The per-flavor source sets already dependsOn(commonMain),
-            // so the variant's defaultSourceSet transitively sees commonMain via
-            // the KotlinSourceSet hierarchy — `expect` in commonMain and
-            // `actual` in commonFlavor live in SEPARATE compilation modules,
-            // which is exactly what KMP's expect/actual semantics require.
-            // v1.x SourceSetConfigurator only wires `commonFlavor.dependsOn(commonMain)`
-            // for the active flavor (see SourceSetConfigurator.kt line 81). For inactive
-            // flavors in matrix mode, we wire that edge ourselves so the variant
-            // compilation can see commonMain's `expect` declarations through the
-            // commonFlavor -> commonMain dependsOn chain.
+            // RFC §3 Q2-C hybrid, revised v2.9 — PER-VARIANT common source set.
+            //
+            // Previously each variant compilation was wired `dependsOn(commonFree)` /
+            // `dependsOn(commonProd)` — the SHARED per-flavor source sets that
+            // SourceSetConfigurator creates. KGP treats every compilation as its own
+            // "Kotlin Source Set Tree", so a single shared node ended up depended on from
+            // several trees at once (the active variant's `main` tree plus every matrix
+            // variant containing that flavor). KGP flagged each one:
+            //
+            //   w: ⚠️ Invalid Source Set Dependency Across Trees
+            //      Following Kotlin Source Set groups can't depend on 'commonFree' together
+            //      as they belong to different Kotlin Source Set Trees.
+            //
+            // …249 times in a single CI run. The edges also encode a shape KGP explicitly
+            // does not support, so it is forward-compat risk, not just noise.
+            //
+            // Fix: share the flavor DIRECTORIES, never the source-set NODES. Each variant
+            // gets its own `common{Variant}` source set carrying the same `src/common<Flavor>/`
+            // directories, so every node belongs to exactly one tree.
+            //
+            // The Q11/Q12 guarantees are preserved:
+            //   Q11 (expect/actual) — `expect` still lives in commonMain, `actual` in a
+            //     SEPARATE downstream source set (`common{Variant}` or the platform
+            //     variant source set), which is what KMP requires.
+            //   Q12 (cross-variant isolation) — stronger than before: variants no longer
+            //     share any source-set node at all, so a flavor's symbols cannot leak
+            //     between variant compilations.
             val commonMainSourceSet = kotlin.sourceSets.getByName("commonMain")
             val parentSourceSetsFor: (String) -> List<org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet> = { name ->
                 val variant = variantByName[name]
                 if (variant == null) {
                     emptyList()
                 } else {
-                    variant.flavors.mapNotNull { flavor ->
-                        val ssName = "common${flavor.name.replaceFirstChar { it.uppercase() }}"
-                        kotlin.sourceSets.findByName(ssName)?.also { commonFlavor ->
-                            commonFlavor.dependsOn(commonMainSourceSet)
-                        }
+                    // NOTE the `Variant` infix. With a single flavor dimension and no build
+                    // types the variant name EQUALS the flavor name, so a plain
+                    // `common{Variant}` would collide with SourceSetConfigurator's
+                    // `common{Flavor}` node — re-creating the exact cross-tree edge this
+                    // change exists to remove.
+                    val variantCommonName = "${name}VariantMain"
+                    val variantCommon = kotlin.sourceSets.maybeCreate(variantCommonName)
+                    // commonMain stays a `dependsOn` parent. Q17 (dropping this edge and
+                    // re-establishing dependencies via `extendsFrom`) was implemented and
+                    // MEASURED here: it does remove the commonMain/commonTest cross-tree
+                    // warnings, but KGP already includes commonMain in the variant
+                    // compilation, so the intermediate then has no common root with it and
+                    // KGP emits "Missing 'dependsOn' in Source Sets" instead — 112 new
+                    // warnings against 19 removed, plus duplicated commonMain sources.
+                    // Closing that properly means dropping intermediate source sets for
+                    // variant compilations altogether (KGP's documented shape for custom
+                    // compilations), which collides with expect/actual placement. Left as a
+                    // deliberate, measured trade — see CHANGELOG.
+                    // commonMain is folded in as a SEPARATE, upstream source set inside this
+                    // variant's own tree — never as a `dependsOn` on the real `commonMain`
+                    // node (that edge is what put one node into many Source Set Trees).
+                    //
+                    // Two levels are required, not one. Collapsing commonMain and the flavor
+                    // directories into a single source set puts `expect` (commonMain) and
+                    // `actual` (commonFlavor) in the SAME source set, which Kotlin rejects:
+                    //   "appName: expect and corresponding actual are in the same module"
+                    // So: {variant}VariantCommon (commonMain) <- {variant}VariantMain (flavors).
+                    val variantRootName = "${name}VariantCommon"
+                    val variantRoot = kotlin.sourceSets.maybeCreate(variantRootName)
+                    variantRoot.kotlin.srcDir("src/commonMain/kotlin")
+                    variantRoot.resources.srcDir("src/commonMain/resources")
+                    inheritSourceSetDependencies(project, variantRootName, "commonMain")
+                    variantCommon.dependsOn(variantRoot)
+                    // Share the flavor directories by path. `src/common<Flavor>/{kotlin,resources}`
+                    // is the same convention SourceSetConfigurator uses.
+                    variant.flavors.forEach { flavor ->
+                        val cap = flavor.name.replaceFirstChar { it.uppercase() }
+                        variantCommon.kotlin.srcDir("src/common$cap/kotlin")
+                        variantCommon.resources.srcDir("src/common$cap/resources")
+                        // The documented `src/{flavor}Main/` convention — see the note in
+                        // SourceSetConfigurator; these directories had no consumer at all
+                        // before v2.9.
+                        variantCommon.kotlin.srcDir("src/${flavor.name}Main/kotlin")
+                        variantCommon.resources.srcDir("src/${flavor.name}Main/resources")
+                        // Sharing the DIRECTORY carries the flavor's SOURCES but not the
+                        // dependencies a consumer declared on the flavor source set itself
+                        // (`sourceSets.commonPaid.dependencies { ... }`) — those used to
+                        // arrive through the dependsOn edge. Re-establish them explicitly on
+                        // the Gradle configurations, which does not create a tree edge.
+                        inheritSourceSetDependencies(project, variantCommonName, "common$cap")
                     }
+                    // Build-type-level shared code, when the variant carries a build type.
+                    variant.buildType?.let { bt ->
+                        val cap = bt.name.replaceFirstChar { it.uppercase() }
+                        variantCommon.kotlin.srcDir("src/common$cap/kotlin")
+                        variantCommon.resources.srcDir("src/common$cap/resources")
+                        inheritSourceSetDependencies(project, variantCommonName, "common$cap")
+                    }
+                    listOf(variantCommon)
                 }
             }
             // Variant-specific srcDir (e.g., `src/freeDev/kotlin`) — only used
@@ -617,6 +684,7 @@ class KmpFlavorPlugin : Plugin<Project> {
             // v2.2 Phase 1A — wire cross-variant intermediate source sets when opted in.
             // No-op when createIntermediateBuildTypeSourceSets=false OR no buildTypes registered.
             intermediateSourceSetsByVariant = IntermediateSourceSetConfigurator.configure(
+                project = project,
                 kotlin = kotlin,
                 buildTypes = buildTypesList,
                 allVariants = allVariants,
@@ -637,19 +705,38 @@ class KmpFlavorPlugin : Plugin<Project> {
             // Skipped silently when the module declares no `commonTest` (test-less modules).
             val commonTestSourceSet = kotlin.sourceSets.findByName("commonTest")
             if (commonTestSourceSet != null) {
+                // v2.9 — per-variant common TEST source set, mirroring the main-tree fix
+                // above. Sharing the `common{Flavor}Test` NODE across variant test
+                // compilations produced the same cross-tree KGP warning; sharing the
+                // DIRECTORY does not.
                 val parentTestSourceSetsFor: (String) -> List<org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet> = { name ->
                     val variant = variantByName[name]
                     if (variant == null) {
                         emptyList()
                     } else {
-                        variant.flavors.map { flavor ->
+                        // Collision-free for the same reason as the main tree above.
+                        val variantCommonTestName = "${name}VariantTest"
+                        val variantCommonTest = kotlin.sourceSets.maybeCreate(variantCommonTestName)
+                        // Same two-level shape as the main tree above.
+                        val variantTestRootName = "${name}VariantCommonTest"
+                        val variantTestRoot = kotlin.sourceSets.maybeCreate(variantTestRootName)
+                        variantTestRoot.kotlin.srcDir("src/commonTest/kotlin")
+                        variantTestRoot.resources.srcDir("src/commonTest/resources")
+                        inheritSourceSetDependencies(project, variantTestRootName, "commonTest")
+                        variantCommonTest.dependsOn(variantTestRoot)
+                        variant.flavors.forEach { flavor ->
                             val ssName = "common${flavor.name.replaceFirstChar { it.uppercase() }}Test"
-                            kotlin.sourceSets.maybeCreate(ssName).also { commonFlavorTest ->
-                                commonFlavorTest.dependsOn(commonTestSourceSet)
-                                commonFlavorTest.kotlin.srcDir("src/$ssName/kotlin")
-                                commonFlavorTest.resources.srcDir("src/$ssName/resources")
-                            }
+                            variantCommonTest.kotlin.srcDir("src/$ssName/kotlin")
+                            variantCommonTest.resources.srcDir("src/$ssName/resources")
+                            inheritSourceSetDependencies(project, variantCommonTestName, ssName)
                         }
+                        variant.buildType?.let { bt ->
+                            val ssName = "common${bt.name.replaceFirstChar { it.uppercase() }}Test"
+                            variantCommonTest.kotlin.srcDir("src/$ssName/kotlin")
+                            variantCommonTest.resources.srcDir("src/$ssName/resources")
+                            inheritSourceSetDependencies(project, variantCommonTestName, ssName)
+                        }
+                        listOf(variantCommonTest)
                     }
                 }
                 val variantSpecificTestSrcDirsFor: (String) -> List<String> = { name ->
@@ -1395,6 +1482,29 @@ class KmpFlavorPlugin : Plugin<Project> {
             webTitleSuffix.set(
                 activeVariantResolved.combinedWebTitleSuffix.ifEmpty { null },
             )
+        }
+    }
+
+    /**
+     * v2.9 — let a matrix-variant source set inherit the dependencies a consumer declared on
+     * a per-flavor source set, WITHOUT a `dependsOn` edge between them.
+     *
+     * Variants now share flavor DIRECTORIES rather than source-set NODES, which keeps every
+     * node inside a single Kotlin Source Set Tree (KGP rejects the alternative). Directories
+     * carry sources but not dependencies, so `sourceSets.commonPaid.dependencies { … }` would
+     * silently stop reaching inactive variant compilations — a far worse regression than the
+     * warning being fixed. `PerVariantDependencyClasspathTest` guards exactly this.
+     *
+     * KGP names a source set's dependency configurations `<sourceSetName><Scope>`. Missing
+     * configurations are skipped: not every scope exists for every source set.
+     */
+    private fun inheritSourceSetDependencies(project: org.gradle.api.Project, variantSourceSetName: String, flavorSourceSetName: String) {
+        listOf("Implementation", "Api", "CompileOnly", "RuntimeOnly").forEach { scope ->
+            val from = project.configurations.findByName("$flavorSourceSetName$scope") ?: return@forEach
+            val into = project.configurations.findByName("$variantSourceSetName$scope") ?: return@forEach
+            if (from !== into && !into.extendsFrom.contains(from)) {
+                into.extendsFrom(from)
+            }
         }
     }
 

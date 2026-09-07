@@ -25,6 +25,7 @@ import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
 import org.gradle.work.DisableCachingByDefault
+import java.io.File
 
 /**
  * v2.9 — generates the Xcode Run-Script that makes SPM consumption actually work.
@@ -88,16 +89,14 @@ abstract class GenerateSpmEmbedScriptTask : DefaultTask() {
         val mapping = configurationToBuildType.get()
 
         val target = outputFile.get().asFile
-        target.parentFile?.mkdirs()
-        target.writeText(renderScript(name, modulePath, iosDir, mapping))
+        target.parentFile.mkdirs()
+        target.writeText(renderScript(name, modulePath, iosDir, mapping, target.name))
         target.setExecutable(true, false)
-        val shown = rootDirPath.orNull?.asFile
-            ?.let { root -> runCatching { target.relativeTo(root).path }.getOrElse { target.path } }
-            ?: target.path
+        val shown = displayPath(target)
         logger.lifecycle("[KMP Flavors] Wrote SPM embed script → $shown")
     }
 
-    private fun renderScript(name: String, modulePath: String, iosDir: String, mapping: Map<String, String>): String {
+    private fun renderScript(name: String, modulePath: String, iosDir: String, mapping: Map<String, String>, scriptFileName: String): String {
         // Group configurations by build type so the case statement stays compact and
         // reviewable: one arm per Kotlin build type listing every configuration that maps
         // to it. Sorted for deterministic output (reproducible builds / clean diffs).
@@ -115,7 +114,7 @@ abstract class GenerateSpmEmbedScriptTask : DefaultTask() {
             appendLine("#")
             appendLine("# Wire this as an Xcode Run-Script build phase on the app target, ordered")
             appendLine("# BEFORE 'Compile Sources':")
-            appendLine("#     \"\$SRCROOT/scripts/$(target_basename())\"")
+            appendLine("#     \"\$SRCROOT/scripts/$scriptFileName\"")
             appendLine("#")
             appendLine("# It reproduces the flavor-aware build-type selection that the Kotlin CocoaPods")
             appendLine("# plugin's xcodeConfigurationToNativeBuildType[...] block used to perform, but")
@@ -179,5 +178,15 @@ abstract class GenerateSpmEmbedScriptTask : DefaultTask() {
         }
     }
 
-    private fun target_basename(): String = "embed-xcframework.sh"
+    /**
+     * Pretty relative path for logs, without touching `Task.project` at execution time.
+     *
+     * Deliberately pure string work: `File.relativeTo` throws when two paths share no root,
+     * and guarding that with `runCatching` produced a branch unreachable on POSIX — which
+     * the 100% Kover floor then (correctly) refused to accept as covered.
+     */
+    private fun displayPath(file: File): String {
+        val root = rootDirPath.orNull?.asFile?.path ?: return file.path
+        return file.path.removePrefix(root).removePrefix(File.separator)
+    }
 }
