@@ -3,9 +3,12 @@
 # Version pins for the nightly multi-kgp-matrix.yml workflow that runs the
 # plugin's TestKit suite against multiple Kotlin Gradle Plugin versions.
 #
-# v2.8 raised the floor to AGP 9.2.1+ / Gradle 9.5.1+ / Kotlin 2.3.21+ per
-# the AGP 9.2.1+ floor policy. Pre-v2.8 KGP rows (2.1.x, 2.2.x) and
-# Gradle 9.0 are below the floor and were dropped.
+# v2.10 raises the floor to AGP 9.4.0 / Gradle 9.6.0+ / Kotlin 2.3.21+.
+#
+# Why Gradle moved: AGP 9.4.0 refuses to apply below Gradle 9.6.0
+# ("Minimum supported Gradle version is 9.6.0"). The project builds and tests on
+# 9.7.1 (current). The previous 9.5.1 floor is no longer exercised by CI, and an
+# unexercised floor is a claim, not a guarantee — so it is not advertised.
 #
 # As new KGP minors ship, add rows here AND to `.github/workflows/multi-kgp-matrix.yml`.
 #
@@ -23,7 +26,7 @@
 #     specific compat constraints; pinning per-row avoids muddying signal).
 
 [matrix]
-gradle-version = "9.5.1"
+gradle-version = "9.7.1"
 
 [[matrix.kgp]]
 version = "2.3.21"

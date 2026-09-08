@@ -1,6 +1,6 @@
 [versions]
 # Core Dependencies (aligned with kmp-project-template)
-agp = "9.3.2"
+agp = "9.4.0"
 kotlin = "2.4.20"
 compose-multiplatform = "1.12.0"
 android-minSdk = "24"
@@ -20,7 +20,7 @@ mockk = "1.14.11"
 
 # v2.6 Phase 1 — coverage gate + mutation testing baseline
 kover = "0.9.9"
-pitest = "1.19.0-rc.1"
+pitest = "1.19.0"
 pitestJunit5 = "1.2.3"
 
 # AndroidX (aligned with kmp-project-template)

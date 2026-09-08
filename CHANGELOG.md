@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   | pin | from | to |
   |---|---|---|
   | kotlin | 2.3.21 | **2.4.20** |
-  | agp | 9.2.1 | **9.3.2** |
+  | agp | 9.2.1 | **9.4.0** |
   | compose-multiplatform | 1.10.3 | **1.12.0** |
   | spotless | 7.0.3 | **8.10.2** |
   | coroutines | 1.10.2 | **1.11.0** |
@@ -24,14 +24,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   | pitest-junit5 | 1.2.1 | **1.2.3** |
   | androidx-activityCompose | 1.12.2 | **1.13.0** |
 
-  `detekt` (1.23.8) and `ktlint` (1.8.0) were already current. `pitest` stays at
-  `1.19.0-rc.1`: that id resolves from the Gradle Plugin Portal, which is AHEAD of the
-  1.15.0 that Maven Central mirrors — "updating" it is a downgrade to a version that does
-  not exist for that plugin id.
+  `detekt` (1.23.8) and `ktlint` (1.8.0) were already current. **`pitest` 1.19.0-rc.1 →
+  1.19.0** (release candidate → GA): its version must be read from the Gradle Plugin Portal
+  marker artifact, which is ahead of the 1.15.0 that Maven Central mirrors — reading Central
+  suggests a "newer" 1.30.0 that belongs to the pitest ENGINE, not this plugin id, and
+  pinning it breaks the build.
 
-  **AGP is capped at 9.3.2, not the latest 9.4.0**: AGP 9.4.0 requires Gradle 9.6.0, and
-  `Gradle 9.5.1+` is a documented CONSUMER floor. Raising it is a policy decision, not a
-  routine refresh, so it is left alone deliberately.
+  | gradle wrapper | 9.5.1 | **9.7.1** |
+  | pitest | 1.19.0-rc.1 | **1.19.0** (GA) |
+
+  **Toolchain floor raised — this is a BREAKING support change.** AGP is now **9.4.0** and
+  the Gradle wrapper **9.7.1**, because AGP 9.4.0 refuses to apply below Gradle 9.6.0. The
+  supported floor moves from `AGP 9.2.1 / Gradle 9.5.1` to **`AGP 9.4.0 / Gradle 9.6.0+`**,
+  and README badges, the requirements table and `docs/AGP_SUPPORT.md` were updated to match.
+
+  The floor is a claim about what CI EXERCISES, so it moved with the tooling rather than
+  being left behind: continuing to advertise `Gradle 9.5.1+` while no job runs it would be
+  the same vacuous-green problem as the KGP matrix below. Note the plugin artifact itself
+  does not depend on AGP (it is applied only by the root build and samples, to exercise the
+  AGP bridge), so consumers on older AGP may well still work — they are simply no longer
+  tested, and therefore no longer claimed.
+
+  Also fixed: `project-isolation-check.yml` pinned Gradle **9.0** under a step labelled
+  "Setup Gradle (latest)" — stale drift that would now fail outright, since that job builds
+  a sample which applies AGP.
 
   The plugin still compiles against `languageVersion`/`apiVersion` **2.0** so its metadata
   stays readable by consumers on Gradle <9.5. The supported floor remains **Kotlin 2.3.21+**,

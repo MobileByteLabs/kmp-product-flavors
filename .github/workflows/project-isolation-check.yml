@@ -33,10 +33,12 @@ jobs:
           distribution: zulu
           java-version: '21'
 
-      - name: Setup Gradle (latest)
+      # Was pinned to '9.0' under a "(latest)" label — stale drift. This job builds a
+      # sample that applies AGP, and AGP 9.4.0 refuses to run below Gradle 9.6.0.
+      - name: Setup Gradle 9.7.1
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '9.0'
+          gradle-version: '9.7.1'
 
       - name: Run plugin TestKit under --project-isolation
         env:
