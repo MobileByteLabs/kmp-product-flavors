@@ -75,8 +75,9 @@ class IosPodsXcconfigOptInTest {
         val project = ProjectBuilder.builder().build()
         val ext = project.objects.newInstance(KmpFlavorExtension::class.java)
         assertFalse(ext.iosIncludePodsXcconfig.get())
-        // ...while SPM manifest generation is ON by default.
-        assertTrue(ext.spm.generateManifest.get())
+        // ...while SPM manifest generation is ON by default. Resolved as `orNull ?: true`
+        // since v2.9.2 so AUTO stays distinguishable from an explicit opt-in.
+        assertTrue(ext.spm.generateManifest.getOrElse(true))
     }
 
     @Test

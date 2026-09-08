@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The v2.9.0 SPM default no longer warns at modules that never asked for it.** Flipping
+  `spm.generateManifest` to default `true` gated only on "module declares an iOS target" —
+  which is every KMP LIBRARY module too. Those publish klibs and never aggregate an
+  XCFramework, so each hit the no-producer path and emitted a `logger.warn` **per variant**:
+  a 6-variant matrix across a handful of library modules becomes dozens of warnings for a
+  feature the consumer never requested. Real consumers apply the flavor convention across
+  their whole module graph, so this scaled badly.
+
+  `generateManifest` is now tri-state — UNSET means **AUTO** (generate when a producer
+  exists, otherwise skip in silence at info level), `true` means an explicit opt-in that
+  still WARNS when no producer is found (the consumer asked for a manifest and needs to know
+  why none appeared), `false` is off. The effective default is unchanged — SPM is still on —
+  but it is resolved as `orNull ?: true` rather than a Gradle convention, because a
+  convention makes an explicit `true` indistinguishable from the default.
+  Guarded by `SpmAutoDefaultQuietTest`.
+
+
 ### Added
 
 - **End-to-end Swift Package Manager support — SPM is now the DEFAULT iOS distribution path.**
