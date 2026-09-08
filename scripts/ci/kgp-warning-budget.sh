@@ -61,10 +61,19 @@ trap 'rm -f "$LOG"' EXIT
     exit 1
 }
 
-ACTUAL=$(grep -c 'w: ⚠️' "$LOG" || true)
+# Count only the SOURCE-SET WIRING classes this gate exists to police. Counting every
+# `w: ⚠️` made the budget HOST-DEPENDENT: Kotlin 2.4.20 emits
+#   "Native task 'iosX64Test' is disabled … architecture mismatch"
+# for every X64 native target on an ARM64 Mac, and a different set on a Linux runner.
+# Those say nothing about wiring and would make the gate flap between a dev machine and
+# CI — a gate that fails for reasons unrelated to the code is one people learn to ignore.
+SOURCE_SET_CLASSES='Invalid Source Set Dependency Across Trees|Unused Kotlin Source Sets|Missing .dependsOn. in Source Sets'
+ACTUAL=$(grep -E "w: ⚠️ ($SOURCE_SET_CLASSES)" "$LOG" | wc -l | tr -d ' ')
 
-echo "── KGP source-set warnings ──────────────────────────────"
-grep -oE 'w: ⚠️ [A-Za-z'"'"' ]+' "$LOG" | sort | uniq -c | sort -rn || true
+echo "── KGP source-set warnings (counted) ────────────────────"
+grep -oE "w: ⚠️ ($SOURCE_SET_CLASSES)" "$LOG" | sort | uniq -c | sort -rn || true
+echo "── other KGP warnings (NOT counted — host/env dependent) ─"
+grep -oE 'w: ⚠️ [A-Za-z'"'"' ]+' "$LOG" | grep -vE "($SOURCE_SET_CLASSES)" | sort | uniq -c | sort -rn || echo "  (none)"
 echo "─────────────────────────────────────────────────────────"
 echo "  actual: ${ACTUAL}   budget: ${KGP_WARNING_BUDGET}"
 

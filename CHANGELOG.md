@@ -7,7 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Kotlin 2.3.21 → 2.4.20** (`gradle/libs.versions.toml`). Full TestKit suite, Spotless,
+  Detekt and the 100% Kover floor all pass unchanged.
+  - The plugin still COMPILES against `languageVersion`/`apiVersion` **2.0**
+    (`build-logic/flavor-plugin/build.gradle.kts`) so its metadata stays readable by
+    consumers on Gradle <9.5, whose embedded `kotlin-dsl` compiler is Kotlin 2.0.x. Bumping
+    the toolchain and raising that floor are separate decisions; only the former happened.
+  - The supported floor is unchanged — **Kotlin 2.3.21+**. The CI matrix now exercises BOTH
+    the floor (2.3.21 / CMP 1.10.3) and the current line (2.4.20 / CMP 1.12.0), in
+    `gradle/kgp-matrix.toml` and both matrix jobs of `multi-kgp-matrix.yml`.
+
 ### Fixed
+
+- **`gradle/kgp-matrix.toml` documented a propagation that never existed.** Its header said
+  "the workflow reads from this TOML, so a single edit propagates the new pin through CI" —
+  but `multi-kgp-matrix.yml` hardcodes its `matrix` arrays and parses nothing. Adding a KGP
+  row is a manual lock-step edit of both files, and of BOTH matrix jobs in that workflow
+  (`matrix-build` and `sample-build-matrix` — the second was still pinned to a single row).
+  Corrected the header to describe reality.
+
+- **The KGP warning budget gate counted host-dependent warnings.** It matched every
+  `w: ⚠️`, so Kotlin 2.4.20's new
+  `Native task 'iosX64Test' is disabled … architecture mismatch` warnings — one per X64
+  native target on an ARM64 Mac, and a different set on a Linux runner — pushed the count
+  from 7 to 12 and failed the gate for reasons unrelated to any wiring change. It now counts
+  only the source-set classes it exists to police, and prints the excluded environmental
+  ones separately. Re-proved non-vacuous: reintroducing a cross-tree `dependsOn` still fails it.
+
 
 - **The v2.9.0 SPM default no longer warns at modules that never asked for it.** Flipping
   `spm.generateManifest` to default `true` gated only on "module declares an iOS target" —
