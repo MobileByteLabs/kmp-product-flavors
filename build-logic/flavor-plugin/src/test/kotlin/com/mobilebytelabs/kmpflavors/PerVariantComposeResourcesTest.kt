@@ -149,9 +149,9 @@ class PerVariantComposeResourcesTest {
         buildFile.writeText(
             """
             plugins {
-                kotlin("multiplatform") version "2.3.0"
-                id("org.jetbrains.compose") version "1.10.3"
-                id("org.jetbrains.kotlin.plugin.compose") version "2.3.0"
+                kotlin("multiplatform") version "${TestToolchainVersions.kgp}"
+                id("org.jetbrains.compose") version "${TestToolchainVersions.cmp}"
+                id("org.jetbrains.kotlin.plugin.compose") version "${TestToolchainVersions.kgp}"
                 id("io.github.mobilebytelabs.kmp-product-flavors")
             }
             kotlin {

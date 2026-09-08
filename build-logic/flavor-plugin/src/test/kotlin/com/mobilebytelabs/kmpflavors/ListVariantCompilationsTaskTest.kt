@@ -63,7 +63,7 @@ class ListVariantCompilationsTaskTest {
         buildFile.writeText(
             """
             plugins {
-                kotlin("multiplatform") version "2.2.21"
+                kotlin("multiplatform") version "${TestToolchainVersions.kgp}"
                 id("io.github.mobilebytelabs.kmp-product-flavors")
             }
             kotlin {
@@ -151,7 +151,7 @@ class ListVariantCompilationsTaskTest {
         buildFile.writeText(
             """
             plugins {
-                kotlin("jvm") version "2.2.21"
+                kotlin("jvm") version "${TestToolchainVersions.kgp}"
                 id("io.github.mobilebytelabs.kmp-product-flavors")
             }
             kmpFlavors {

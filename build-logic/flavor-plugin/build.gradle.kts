@@ -138,8 +138,39 @@ mavenPublishing {
     }
 }
 
+// CMP pin read straight from gradle/libs.versions.toml — the version-catalog accessor for a
+// dashed alias is awkward here, and this keeps the fallback in lock-step with the TOML.
+val cmpVersionFromToml: String =
+    rootProject
+        .file("../gradle/libs.versions.toml") // build-logic is an included build; the catalog lives one level up
+        .readLines()
+        .firstOrNull { it.trimStart().startsWith("compose-multiplatform") }
+        ?.substringAfter('=')
+        ?.trim()
+        ?.trim('"')
+        ?: error("compose-multiplatform not set in gradle/libs.versions.toml")
+
 tasks.test {
     useJUnitPlatform()
+
+    // Forward the KGP/CMP pins into the TestKit fixtures.
+    //
+    // `.github/workflows/multi-kgp-matrix.yml` passes a version per matrix row as
+    // `-Pkmpflavor.test.kgp.version` (and as the KMPF_TEST_KGP_VERSION env var), but nothing
+    // consumed either: every fixture hardcoded its own `kotlin("multiplatform") version`, so
+    // ALL rows of the "multi-KGP" matrix compiled the same Kotlin version. The matrix was
+    // green because it was vacuous. This is the missing link — see TestToolchainVersions.
+    //
+    // Falls back to the project's own libs.versions.toml pin so a plain `test` run exercises
+    // the version this repo actually builds against.
+    systemProperty(
+        "kmpflavor.test.kgp.version",
+        providers.gradleProperty("kmpflavor.test.kgp.version").getOrElse(libs.versions.kotlin.get()),
+    )
+    systemProperty(
+        "kmpflavor.test.cmp.version",
+        providers.gradleProperty("kmpflavor.test.cmp.version").getOrElse(cmpVersionFromToml),
+    )
 }
 
 tasks.withType<Sign>().configureEach {

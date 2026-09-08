@@ -67,7 +67,7 @@ class PerVariantNativePublishingTest {
         buildFile.writeText(
             """
             plugins {
-                kotlin("multiplatform") version "2.2.21"
+                kotlin("multiplatform") version "${TestToolchainVersions.kgp}"
                 `maven-publish`
                 id("io.github.mobilebytelabs.kmp-product-flavors")
             }
@@ -115,7 +115,7 @@ class PerVariantNativePublishingTest {
         buildFile.writeText(
             """
             plugins {
-                kotlin("multiplatform") version "2.2.21"
+                kotlin("multiplatform") version "${TestToolchainVersions.kgp}"
                 `maven-publish`
                 id("io.github.mobilebytelabs.kmp-product-flavors")
             }
@@ -159,7 +159,7 @@ class PerVariantNativePublishingTest {
             """
             import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
             plugins {
-                kotlin("multiplatform") version "2.2.21"
+                kotlin("multiplatform") version "${TestToolchainVersions.kgp}"
                 `maven-publish`
                 id("io.github.mobilebytelabs.kmp-product-flavors")
             }
@@ -199,7 +199,7 @@ class PerVariantNativePublishingTest {
         buildFile.writeText(
             """
             plugins {
-                kotlin("multiplatform") version "2.2.21"
+                kotlin("multiplatform") version "${TestToolchainVersions.kgp}"
                 `maven-publish`
                 id("io.github.mobilebytelabs.kmp-product-flavors")
             }

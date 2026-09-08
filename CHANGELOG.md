@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Kotlin 2.3.21 → 2.4.20**, and dependency pins refreshed to current:
+
+  | pin | from | to |
+  |---|---|---|
+  | kotlin | 2.3.21 | **2.4.20** |
+  | agp | 9.2.1 | **9.3.2** |
+  | compose-multiplatform | 1.10.3 | **1.12.0** |
+  | spotless | 7.0.3 | **8.10.2** |
+  | coroutines | 1.10.2 | **1.11.0** |
+  | mockk | 1.13.16 | **1.14.11** |
+  | kover | 0.9.1 | **0.9.9** |
+  | vanniktech-maven-publish | 0.36.0 | **0.37.0** |
+  | pitest-junit5 | 1.2.1 | **1.2.3** |
+  | androidx-activityCompose | 1.12.2 | **1.13.0** |
+
+  `detekt` (1.23.8) and `ktlint` (1.8.0) were already current. `pitest` stays at
+  `1.19.0-rc.1`: that id resolves from the Gradle Plugin Portal, which is AHEAD of the
+  1.15.0 that Maven Central mirrors — "updating" it is a downgrade to a version that does
+  not exist for that plugin id.
+
+  **AGP is capped at 9.3.2, not the latest 9.4.0**: AGP 9.4.0 requires Gradle 9.6.0, and
+  `Gradle 9.5.1+` is a documented CONSUMER floor. Raising it is a policy decision, not a
+  routine refresh, so it is left alone deliberately.
+
+  The plugin still compiles against `languageVersion`/`apiVersion` **2.0** so its metadata
+  stays readable by consumers on Gradle <9.5. The supported floor remains **Kotlin 2.3.21+**,
+  now genuinely exercised — see the matrix fix below.
+
+
 ### Fixed
 
 - **The v2.9.0 SPM default no longer warns at modules that never asked for it.** Flipping

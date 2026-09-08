@@ -56,7 +56,7 @@ class PerVariantPublishingTest {
         File(testProjectDir, "build.gradle.kts").writeText(
             """
             plugins {
-                kotlin("multiplatform") version "2.2.21"
+                kotlin("multiplatform") version "${TestToolchainVersions.kgp}"
                 id("io.github.mobilebytelabs.kmp-product-flavors")
                 `maven-publish`
             }
@@ -107,7 +107,7 @@ class PerVariantPublishingTest {
         File(testProjectDir, "build.gradle.kts").writeText(
             """
             plugins {
-                kotlin("multiplatform") version "2.2.21"
+                kotlin("multiplatform") version "${TestToolchainVersions.kgp}"
                 id("io.github.mobilebytelabs.kmp-product-flavors")
                 `maven-publish`
             }
