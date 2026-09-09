@@ -1,30 +1,36 @@
 [versions]
 # Core Dependencies (aligned with kmp-project-template)
-agp = "9.2.1"
-kotlin = "2.3.21"
-compose-multiplatform = "1.10.3"
+agp = "9.4.0"
+kotlin = "2.4.20"
+compose-multiplatform = "1.12.0"
 android-minSdk = "24"
 android-compileSdk = "36"
 android-targetSdk = "36"
-vanniktechMavenPublish = "0.36.0"
+vanniktechMavenPublish = "0.37.0"
 
 # Code Quality (aligned with kmp-project-template)
 detekt = "1.23.8"
-spotless = "7.0.3"
+spotless = "8.10.2"
 ktlint = "1.8.0"
 
 # Testing
 junit = "4.13.2"
-coroutines = "1.10.2"
-mockk = "1.13.16"
+coroutines = "1.11.0"
+mockk = "1.14.11"
 
 # v2.6 Phase 1 — coverage gate + mutation testing baseline
-kover = "0.9.1"
-pitest = "1.19.0-rc.1"
-pitestJunit5 = "1.2.1"
+kover = "0.9.9"
+# Resolved by plugin ID from the Gradle Plugin Portal (settings.gradle.kts:22), so check
+# versions at https://plugins.gradle.org/plugin/info.solidsoft.pitest — NOT Maven Central.
+# Central holds two decoys: `org.pitest:pitest` is the ENGINE (currently 1.30.x, a different
+# artifact — pinning it here fails with "plugin not found"), and the mirrored
+# `info.solidsoft.gradle.pitest:gradle-pitest-plugin` lags at 1.15.0, which makes the real
+# version look older than it is.
+pitest = "1.19.0"
+pitestJunit5 = "1.2.3"
 
 # AndroidX (aligned with kmp-project-template)
-androidx-activityCompose = "1.12.2"
+androidx-activityCompose = "1.13.0"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }

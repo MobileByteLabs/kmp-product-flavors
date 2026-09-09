@@ -3,13 +3,19 @@
 # Version pins for the nightly multi-kgp-matrix.yml workflow that runs the
 # plugin's TestKit suite against multiple Kotlin Gradle Plugin versions.
 #
-# v2.8 raised the floor to AGP 9.2.1+ / Gradle 9.5.1+ / Kotlin 2.3.21+ per
-# the AGP 9.2.1+ floor policy. Pre-v2.8 KGP rows (2.1.x, 2.2.x) and
-# Gradle 9.0 are below the floor and were dropped.
+# v2.10 raises the floor to AGP 9.4.0 / Gradle 9.6.0+ / Kotlin 2.3.21+.
 #
-# As new KGP minors ship on the 2.3.x line (and 2.4 when released), add rows
-# here — the workflow reads from this TOML, so a single edit propagates the
-# new pin through CI.
+# Why Gradle moved: AGP 9.4.0 refuses to apply below Gradle 9.6.0
+# ("Minimum supported Gradle version is 9.6.0"). The project builds and tests on
+# 9.7.1 (current). The previous 9.5.1 floor is no longer exercised by CI, and an
+# unexercised floor is a claim, not a guarantee — so it is not advertised.
+#
+# As new KGP minors ship, add rows here AND to `.github/workflows/multi-kgp-matrix.yml`.
+#
+# NOTE: the workflow does NOT parse this file — its `matrix.kgp-version` array is
+# hardcoded. This TOML is the documented source of truth, but propagation is a
+# manual lock-step edit of both files. (The header previously claimed a single
+# edit propagated automatically; it never did.)
 #
 # Schema:
 #   - versions — array of KGP version strings the workflow exercises.
@@ -20,9 +26,15 @@
 #     specific compat constraints; pinning per-row avoids muddying signal).
 
 [matrix]
-gradle-version = "9.5.1"
+gradle-version = "9.7.1"
 
 [[matrix.kgp]]
 version = "2.3.21"
-# CMP 1.10.3 tracks Kotlin 2.3.21 — the v2.8 floor line.
+# CMP 1.10.3 tracks Kotlin 2.3.21 — the v2.8 floor line. Kept as the FLOOR row:
+# the plugin supports a range, so the oldest supported KGP must stay exercised.
 compose-multiplatform = "1.10.3"
+
+[[matrix.kgp]]
+version = "2.4.20"
+# The current Kotlin line (the version the plugin itself builds against).
+compose-multiplatform = "1.12.0"

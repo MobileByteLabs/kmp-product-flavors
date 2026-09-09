@@ -1033,7 +1033,8 @@ class KmpFlavorPlugin : Plugin<Project> {
         val hasIosTarget = nonAndroidTargets.any {
             it.name in com.mobilebytelabs.kmpflavors.internal.SpmXcframeworkResolver.IOS_TARGET_NAMES
         }
-        if (extension.spm.generateManifest.get() && hasIosTarget) {
+        // Unset => AUTO (effective default ON). See SpmConfig.generateManifest.
+        if (extension.spm.generateManifest.getOrElse(true) && hasIosTarget) {
             if (matrixModeEnabled) {
                 for (variant in allVariants) {
                     registerSpmTaskForVariant(project, extension, variant)
@@ -1620,10 +1621,16 @@ class KmpFlavorPlugin : Plugin<Project> {
                 project.tasks.named(manifestTaskName).configure {
                     onlyIf { false }
                 }
-                project.logger.warn(
-                    com.mobilebytelabs.kmpflavors.internal.SpmXcframeworkResolver
-                        .missingProducerMessage(name, variant.name),
-                )
+                // Only the consumer who ASKED for SPM gets a warning. On the AUTO default a
+                // klib-publishing library module is silently skipped — warning there is noise
+                // about a feature nobody requested, and it multiplies by variant × module.
+                val message = com.mobilebytelabs.kmpflavors.internal.SpmXcframeworkResolver
+                    .missingProducerMessage(name, variant.name)
+                if (extension.spm.generateManifest.orNull == true) {
+                    project.logger.warn(message)
+                } else {
+                    project.logger.info(message)
+                }
                 return@afterEvaluate
             }
 

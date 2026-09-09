@@ -21,10 +21,14 @@ class SpmConfigTest {
     private fun newConfig(): SpmConfig = ProjectBuilder.builder().build().objects.newInstance(SpmConfig::class.java)
 
     @Test
-    fun `generateManifest convention is true — SPM is the default iOS distribution path`() {
-        // v2.9: SPM is on by default. CocoaPods was never the default and stays opt-in;
-        // before v2.9 NEITHER was on, so "SPM by default" was only true on paper.
-        assertTrue(newConfig().generateManifest.get())
+    fun `generateManifest is UNSET by default so AUTO is distinguishable from an opt-in`() {
+        // v2.9.2: the effective default is still ON, but it is resolved as `orNull ?: true`
+        // rather than a Gradle convention. A convention would make `orNull` return `true`
+        // for BOTH the default and an explicit `spm { generateManifest.set(true) }`, and the
+        // plugin must tell them apart: an explicit opt-in with no XCFramework producer earns
+        // a warning, the silent default does not (SpmAutoDefaultQuietTest).
+        assertFalse(newConfig().generateManifest.isPresent)
+        assertTrue(newConfig().generateManifest.getOrElse(true))
     }
 
     @Test

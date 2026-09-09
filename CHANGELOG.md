@@ -7,6 +7,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Kotlin 2.3.21 → 2.4.20**, and dependency pins refreshed to current:
+
+  | pin | from | to |
+  |---|---|---|
+  | kotlin | 2.3.21 | **2.4.20** |
+  | agp | 9.2.1 | **9.4.0** |
+  | compose-multiplatform | 1.10.3 | **1.12.0** |
+  | spotless | 7.0.3 | **8.10.2** |
+  | coroutines | 1.10.2 | **1.11.0** |
+  | mockk | 1.13.16 | **1.14.11** |
+  | kover | 0.9.1 | **0.9.9** |
+  | vanniktech-maven-publish | 0.36.0 | **0.37.0** |
+  | pitest-junit5 | 1.2.1 | **1.2.3** |
+  | androidx-activityCompose | 1.12.2 | **1.13.0** |
+
+  `detekt` (1.23.8) and `ktlint` (1.8.0) were already current. **`pitest` 1.19.0-rc.1 →
+  1.19.0** (release candidate → GA): its version must be read from the Gradle Plugin Portal
+  marker artifact, which is ahead of the 1.15.0 that Maven Central mirrors — reading Central
+  suggests a "newer" 1.30.0 that belongs to the pitest ENGINE, not this plugin id, and
+  pinning it breaks the build.
+
+  | gradle wrapper | 9.5.1 | **9.7.1** |
+  | pitest | 1.19.0-rc.1 | **1.19.0** (GA) |
+
+  **Toolchain floor raised — this is a BREAKING support change.** AGP is now **9.4.0** and
+  the Gradle wrapper **9.7.1**, because AGP 9.4.0 refuses to apply below Gradle 9.6.0. The
+  supported floor moves from `AGP 9.2.1 / Gradle 9.5.1` to **`AGP 9.4.0 / Gradle 9.6.0+`**,
+  and README badges, the requirements table and `docs/AGP_SUPPORT.md` were updated to match.
+
+  The floor is a claim about what CI EXERCISES, so it moved with the tooling rather than
+  being left behind: continuing to advertise `Gradle 9.5.1+` while no job runs it would be
+  the same vacuous-green problem as the KGP matrix below. Note the plugin artifact itself
+  does not depend on AGP (it is applied only by the root build and samples, to exercise the
+  AGP bridge), so consumers on older AGP may well still work — they are simply no longer
+  tested, and therefore no longer claimed.
+
+  Also fixed: `project-isolation-check.yml` pinned Gradle **9.0** under a step labelled
+  "Setup Gradle (latest)" — stale drift that would now fail outright, since that job builds
+  a sample which applies AGP.
+
+  The plugin still compiles against `languageVersion`/`apiVersion` **2.0** so its metadata
+  stays readable by consumers on Gradle <9.5. The supported floor remains **Kotlin 2.3.21+**,
+  now genuinely exercised — see the matrix fix below.
+
+
+### Fixed
+
+- **The v2.9.0 SPM default no longer warns at modules that never asked for it.** Flipping
+  `spm.generateManifest` to default `true` gated only on "module declares an iOS target" —
+  which is every KMP LIBRARY module too. Those publish klibs and never aggregate an
+  XCFramework, so each hit the no-producer path and emitted a `logger.warn` **per variant**:
+  a 6-variant matrix across a handful of library modules becomes dozens of warnings for a
+  feature the consumer never requested. Real consumers apply the flavor convention across
+  their whole module graph, so this scaled badly.
+
+  `generateManifest` is now tri-state — UNSET means **AUTO** (generate when a producer
+  exists, otherwise skip in silence at info level), `true` means an explicit opt-in that
+  still WARNS when no producer is found (the consumer asked for a manifest and needs to know
+  why none appeared), `false` is off. The effective default is unchanged — SPM is still on —
+  but it is resolved as `orNull ?: true` rather than a Gradle convention, because a
+  convention makes an explicit `true` indistinguishable from the default.
+  Guarded by `SpmAutoDefaultQuietTest`.
+
+
 ### Added
 
 - **End-to-end Swift Package Manager support — SPM is now the DEFAULT iOS distribution path.**

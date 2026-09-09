@@ -29,10 +29,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Pinned KGP versions. Source of truth: gradle/kgp-matrix.toml. Update
-        # in lock-step with the TOML when adding a new KGP minor.
-        kgp-version: ['2.3.21']
-        compose-multiplatform: ['1.10.3']
+        # Pinned KGP versions. Documented source of truth: gradle/kgp-matrix.toml —
+        # but this array is NOT parsed from it, so adding a KGP minor is a manual
+        # lock-step edit of BOTH files (and of every matrix job in this workflow).
+        # 2.3.21 = supported floor, 2.4.20 = current line.
+        include:
+          - kgp-version: '2.3.21'
+            compose-multiplatform: '1.10.3'
+          - kgp-version: '2.4.20'
+            compose-multiplatform: '1.12.0'
 
     steps:
       - uses: actions/checkout@v4
@@ -49,10 +54,10 @@ jobs:
           distribution: zulu
           java-version: '21'
 
-      - name: Setup Gradle 9.5.1
+      - name: Setup Gradle 9.7.1
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '9.5.1'
+          gradle-version: '9.7.1'
 
       - name: Run plugin TestKit against KGP ${{ matrix.kgp-version }} / CMP ${{ matrix.compose-multiplatform }}
         env:
@@ -88,8 +93,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        kgp-version: ['2.3.21']
-        compose-multiplatform: ['1.10.3']
+        # Lock-step with the matrix above and gradle/kgp-matrix.toml.
+        include:
+          - kgp-version: '2.3.21'
+            compose-multiplatform: '1.10.3'
+          - kgp-version: '2.4.20'
+            compose-multiplatform: '1.12.0'
 
     steps:
       - uses: actions/checkout@v4
@@ -106,10 +115,10 @@ jobs:
           distribution: zulu
           java-version: '21'
 
-      - name: Setup Gradle 9.5.1
+      - name: Setup Gradle 9.7.1
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '9.5.1'
+          gradle-version: '9.7.1'
 
       - name: Pin Kotlin version in libs.versions.toml to the matrix row
         run: |

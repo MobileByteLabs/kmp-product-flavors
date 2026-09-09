@@ -79,7 +79,19 @@ enum class SpmChecksumStrategy { AUTO, REQUIRE_FILE, SKIP }
 abstract class SpmConfig @Inject constructor() {
 
     /**
-     * Master switch — when false (the default), no SPM manifest task is registered.
+     * Master switch, tri-state by design:
+     *
+     * | value    | meaning |
+     * |----------|---------|
+     * | UNSET    | **AUTO (the default).** Generate when this module actually produces an XCFramework; otherwise skip in SILENCE. |
+     * | `true`   | **Explicit opt-in.** Generate, and WARN if no XCFramework producer can be found — the consumer asked for a manifest and needs to know why none appeared. |
+     * | `false`  | Off entirely. |
+     *
+     * The tri-state exists so the v2.9 default-on flip cannot spam consumers. Defaulting to
+     * `true` and gating only on "module has an iOS target" also matches every KMP LIBRARY
+     * module, which publishes klibs and never aggregates an XCFramework — each one then hit
+     * the no-producer path and warned once PER VARIANT, for a feature nobody requested.
+     * Distinguishing "asked for" from "defaulted into" is what keeps the default quiet.
      */
     abstract val generateManifest: Property<Boolean>
 
@@ -164,7 +176,10 @@ abstract class SpmConfig @Inject constructor() {
         // "SPM only" stance in docs/IOS_DISTRIBUTION.md was therefore aspirational rather
         // than the shipped default. Registration is still skipped entirely for projects with
         // no iOS target, so non-Apple consumers see no new tasks.
-        generateManifest.convention(true)
+        //
+        // NOTE: deliberately NO `.convention(true)` — an unset value must stay
+        // distinguishable from an explicit `true` (see the [generateManifest] table). The
+        // effective default is still ON; it is resolved as `orNull ?: true` at the call site.
         xcframeworkName.convention("Shared")
         distribution.convention(SpmDistribution.LOCAL)
         checksumStrategy.convention(SpmChecksumStrategy.AUTO)

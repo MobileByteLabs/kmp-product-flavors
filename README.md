@@ -1,7 +1,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Kotlin-2.3.21+-7F52FF?logo=kotlin&logoColor=white" alt="Kotlin">
-  <img src="https://img.shields.io/badge/Gradle-9.5.1+-02303A?logo=gradle&logoColor=white" alt="Gradle">
-  <img src="https://img.shields.io/badge/AGP-9.2.1+-3DDC84?logo=android&logoColor=white" alt="AGP">
+  <img src="https://img.shields.io/badge/Gradle-9.6.0+-02303A?logo=gradle&logoColor=white" alt="Gradle">
+  <img src="https://img.shields.io/badge/AGP-9.4.0+-3DDC84?logo=android&logoColor=white" alt="AGP">
 </p>
 
 # KMP Product Flavors
@@ -73,7 +73,7 @@ Curated index: **[`docs/README.md`](docs/README.md)**. Most-visited:
 | [`docs/MATRIX_MODE.md`](docs/MATRIX_MODE.md) | Per-variant compilation matrix |
 | [`docs/PUBLISHING.md`](docs/PUBLISHING.md) | Maven Central, XCFramework, SPM, npm, Snapshots |
 | [`docs/ERROR_CODES.md`](docs/ERROR_CODES.md) | `KMPF-V<NN>` catalogue |
-| [`docs/AGP_SUPPORT.md`](docs/AGP_SUPPORT.md) | AGP 9.2.1+ floor contract |
+| [`docs/AGP_SUPPORT.md`](docs/AGP_SUPPORT.md) | AGP 9.4.0+ floor contract |
 | [`docs/LEARNINGS.md`](docs/LEARNINGS.md) | Locked architectural learnings L1–L6 |
 | [`CHANGELOG.md`](CHANGELOG.md) | What's new per release |
 
@@ -92,8 +92,8 @@ Curated index: **[`docs/README.md`](docs/README.md)**. Most-visited:
 
 | Tool | v2.8.0+ floor |
 |---|---|
-| Android Gradle Plugin | **9.2.1+** |
-| Gradle wrapper | **9.5.1+** |
+| Android Gradle Plugin | **9.4.0+** |
+| Gradle wrapper | **9.6.0+** |
 | Kotlin | **2.3.21+** |
 | Compose Multiplatform | **1.10.3+** |
 | JVM toolchain | **17+** |

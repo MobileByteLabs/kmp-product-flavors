@@ -10,6 +10,7 @@
 
 package com.mobilebytelabs.kmpflavors.internal
 
+import com.mobilebytelabs.kmpflavors.TestToolchainVersions
 import org.gradle.testkit.runner.GradleRunner
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -48,7 +49,7 @@ class NetworkDslRegressionTest {
         File(testProjectDir, "build.gradle.kts").writeText(
             """
             plugins {
-                kotlin("multiplatform") version "2.2.21"
+                kotlin("multiplatform") version "${TestToolchainVersions.kgp}"
                 id("io.github.mobilebytelabs.kmp-product-flavors")
             }
             kmpFlavors {

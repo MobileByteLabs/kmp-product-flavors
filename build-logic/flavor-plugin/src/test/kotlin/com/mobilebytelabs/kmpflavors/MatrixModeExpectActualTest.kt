@@ -72,7 +72,7 @@ class MatrixModeExpectActualTest {
         File(projectDir, "build.gradle.kts").writeText(
             """
             plugins {
-                kotlin("multiplatform") version "2.2.21"
+                kotlin("multiplatform") version "${TestToolchainVersions.kgp}"
                 id("io.github.mobilebytelabs.kmp-product-flavors")
             }
             kmpFlavors {
@@ -136,7 +136,7 @@ class MatrixModeExpectActualTest {
         File(projectDir, "build.gradle.kts").writeText(
             """
             plugins {
-                kotlin("multiplatform") version "2.2.21"
+                kotlin("multiplatform") version "${TestToolchainVersions.kgp}"
                 id("io.github.mobilebytelabs.kmp-product-flavors")
             }
             kmpFlavors {
