@@ -9,6 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Consumer metadata pin raised: `KOTLIN_2_0` → `KOTLIN_2_3`.** The plugin's
+  `languageVersion`/`apiVersion` cap exists so a consumer's embedded `kotlin-dsl` compiler
+  can read our published class metadata when they apply the plugin from a `.gradle.kts`
+  file. Its comment claimed Gradle <9.5 ships a "Kotlin 2.0.x" kotlin-dsl compiler — that
+  was the **Gradle 8.x** era, not anything we support. Measured:
+
+  | Gradle | embedded kotlin-dsl |
+  |---|---|
+  | 9.5.1 (previous floor) | 2.3.20 |
+  | 9.6.0 (current floor) | 2.3.21 |
+  | 9.7.1 (we build on) | 2.4.0 |
+
+  The cap therefore sat three minors below what any supported consumer could read, limiting
+  the plugin's own language features for no benefit. The rule is now stated explicitly at
+  the pin: **match the embedded Kotlin of the MINIMUM SUPPORTED GRADLE** (verify with
+  `./gradlew -v` on that version), which is a different axis from `libs.versions.kotlin`.
+
+  Verified end-to-end, not by inspection: published to `mavenLocal` and applied from a real
+  **Gradle 9.6.0** build (kotlin-dsl 2.3.21) — plugin loads, `KmpFlavorExtension` metadata
+  resolves, flavors configure. An **unpinned** build (metadata 2.4) was also measured and
+  also loads today, but only because a 2.3.21 compiler tolerates metadata one minor ahead;
+  that tolerance disappears the moment `kotlin` reaches 2.5 while the floor stays 9.6.0,
+  which is why an explicit pin is kept rather than deleted.
+
+  **Consumer impact:** builds on Gradle 9.5.1 or older, which the 2.0 cap happened to keep
+  working, will now fail with an incompatible-metadata error. That matches the AGP 9.4.0 /
+  Gradle 9.6.0+ floor declared in 2.10.0.
+
+## [2.10.0] — 2026-09-09
+
+### Changed
+
 - **Kotlin 2.3.21 → 2.4.20**, and dependency pins refreshed to current:
 
   | pin | from | to |
@@ -49,9 +81,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "Setup Gradle (latest)" — stale drift that would now fail outright, since that job builds
   a sample which applies AGP.
 
-  The plugin still compiles against `languageVersion`/`apiVersion` **2.0** so its metadata
-  stays readable by consumers on Gradle <9.5. The supported floor remains **Kotlin 2.3.21+**,
-  now genuinely exercised — see the matrix fix below.
+  The plugin still compiles against `languageVersion`/`apiVersion` **2.0** for consumer
+  build-script metadata compatibility. (That cap is revisited below — its stated rationale
+  turned out to be wrong.) The supported floor remains **Kotlin 2.3.21+**, now genuinely
+  exercised — see the matrix fix below.
 
 
 ### Fixed
@@ -72,6 +105,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   convention makes an explicit `true` indistinguishable from the default.
   Guarded by `SpmAutoDefaultQuietTest`.
 
+
+## [2.9.0] – [2.9.1] — 2026-09-07
+
+> Both tags were cut from this body of work about an hour apart (2.9.0 from the SwiftPM
+> PR, 2.9.1 from the source-set PR) and were never stamped separately at release time.
+> The entries below interleave the two, so they are recorded under a combined heading
+> rather than split on boundaries that cannot now be reconstructed reliably.
 
 ### Added
 
