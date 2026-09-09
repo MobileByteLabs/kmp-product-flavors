@@ -20,6 +20,12 @@ mockk = "1.14.11"
 
 # v2.6 Phase 1 — coverage gate + mutation testing baseline
 kover = "0.9.9"
+# Resolved by plugin ID from the Gradle Plugin Portal (settings.gradle.kts:22), so check
+# versions at https://plugins.gradle.org/plugin/info.solidsoft.pitest — NOT Maven Central.
+# Central holds two decoys: `org.pitest:pitest` is the ENGINE (currently 1.30.x, a different
+# artifact — pinning it here fails with "plugin not found"), and the mirrored
+# `info.solidsoft.gradle.pitest:gradle-pitest-plugin` lags at 1.15.0, which makes the real
+# version look older than it is.
 pitest = "1.19.0"
 pitestJunit5 = "1.2.3"
 
