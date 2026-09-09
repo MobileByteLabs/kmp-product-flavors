@@ -46,16 +46,40 @@ java {
 kotlin {
     jvmToolchain(17)
 
-    // Compile against Kotlin 2.0 language/api so the output metadata is readable by
-    // consumers using Gradle <9.5 (whose embedded `kotlin-dsl` compiler is Kotlin 2.0.x).
-    // Without this, the plugin's metadata 2.2 cannot be read and consumers see:
+    // Metadata compatibility for CONSUMERS' build scripts.
+    //
+    // A consumer applies this plugin from a `.gradle.kts` file, so THEIR embedded
+    // `kotlin-dsl` compiler has to read our published class metadata. Compiling with a
+    // newer language/api than that compiler understands produces:
     //   "Class 'KmpFlavorExtension' was compiled with an incompatible version of Kotlin.
-    //    The actual metadata version is 2.2.0, but the compiler version 2.0.0 can read
-    //    versions up to 2.1.0."
-    // No source-level features depend on Kotlin 2.1+ so this is purely metadata-level.
+    //    The actual metadata version is X, but the compiler version Y can read versions
+    //    up to Z."
+    //
+    // THE RULE: pin to the embedded Kotlin of the MINIMUM SUPPORTED GRADLE — not to the
+    // Kotlin we build with (`libs.versions.kotlin`, currently 2.4.20), which is a
+    // different axis entirely (that one is about consumers' KMP source, not their build
+    // scripts).
+    //
+    //   Gradle 9.6.0 (our floor) embeds kotlin-dsl 2.3.21   → KOTLIN_2_3
+    //   Gradle 9.7.1 (what we build on) embeds        2.4.0
+    //
+    // Verify with `./gradlew -v` on the floor version before changing this.
+    //
+    // Why pin at all, rather than just deleting this block? Measured on 2026-09-09: an
+    // UNPINNED build (metadata 2.4) also loads fine on Gradle 9.6.0, because a 2.3.21
+    // compiler tolerates metadata one minor ahead. That tolerance is the only thing making
+    // it work — the moment `libs.versions.kotlin` reaches 2.5 while the floor stays 9.6.0,
+    // an unpinned build breaks for every consumer. Pinning to the floor's own compiler
+    // version depends on no tolerance at all.
+    //
+    // History: this was pinned to KOTLIN_2_0 with a comment claiming Gradle <9.5 shipped a
+    // "Kotlin 2.0.x" kotlin-dsl compiler. That was true in the Gradle 8.x era but not for
+    // any Gradle we support — 9.5.1 already embedded 2.3.20 — so the pin sat three minors
+    // below what consumers could actually read, capping our own language features for no
+    // benefit.
     compilerOptions {
-        languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0)
-        apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0)
+        languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_3)
+        apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_3)
     }
 }
 
